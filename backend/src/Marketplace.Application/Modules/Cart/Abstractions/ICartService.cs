@@ -31,6 +31,8 @@ public interface IWishlistService
     Task<Result> ClearAsync(CancellationToken cancellationToken = default);
 }
 
+public sealed record AddWishlistItemRequest(Guid ProductId);
+
 public sealed record WishlistItemResponse(
     Guid ProductId,
     string Name,
