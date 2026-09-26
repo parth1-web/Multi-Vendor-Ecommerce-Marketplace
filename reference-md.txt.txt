@@ -1,0 +1,3866 @@
+# 🚀 Multi-Vendor E-Commerce Marketplace
+## Complete Master Development & AI Coding Reference — Next.js Edition
+
+> **Project Type:** Production-Grade Multi-Vendor E-Commerce Marketplace  
+> **Architecture:** Clean Architecture + Modular Monolith  
+> **Backend:** ASP.NET Core 8 Web API  
+> **Frontend:** Next.js + TypeScript  
+> **Frontend Architecture:** Next.js App Router  
+> **Database:** PostgreSQL  
+> **ORM:** Entity Framework Core  
+> **Cache:** Redis  
+> **Real-Time:** SignalR  
+> **Authentication:** JWT + Refresh Tokens  
+> **Validation:** FluentValidation + Zod  
+> **Logging:** Serilog  
+> **Background Processing:** Hangfire / Background Services  
+> **Testing:** xUnit + Integration Testing  
+> **Charts:** Recharts  
+> **UI:** Bootstrap 5 + React-Bootstrap  
+> **State Management:** Zustand + TanStack Query  
+> **HTTP Client:** Axios  
+> **Forms:** React Hook Form + Zod  
+> **Icons:** Lucide React  
+> **DevOps:** Git + GitHub Actions  
+> **Containerization:** ❌ Not used  
+> **CSS Framework:** Bootstrap 5  
+> **CSS Utility Framework:** ❌ Tailwind not used
+
+---
+
+# 1. Project Vision
+
+The goal is to build a **production-grade multi-vendor e-commerce marketplace** similar in concept to large marketplace platforms such as Amazon or Daraz.
+
+Unlike a basic e-commerce application where products belong directly to one store, this system supports:
+
+- Multiple sellers
+- Multiple customers
+- Seller stores
+- Seller-specific products
+- Inventory management
+- Product variants
+- Product search
+- Category hierarchy
+- Shopping cart
+- Wishlist
+- Checkout
+- Multi-seller order splitting
+- Payments
+- Payment webhooks
+- Refunds
+- Seller commissions
+- Reviews
+- Coupons
+- Notifications
+- Real-time updates
+- Analytics
+- Admin management
+- Audit logs
+- Background processing
+- Redis caching
+- SEO-friendly storefront pages
+
+The project should demonstrate the ability to build a **large real-world business platform**, not simply a CRUD application.
+
+---
+
+# 2. Why Next.js
+
+The frontend is intentionally upgraded from a basic React/Vite architecture to **Next.js** because this marketplace contains many public pages where SEO, routing, metadata, performance, and scalable frontend organization matter.
+
+Next.js will be used for:
+
+```text
+Public marketplace pages
+Product pages
+Category pages
+Seller/store pages
+Search pages
+Customer dashboard
+Seller dashboard
+Admin dashboard
+Authentication pages
+SEO metadata
+Open Graph metadata
+Sitemap
+Robots configuration
+Image optimization
+Server-rendered/static public content where appropriate
+Client-side interactive features where required
+```
+
+The application should use the **Next.js App Router**.
+
+Do not treat Next.js as merely React with a different start command.
+
+Use Next.js features intentionally.
+
+---
+
+# 3. Frontend Rendering Strategy
+
+Use a hybrid rendering model.
+
+## Server Components
+
+Prefer Server Components for:
+
+```text
+Public homepage
+Product detail pages
+Category pages
+Seller/store pages
+Static informational pages
+SEO-sensitive content
+Initial product discovery
+```
+
+Benefits:
+
+```text
+Better SEO
+Smaller client JavaScript
+Better initial rendering
+Improved performance
+```
+
+---
+
+## Client Components
+
+Use Client Components only where interactivity requires them.
+
+Examples:
+
+```text
+Cart interactions
+Wishlist buttons
+Product quantity selectors
+Checkout forms
+Filters with client interaction
+Modals
+Dropdowns
+Notifications
+Real-time SignalR
+Zustand state
+React Hook Form
+Interactive charts
+```
+
+Use:
+
+```tsx
+"use client";
+```
+
+only when required.
+
+Do not make the entire application a Client Component unnecessarily.
+
+---
+
+# 4. Technology Stack
+
+## Backend
+
+```text
+C#
+.NET 8
+ASP.NET Core Web API
+Entity Framework Core
+PostgreSQL
+Redis
+SignalR
+JWT Bearer Authentication
+Refresh Tokens
+FluentValidation
+Serilog
+Swagger / OpenAPI
+Hangfire
+xUnit
+Moq
+Integration Testing
+```
+
+---
+
+## Frontend
+
+```text
+Next.js
+TypeScript
+React
+Next.js App Router
+Bootstrap 5
+React-Bootstrap
+TanStack Query
+Zustand
+Axios
+React Hook Form
+Zod
+Recharts
+Lucide React
+Microsoft SignalR Client
+```
+
+---
+
+## DevOps
+
+```text
+Git
+GitHub
+GitHub Actions
+Environment Variables
+CI/CD
+Cloud Deployment
+```
+
+---
+
+## Explicitly Not Used
+
+```text
+Docker ❌
+Docker Compose ❌
+Tailwind CSS ❌
+Material UI ❌
+Chakra UI ❌
+Ant Design ❌
+```
+
+---
+
+# 5. High-Level Architecture
+
+The backend remains a:
+
+> **Modular Monolith using Clean Architecture**
+
+The frontend becomes:
+
+> **Next.js App Router application using a hybrid Server Component / Client Component architecture**
+
+Architecture:
+
+```text
+Customer Browser
+        │
+        ▼
+┌───────────────────────────────┐
+│          Next.js              │
+│                               │
+│ App Router                    │
+│ Server Components             │
+│ Client Components             │
+│ Metadata / SEO                │
+│ Route Handlers where needed   │
+└───────────────┬───────────────┘
+                │
+         REST / SignalR
+                │
+                ▼
+┌───────────────────────────────┐
+│      ASP.NET Core Web API     │
+│                               │
+│ Controllers                   │
+│ Authentication                │
+│ Authorization                 │
+│ Middleware                    │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│       Application Layer       │
+│                               │
+│ Services / Use Cases          │
+│ DTOs                          │
+│ Validation                    │
+│ Business Rules                │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│          Domain               │
+│                               │
+│ Entities                      │
+│ Value Objects                 │
+│ Domain Events                 │
+│ Business Rules                │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│       Infrastructure          │
+│                               │
+│ EF Core                       │
+│ PostgreSQL                    │
+│ Redis                         │
+│ Payments                      │
+│ Background Jobs               │
+│ External Services             │
+└───────────────────────────────┘
+```
+
+---
+
+# 6. Repository Structure
+
+Recommended monorepo:
+
+```text
+MultiVendorMarketplace/
+
+├── backend/
+│   ├── Marketplace.sln
+│   │
+│   ├── src/
+│   │   ├── Marketplace.API/
+│   │   ├── Marketplace.Application/
+│   │   ├── Marketplace.Domain/
+│   │   └── Marketplace.Infrastructure/
+│   │
+│   └── tests/
+│       ├── Marketplace.UnitTests/
+│       └── Marketplace.IntegrationTests/
+│
+├── frontend/
+│   └── marketplace-web/
+│
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   ├── database/
+│   └── deployment/
+│
+├── .github/
+│   └── workflows/
+│
+└── README.md
+```
+
+---
+
+# 7. Backend Architecture
+
+## Domain
+
+Contains:
+
+```text
+Entities
+Value Objects
+Enums
+Domain Rules
+Domain Exceptions
+Domain Events
+```
+
+The Domain must not depend on:
+
+```text
+ASP.NET Core
+EF Core
+PostgreSQL
+Redis
+External APIs
+```
+
+---
+
+## Application
+
+Contains:
+
+```text
+Use Cases
+DTOs
+Interfaces
+Validators
+Business Services
+Mappings
+Commands
+Queries
+```
+
+---
+
+## Infrastructure
+
+Contains:
+
+```text
+EF Core
+DbContext
+Repositories
+PostgreSQL
+Redis
+JWT Services
+Email Services
+Payment Integrations
+File Storage
+Background Jobs
+External Services
+```
+
+---
+
+## API
+
+Contains:
+
+```text
+Controllers
+Middleware
+SignalR Hubs
+Authentication
+Authorization
+Dependency Injection
+Swagger
+Exception Handling
+Health Checks
+```
+
+---
+
+# 8. Next.js Frontend Structure
+
+Use the App Router.
+
+Recommended:
+
+```text
+frontend/
+└── marketplace-web/
+    │
+    ├── app/
+    │   ├── (public)/
+    │   │   ├── page.tsx
+    │   │   ├── products/
+    │   │   ├── categories/
+    │   │   └── stores/
+    │   │
+    │   ├── (auth)/
+    │   │   ├── login/
+    │   │   ├── register/
+    │   │   └── forgot-password/
+    │   │
+    │   ├── (customer)/
+    │   │   ├── dashboard/
+    │   │   ├── cart/
+    │   │   ├── checkout/
+    │   │   ├── orders/
+    │   │   ├── wishlist/
+    │   │   ├── profile/
+    │   │   ├── addresses/
+    │   │   └── notifications/
+    │   │
+    │   ├── (seller)/
+    │   │   └── seller/
+    │   │       ├── dashboard/
+    │   │       ├── products/
+    │   │       ├── inventory/
+    │   │       ├── orders/
+    │   │       ├── reviews/
+    │   │       ├── coupons/
+    │   │       ├── analytics/
+    │   │       ├── store/
+    │   │       └── settings/
+    │   │
+    │   ├── (admin)/
+    │   │   └── admin/
+    │   │       ├── dashboard/
+    │   │       ├── users/
+    │   │       ├── sellers/
+    │   │       ├── products/
+    │   │       ├── categories/
+    │   │       ├── orders/
+    │   │       ├── payments/
+    │   │       ├── refunds/
+    │   │       ├── coupons/
+    │   │       ├── commissions/
+    │   │       ├── reports/
+    │   │       ├── audit-logs/
+    │   │       └── settings/
+    │   │
+    │   ├── layout.tsx
+    │   ├── loading.tsx
+    │   ├── error.tsx
+    │   ├── not-found.tsx
+    │   ├── sitemap.ts
+    │   └── robots.ts
+    │
+    ├── components/
+    │   ├── ui/
+    │   ├── layout/
+    │   ├── products/
+    │   ├── cart/
+    │   ├── checkout/
+    │   ├── orders/
+    │   ├── seller/
+    │   ├── admin/
+    │   └── shared/
+    │
+    ├── features/
+    │   ├── auth/
+    │   ├── products/
+    │   ├── cart/
+    │   ├── orders/
+    │   ├── payments/
+    │   ├── sellers/
+    │   ├── reviews/
+    │   ├── coupons/
+    │   ├── notifications/
+    │   └── reports/
+    │
+    ├── api/
+    │   ├── axiosClient.ts
+    │   ├── authApi.ts
+    │   ├── productApi.ts
+    │   ├── categoryApi.ts
+    │   ├── cartApi.ts
+    │   ├── orderApi.ts
+    │   ├── paymentApi.ts
+    │   ├── sellerApi.ts
+    │   ├── reviewApi.ts
+    │   ├── couponApi.ts
+    │   ├── notificationApi.ts
+    │   └── reportApi.ts
+    │
+    ├── hooks/
+    ├── providers/
+    ├── store/
+    ├── types/
+    ├── schemas/
+    ├── utils/
+    ├── lib/
+    ├── styles/
+    ├── public/
+    └── package.json
+```
+
+---
+
+# 9. Next.js Route Groups
+
+Use route groups to organize the application without changing URLs.
+
+Example:
+
+```text
+app/
+├── (public)/
+├── (auth)/
+├── (customer)/
+├── (seller)/
+└── (admin)/
+```
+
+The parentheses are organizational and do not appear in URLs.
+
+---
+
+# 10. Next.js Layout Strategy
+
+Use nested layouts.
+
+Example:
+
+```text
+Root Layout
+    │
+    ├── Public Layout
+    │
+    ├── Auth Layout
+    │
+    ├── Customer Layout
+    │
+    ├── Seller Layout
+    │
+    └── Admin Layout
+```
+
+Each protected area can have its own:
+
+```text
+Navbar
+Sidebar
+Breadcrumbs
+Notifications
+User Menu
+Page Container
+```
+
+---
+
+# 11. Next.js Providers
+
+Create a centralized provider layer.
+
+Example:
+
+```text
+providers/
+├── AppProviders.tsx
+├── QueryProvider.tsx
+├── AuthProvider.tsx
+├── SignalRProvider.tsx
+└── ThemeProvider.tsx
+```
+
+Keep providers minimal.
+
+Do not turn the entire application into a client component unnecessarily.
+
+---
+
+# 12. TanStack Query in Next.js
+
+Use TanStack Query for server state.
+
+Examples:
+
+```text
+Products
+Categories
+Cart
+Orders
+Reviews
+Seller Data
+Notifications
+Reports
+```
+
+Server Components may fetch initial public data where appropriate.
+
+Client Components can use TanStack Query for:
+
+```text
+Interactive updates
+Mutations
+Client-side refetching
+Polling where necessary
+Real-time cache invalidation
+```
+
+---
+
+# 13. Zustand in Next.js
+
+Use Zustand for client-side state:
+
+```text
+Authentication UI state
+Theme
+Sidebar
+Modal state
+Temporary checkout UI state
+Wishlist UI state where appropriate
+```
+
+Do not use Zustand as the primary server-state store.
+
+---
+
+# 14. Axios Architecture
+
+Create:
+
+```text
+api/axiosClient.ts
+```
+
+Responsibilities:
+
+```text
+Base API URL
+Authorization
+Request configuration
+Error normalization
+Refresh-token handling
+```
+
+API modules:
+
+```text
+authApi.ts
+productApi.ts
+categoryApi.ts
+cartApi.ts
+orderApi.ts
+paymentApi.ts
+sellerApi.ts
+reviewApi.ts
+couponApi.ts
+notificationApi.ts
+reportApi.ts
+```
+
+---
+
+# 15. Important Next.js Authentication Rule
+
+Authentication must ultimately be enforced by the backend.
+
+Next.js frontend checks are only for user experience.
+
+Never rely on:
+
+```text
+Frontend route protection
+Hidden buttons
+Role checks in React
+```
+
+as the actual security mechanism.
+
+The ASP.NET Core API must enforce:
+
+```text
+Authentication
+Authorization
+Resource ownership
+Seller isolation
+```
+
+---
+
+# 16. Next.js Middleware
+
+Use Next.js middleware only for lightweight routing decisions where useful.
+
+Possible uses:
+
+```text
+Redirect unauthenticated users
+Redirect obvious role mismatches
+Protect dashboard routes at the UI layer
+```
+
+Do not put complex business authorization inside middleware.
+
+Backend authorization remains authoritative.
+
+---
+
+# 17. Authentication Token Strategy
+
+Recommended architecture:
+
+```text
+Browser
+   │
+   ▼
+Next.js
+   │
+   ▼
+ASP.NET Core API
+```
+
+For browser authentication, prefer a secure architecture that minimizes JavaScript exposure of long-lived credentials.
+
+Possible strategy:
+
+```text
+Short-lived access token
++
+Secure refresh mechanism
++
+HttpOnly cookie where appropriate
+```
+
+Never store sensitive long-lived refresh tokens in:
+
+```text
+localStorage
+sessionStorage
+Zustand persistence
+```
+
+unless there is a specific, justified architecture requiring it.
+
+---
+
+# 18. SEO Strategy
+
+Next.js should be used heavily for SEO-sensitive marketplace pages.
+
+Public pages should support:
+
+```text
+Dynamic metadata
+Title
+Description
+Canonical URL
+Open Graph
+Twitter metadata
+Product metadata
+Structured data
+Sitemap
+Robots
+```
+
+Important pages:
+
+```text
+Homepage
+Product pages
+Category pages
+Seller/store pages
+```
+
+---
+
+# 19. Product SEO
+
+Example product page:
+
+```text
+/products/apple-iphone-17
+```
+
+Metadata should be generated from product data.
+
+Include:
+
+```text
+Product name
+Description
+Price
+Availability
+Rating
+Images
+Brand
+Seller
+```
+
+Where appropriate, generate structured product data.
+
+---
+
+# 20. Category SEO
+
+Example:
+
+```text
+/categories/mobile-phones
+```
+
+Support:
+
+```text
+Category title
+Description
+Product listing
+Metadata
+Canonical URL
+Structured content
+```
+
+---
+
+# 21. Seller Store SEO
+
+Example:
+
+```text
+/stores/tech-world
+```
+
+Include:
+
+```text
+Store name
+Description
+Logo
+Products
+Rating
+Seller information
+Metadata
+```
+
+---
+
+# 22. Sitemap
+
+Use Next.js sitemap support.
+
+Potential sitemap entries:
+
+```text
+/
+/products
+/products/*
+/categories/*
+/stores/*
+```
+
+Do not include private dashboard routes.
+
+---
+
+# 23. Robots
+
+Private pages should not be indexed.
+
+Examples:
+
+```text
+/dashboard
+/cart
+/checkout
+/orders
+/seller/*
+/admin/*
+```
+
+---
+
+# 24. Image Strategy
+
+Use Next.js image optimization where appropriate.
+
+Product images should:
+
+```text
+Have meaningful alt text
+Use responsive sizes
+Avoid layout shift
+Use optimized formats where supported
+```
+
+Use:
+
+```text
+next/image
+```
+
+for appropriate image rendering.
+
+---
+
+# 25. Dynamic Product Pages
+
+Product pages should use dynamic routes.
+
+Example:
+
+```text
+app/
+└── (public)/
+    └── products/
+        └── [slug]/
+            └── page.tsx
+```
+
+URL:
+
+```text
+/products/iphone-17-pro
+```
+
+---
+
+# 26. Dynamic Category Pages
+
+```text
+app/
+└── (public)/
+    └── categories/
+        └── [slug]/
+            └── page.tsx
+```
+
+---
+
+# 27. Dynamic Seller Pages
+
+```text
+app/
+└── (public)/
+    └── stores/
+        └── [slug]/
+            └── page.tsx
+```
+
+---
+
+# 28. Next.js Loading UI
+
+Use route-level loading states.
+
+Examples:
+
+```text
+app/loading.tsx
+app/products/loading.tsx
+app/products/[slug]/loading.tsx
+```
+
+Use skeletons instead of blank screens.
+
+---
+
+# 29. Next.js Error Handling
+
+Use:
+
+```text
+error.tsx
+not-found.tsx
+global-error.tsx
+```
+
+Where appropriate.
+
+Provide:
+
+```text
+Human-readable message
+Retry button
+Navigation option
+Useful recovery action
+```
+
+---
+
+# 30. API Route Handlers
+
+Do not duplicate the entire ASP.NET Core API inside Next.js.
+
+The primary business API remains:
+
+```text
+ASP.NET Core
+```
+
+Next.js Route Handlers should only be used when they provide a legitimate frontend-specific purpose.
+
+Examples:
+
+```text
+Small frontend-only endpoint
+Secure browser-facing integration
+Webhook adapter if architecturally justified
+BFF pattern if later introduced intentionally
+```
+
+Do not create duplicate business logic.
+
+---
+
+# 31. Backend Domain Model
+
+Core entities:
+
+```text
+User
+Role
+RefreshToken
+
+Seller
+SellerStore
+
+Category
+Product
+ProductImage
+ProductVariant
+
+Inventory
+InventoryTransaction
+
+Cart
+CartItem
+Wishlist
+WishlistItem
+
+Address
+
+Order
+OrderItem
+SellerOrder
+
+Payment
+PaymentTransaction
+PaymentWebhook
+
+Refund
+RefundItem
+
+Commission
+
+Review
+ReviewReply
+
+Coupon
+CouponUsage
+
+Notification
+
+AuditLog
+```
+
+Potential future entities:
+
+```text
+ProductTag
+Tag
+ProductSpecification
+ReturnRequest
+Shipment
+DeliveryTracking
+SellerPayout
+PayoutTransaction
+```
+
+---
+
+# 32. User Roles
+
+```text
+SuperAdmin
+Admin
+Seller
+Customer
+```
+
+---
+
+# 33. Seller Architecture
+
+Seller:
+
+```text
+User
+ ↓
+Seller
+ ↓
+SellerStore
+ ↓
+Products
+ ↓
+Inventory
+ ↓
+SellerOrders
+ ↓
+Commissions
+```
+
+Seller isolation is mandatory.
+
+---
+
+# 34. Multi-Seller Order Architecture
+
+Example:
+
+```text
+Customer Checkout
+
+Order
+│
+├── SellerOrder A
+│   ├── Product A1
+│   └── Product A2
+│
+└── SellerOrder B
+    ├── Product B1
+    └── Product B2
+```
+
+The customer sees one marketplace order.
+
+Each seller manages only their own SellerOrder.
+
+---
+
+# 35. Inventory Architecture
+
+Track:
+
+```text
+AvailableQuantity
+ReservedQuantity
+SoldQuantity
+```
+
+Use inventory transactions.
+
+Critical inventory operations must use transactions and concurrency protection.
+
+---
+
+# 36. Checkout Architecture
+
+```text
+Cart
+ ↓
+Validate products
+ ↓
+Validate prices
+ ↓
+Validate stock
+ ↓
+Validate coupons
+ ↓
+Calculate totals
+ ↓
+Reserve inventory
+ ↓
+Create order
+ ↓
+Split seller orders
+ ↓
+Create payment
+ ↓
+Commit
+```
+
+---
+
+# 37. Payment Architecture
+
+Support initial:
+
+```text
+CashOnDelivery
+MockPayment
+```
+
+Then integrate:
+
+```text
+Khalti
+eSewa
+Stripe
+```
+
+Payment provider implementation must be abstracted.
+
+Example:
+
+```text
+IPaymentGateway
+```
+
+Implementations:
+
+```text
+MockPaymentGateway
+KhaltiPaymentGateway
+EsewaPaymentGateway
+StripePaymentGateway
+```
+
+---
+
+# 38. Payment Webhook Requirements
+
+Must support:
+
+```text
+Signature verification
+Idempotency
+Duplicate detection
+Transaction verification
+Logging
+Failure handling
+```
+
+Never trust the frontend payment success callback alone.
+
+---
+
+# 39. Refund Architecture
+
+```text
+Customer
+ ↓
+Refund Request
+ ↓
+Admin Review
+ ↓
+Approve / Reject
+ ↓
+Payment Provider
+ ↓
+Refund Result
+ ↓
+Update Order
+ ↓
+Notify Customer
+```
+
+---
+
+# 40. Commission Architecture
+
+Example:
+
+```text
+Sale = Rs. 10,000
+Commission = 10%
+Marketplace = Rs. 1,000
+Seller = Rs. 9,000
+```
+
+Store the applied commission rate historically.
+
+---
+
+# 41. Review Rules
+
+Customer can review only eligible products.
+
+Rules:
+
+```text
+Verified purchase
+Valid order item
+Appropriate order state
+One review per eligible purchase
+```
+
+---
+
+# 42. Coupon System
+
+Support:
+
+```text
+Percentage
+Fixed amount
+Minimum order
+Maximum discount
+Start date
+End date
+Global usage limit
+Per-user usage limit
+Seller-specific coupons
+Product-specific coupons
+```
+
+---
+
+# 43. Notifications
+
+Types:
+
+```text
+OrderCreated
+OrderConfirmed
+OrderShipped
+OrderDelivered
+
+PaymentSuccessful
+PaymentFailed
+
+RefundRequested
+RefundApproved
+RefundRejected
+
+SellerApproved
+SellerRejected
+
+ProductApproved
+ProductRejected
+
+LowStock
+NewReview
+SystemNotification
+```
+
+---
+
+# 44. SignalR Architecture
+
+Hub:
+
+```text
+MarketplaceHub
+```
+
+Groups:
+
+```text
+user:{userId}
+seller:{sellerId}
+admin
+order:{orderId}
+```
+
+Real-time events:
+
+```text
+OrderCreated
+OrderUpdated
+PaymentUpdated
+RefundUpdated
+NotificationCreated
+InventoryLow
+SellerStatusChanged
+```
+
+---
+
+# 45. Redis
+
+Use Redis for:
+
+```text
+Product caching
+Category caching
+Popular products
+Rate limiting support
+Distributed locks where justified
+Temporary state
+```
+
+Do not cache everything.
+
+Invalidate cache after relevant mutations.
+
+---
+
+# 46. Background Processing
+
+Use:
+
+```text
+Hangfire
+Background Services
+```
+
+Jobs:
+
+```text
+Release expired inventory reservations
+Send notifications
+Send emails
+Process abandoned carts
+Update analytics
+Process seller payouts
+Clean temporary records
+```
+
+---
+
+# 47. Search
+
+Search:
+
+```text
+Product name
+Description
+SKU
+Category
+Seller
+```
+
+Filters:
+
+```text
+Price
+Rating
+Category
+Seller
+Availability
+Discount
+```
+
+Sort:
+
+```text
+Newest
+Price low-high
+Price high-low
+Rating
+Popularity
+```
+
+Use server-side pagination.
+
+---
+
+# 48. API Pagination
+
+Example:
+
+```text
+GET /api/products?page=1&pageSize=20
+```
+
+Response:
+
+```json
+{
+  "items": [],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 250,
+  "totalPages": 13
+}
+```
+
+---
+
+# 49. API Endpoints
+
+## Authentication
+
+```text
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/refresh
+POST   /api/auth/logout
+GET    /api/auth/me
+```
+
+## Products
+
+```text
+GET    /api/products
+GET    /api/products/{id}
+GET    /api/products/slug/{slug}
+POST   /api/products
+PUT    /api/products/{id}
+DELETE /api/products/{id}
+```
+
+## Categories
+
+```text
+GET    /api/categories
+GET    /api/categories/{id}
+POST   /api/categories
+PUT    /api/categories/{id}
+DELETE /api/categories/{id}
+```
+
+## Cart
+
+```text
+GET    /api/cart
+POST   /api/cart/items
+PUT    /api/cart/items/{productId}
+DELETE /api/cart/items/{productId}
+DELETE /api/cart
+```
+
+## Orders
+
+```text
+POST   /api/orders
+GET    /api/orders
+GET    /api/orders/{id}
+PUT    /api/orders/{id}/status
+POST   /api/orders/{id}/cancel
+```
+
+## Payments
+
+```text
+POST   /api/payments
+GET    /api/payments/{id}
+POST   /api/payments/{id}/verify
+POST   /api/payments/webhook
+```
+
+## Refunds
+
+```text
+POST   /api/refunds
+GET    /api/refunds
+GET    /api/refunds/{id}
+PUT    /api/refunds/{id}/status
+```
+
+## Sellers
+
+```text
+POST   /api/sellers/apply
+GET    /api/sellers
+GET    /api/sellers/{id}
+PUT    /api/sellers/{id}
+PUT    /api/sellers/{id}/status
+```
+
+## Reviews
+
+```text
+GET    /api/products/{productId}/reviews
+POST   /api/products/{productId}/reviews
+PUT    /api/reviews/{id}
+DELETE /api/reviews/{id}
+```
+
+## Coupons
+
+```text
+GET    /api/coupons
+POST   /api/coupons
+PUT    /api/coupons/{id}
+DELETE /api/coupons/{id}
+POST   /api/coupons/validate
+```
+
+## Notifications
+
+```text
+GET    /api/notifications
+PUT    /api/notifications/{id}/read
+PUT    /api/notifications/read-all
+```
+
+---
+
+# 50. Customer Routes
+
+```text
+/
+/products
+/products/[slug]
+/categories/[slug]
+/stores/[slug]
+
+/login
+/register
+/forgot-password
+
+/dashboard
+/cart
+/checkout
+/orders
+/orders/[id]
+/wishlist
+/profile
+/addresses
+/notifications
+```
+
+---
+
+# 51. Seller Routes
+
+```text
+/seller/dashboard
+/seller/products
+/seller/products/new
+/seller/products/[id]
+/seller/inventory
+/seller/orders
+/seller/orders/[id]
+/seller/reviews
+/seller/coupons
+/seller/analytics
+/seller/store
+/seller/settings
+```
+
+---
+
+# 52. Admin Routes
+
+```text
+/admin/dashboard
+/admin/users
+/admin/sellers
+/admin/sellers/[id]
+/admin/products
+/admin/categories
+/admin/orders
+/admin/payments
+/admin/refunds
+/admin/coupons
+/admin/commissions
+/admin/reports
+/admin/audit-logs
+/admin/settings
+```
+
+---
+
+# 53. Customer Frontend
+
+Build:
+
+```text
+Homepage
+Product discovery
+Search
+Category browsing
+Seller/store browsing
+Product detail
+Cart
+Checkout
+Orders
+Wishlist
+Reviews
+Notifications
+Profile
+Addresses
+```
+
+---
+
+# 54. Seller Frontend
+
+Build:
+
+```text
+Seller dashboard
+Product management
+Inventory
+Orders
+Reviews
+Coupons
+Analytics
+Store management
+Settings
+```
+
+---
+
+# 55. Admin Frontend
+
+Build:
+
+```text
+Admin dashboard
+Users
+Sellers
+Products
+Categories
+Orders
+Payments
+Refunds
+Coupons
+Commissions
+Reports
+Audit logs
+Settings
+```
+
+---
+
+# 56. Marketplace UI Design
+
+Visual direction:
+
+```text
+Modern
+Premium
+Clean
+Professional
+Trustworthy
+Fast
+Responsive
+Accessible
+```
+
+Use:
+
+```text
+Bootstrap 5
+React-Bootstrap
+Lucide React
+CSS variables
+```
+
+Avoid:
+
+```text
+Excessive gradients
+Excessive shadows
+Random colors
+Huge cards
+Visual clutter
+Generic Bootstrap dashboard appearance
+```
+
+---
+
+# 57. Theme
+
+Support:
+
+```text
+Light
+Dark
+System
+```
+
+Use centralized CSS variables.
+
+Dark mode must be intentionally designed.
+
+---
+
+# 58. Product UI
+
+Product cards should display:
+
+```text
+Image
+Name
+Seller
+Rating
+Price
+Discount
+Stock state
+Wishlist
+Add to cart
+```
+
+---
+
+# 59. Product Detail
+
+Include:
+
+```text
+Image gallery
+Product name
+Seller
+Price
+Discount
+Rating
+Variants
+Quantity
+Stock
+Add to cart
+Buy now
+Wishlist
+Description
+Specifications
+Reviews
+Related products
+```
+
+---
+
+# 60. Cart UI
+
+Group products by seller:
+
+```text
+Seller A
+├── Product A
+└── Product B
+
+Seller B
+├── Product C
+└── Product D
+```
+
+Show:
+
+```text
+Product
+Seller
+Quantity
+Unit price
+Subtotal
+Remove
+Save for later
+```
+
+---
+
+# 61. Checkout UI
+
+Steps:
+
+```text
+Address
+↓
+Delivery
+↓
+Payment
+↓
+Review
+↓
+Place Order
+```
+
+Show:
+
+```text
+Subtotal
+Shipping
+Discount
+Tax
+Total
+```
+
+Backend recalculates all financial values.
+
+---
+
+# 62. Order Tracking UI
+
+Timeline:
+
+```text
+Order Placed
+↓
+Confirmed
+↓
+Processing
+↓
+Packed
+↓
+Shipped
+↓
+Delivered
+```
+
+---
+
+# 63. Seller Dashboard
+
+Metrics:
+
+```text
+Total Sales
+Today's Sales
+Pending Orders
+Products
+Low Stock
+Average Rating
+Pending Reviews
+```
+
+Charts:
+
+```text
+Revenue
+Orders
+Top Products
+Sales by category
+```
+
+---
+
+# 64. Admin Dashboard
+
+Metrics:
+
+```text
+Customers
+Sellers
+Products
+Orders
+Revenue
+Pending Sellers
+Pending Products
+Refund Requests
+Commission Revenue
+```
+
+Charts:
+
+```text
+Revenue
+Orders
+Seller growth
+Customer growth
+Category performance
+Refund rate
+```
+
+Use Recharts.
+
+---
+
+# 65. Real-Time UI
+
+SignalR should update:
+
+```text
+Unread notifications
+Order status
+Payment status
+Refund status
+Low stock alerts
+Seller updates
+```
+
+No manual refresh should be required.
+
+---
+
+# 66. Loading / Error / Empty States
+
+Every major route should support:
+
+```text
+Loading
+Success
+Error
+Empty
+```
+
+Next.js features:
+
+```text
+loading.tsx
+error.tsx
+not-found.tsx
+```
+
+Use skeletons where appropriate.
+
+---
+
+# 67. Responsive Design
+
+Test:
+
+```text
+1920x1080
+1440x900
+1366x768
+1024x768
+768x1024
+430x932
+390x844
+360x800
+```
+
+Mobile must support:
+
+```text
+Responsive navigation
+Offcanvas sidebar
+Responsive tables
+Mobile product grids
+Mobile checkout
+Touch-friendly controls
+```
+
+---
+
+# 68. Accessibility
+
+Implement:
+
+```text
+Semantic HTML
+Labels
+Keyboard navigation
+Focus states
+ARIA where required
+Contrast
+Accessible forms
+Accessible dialogs
+Reduced motion
+```
+
+Do not rely only on color.
+
+---
+
+# 69. Security
+
+Backend security:
+
+```text
+Password hashing
+JWT validation
+Refresh token rotation
+RBAC
+Ownership checks
+Seller isolation
+Rate limiting
+Input validation
+CORS
+HTTPS
+Secure configuration
+```
+
+Frontend security:
+
+```text
+Avoid storing long-lived sensitive tokens in localStorage
+Avoid exposing secrets
+Do not trust client-side authorization
+Validate forms
+Handle authentication expiration
+```
+
+---
+
+# 70. Database
+
+Use:
+
+```text
+PostgreSQL
+EF Core
+Code First
+Fluent API
+Migrations
+Indexes
+Transactions
+Concurrency
+```
+
+---
+
+# 71. Transaction Boundaries
+
+Transactions are required for:
+
+```text
+Checkout
+Inventory reservation
+Order creation
+Payment state changes
+Refund processing
+Commission creation
+```
+
+---
+
+# 72. Inventory Concurrency
+
+Example:
+
+```text
+Stock = 1
+
+Customer A → Buy 1
+Customer B → Buy 1
+```
+
+The database must prevent both from successfully purchasing the same stock.
+
+Use appropriate:
+
+```text
+Transactions
+Concurrency tokens
+Atomic operations
+Inventory reservations
+Distributed locks when justified
+```
+
+---
+
+# 73. Audit Logs
+
+Track:
+
+```text
+Login
+Seller approval
+Seller suspension
+Product creation
+Product update
+Order changes
+Payment changes
+Refund decisions
+Commission changes
+Coupon changes
+Admin actions
+```
+
+---
+
+# 74. Logging
+
+Use Serilog.
+
+Log:
+
+```text
+Requests
+Responses/status
+Exceptions
+Payment events
+Webhook events
+Order events
+Background jobs
+Business failures
+```
+
+Never log:
+
+```text
+Passwords
+JWT tokens
+Refresh tokens
+Payment secrets
+Private credentials
+```
+
+---
+
+# 75. Testing
+
+## Backend Unit Tests
+
+Test:
+
+```text
+Validators
+Business services
+Commission calculation
+Coupon calculation
+Price calculation
+Inventory rules
+Order transitions
+```
+
+## Integration Tests
+
+Test:
+
+```text
+Authentication
+Authorization
+Seller isolation
+Products
+Cart
+Checkout
+Orders
+Payments
+Refunds
+Reviews
+Coupons
+```
+
+## Frontend Validation
+
+At minimum:
+
+```text
+npm run build
+```
+
+Test:
+
+```text
+Navigation
+Authentication
+API integration
+Forms
+Loading states
+Errors
+Responsive layout
+Real-time updates
+```
+
+---
+
+# 76. Critical Integration Tests
+
+Authentication:
+
+```text
+Register
+Duplicate email
+Invalid login
+Refresh token
+Logout
+```
+
+Authorization:
+
+```text
+Customer → Admin endpoint
+Seller A → Seller B data
+Admin → Seller management
+```
+
+Inventory:
+
+```text
+Insufficient stock
+Reservation
+Release
+Concurrent purchase
+```
+
+Orders:
+
+```text
+Create order
+Split order by seller
+Invalid quantity
+Cancel order
+Status transition
+```
+
+Payments:
+
+```text
+Create payment
+Verify payment
+Webhook
+Duplicate webhook
+Invalid webhook
+Payment failure
+```
+
+Refunds:
+
+```text
+Request
+Approve
+Reject
+Duplicate request
+```
+
+---
+
+# 77. Performance
+
+Focus on:
+
+```text
+Database indexes
+Pagination
+Projection
+AsNoTracking
+Avoid N+1 queries
+Redis caching
+Optimized images
+Server Components
+Client Component minimization
+Code splitting
+Lazy loading where appropriate
+```
+
+Do not prematurely optimize every component.
+
+---
+
+# 78. Next.js Performance Rules
+
+Follow:
+
+```text
+Prefer Server Components
+Use Client Components only when required
+Use next/image
+Use metadata APIs
+Avoid unnecessary client-side fetching
+Avoid unnecessary global state
+Use dynamic imports where justified
+Keep large libraries out of initial bundles where possible
+```
+
+---
+
+# 79. Caching Strategy
+
+Caching should exist at multiple levels where appropriate:
+
+```text
+Browser
+Next.js
+TanStack Query
+Redis
+Database
+```
+
+However, caching must not produce stale financial or inventory information.
+
+Never rely on cached:
+
+```text
+Stock availability during checkout
+Final price
+Payment status
+Order authorization
+```
+
+These must come from authoritative backend data.
+
+---
+
+# 80. SEO Strategy
+
+SEO-sensitive routes:
+
+```text
+Homepage
+Products
+Categories
+Stores
+```
+
+Use:
+
+```text
+Metadata
+Open Graph
+Canonical URLs
+Sitemap
+Robots
+Structured data
+Optimized images
+```
+
+Private routes should not be indexed.
+
+---
+
+# 81. Environment Variables
+
+Frontend:
+
+```text
+NEXT_PUBLIC_API_URL
+NEXT_PUBLIC_SIGNALR_URL
+```
+
+Only variables intentionally exposed to the browser should use:
+
+```text
+NEXT_PUBLIC_
+```
+
+Never expose:
+
+```text
+JWT secrets
+Database credentials
+Payment private keys
+Refresh secrets
+Admin credentials
+```
+
+---
+
+# 82. Backend Environment Variables
+
+Examples:
+
+```text
+ConnectionStrings__DefaultConnection
+Jwt__Key
+Jwt__Issuer
+Jwt__Audience
+Redis__ConnectionString
+Payment__ApiKey
+Payment__Secret
+```
+
+---
+
+# 83. Health Checks
+
+Backend:
+
+```text
+GET /health
+```
+
+Check:
+
+```text
+Application
+PostgreSQL
+Redis
+```
+
+---
+
+# 84. Git Strategy
+
+Example commits:
+
+```text
+chore: initialize marketplace solution
+
+feat(auth): implement authentication
+
+feat(auth): add refresh token rotation
+
+feat(sellers): implement seller management
+
+feat(products): implement product management
+
+feat(inventory): implement inventory management
+
+feat(cart): implement shopping cart
+
+feat(orders): implement multi-vendor order workflow
+
+feat(payments): implement payment system
+
+feat(payments): add payment webhook handling
+
+feat(refunds): implement refund workflow
+
+feat(commissions): implement seller commissions
+
+feat(reviews): implement product reviews
+
+feat(coupons): implement coupon system
+
+feat(notifications): implement notifications
+
+feat(realtime): add SignalR marketplace updates
+
+feat(cache): add Redis product caching
+
+feat(frontend): initialize Next.js marketplace
+
+feat(frontend): implement customer storefront
+
+feat(frontend): implement seller dashboard
+
+feat(frontend): implement admin dashboard
+
+test: add marketplace integration tests
+
+ci: add GitHub Actions workflow
+
+docs: add marketplace documentation
+```
+
+---
+
+# 85. Git Workflow
+
+Before commit:
+
+```bash
+git status
+git diff
+```
+
+Then:
+
+```bash
+git add .
+git commit -m "your message"
+git push origin main
+```
+
+---
+
+# 86. GitHub Actions
+
+CI should eventually run:
+
+```text
+Backend restore
+Backend build
+Backend unit tests
+Backend integration tests
+Frontend install
+Frontend build
+```
+
+---
+
+# 87. Development Commands
+
+## Backend
+
+```bash
+dotnet restore
+dotnet build
+dotnet run
+```
+
+## EF Core
+
+```bash
+dotnet ef migrations add MigrationName
+dotnet ef database update
+```
+
+## Tests
+
+```bash
+dotnet test
+```
+
+## Next.js
+
+```bash
+npm install
+npm run dev
+```
+
+Production build:
+
+```bash
+npm run build
+```
+
+Production start:
+
+```bash
+npm start
+```
+
+---
+
+# 88. Next.js Initial Setup
+
+Recommended:
+
+```bash
+npx create-next-app@latest marketplace-web
+```
+
+Select:
+
+```text
+TypeScript → Yes
+ESLint → Yes
+Tailwind → No
+src/ directory → Yes
+App Router → Yes
+Import alias → Yes
+```
+
+Then install required packages:
+
+```bash
+npm install bootstrap react-bootstrap
+npm install @tanstack/react-query
+npm install zustand
+npm install axios
+npm install react-hook-form zod @hookform/resolvers
+npm install recharts
+npm install lucide-react
+npm install @microsoft/signalr
+```
+
+Do not install unnecessary libraries just because they are available.
+
+---
+
+# 89. Next.js App Initialization
+
+The root layout should establish:
+
+```text
+Bootstrap
+Global styles
+Application providers
+Theme
+Query provider
+Authentication context if required
+```
+
+Do not put every provider into one giant client component unless necessary.
+
+Prefer a small:
+
+```text
+AppProviders.tsx
+```
+
+boundary.
+
+---
+
+# 90. API Architecture in Next.js
+
+Use two categories:
+
+### Server-side API calls
+
+For:
+
+```text
+Public SEO-sensitive data
+Server Components
+Initial page rendering
+```
+
+### Client-side API calls
+
+For:
+
+```text
+Mutations
+Interactive filtering
+Cart
+Checkout
+Notifications
+Real-time updates
+Authenticated dashboard interactions
+```
+
+---
+
+# 91. Authentication Architecture Recommendation
+
+A practical architecture for this project:
+
+```text
+Next.js Browser
+      │
+      │ Secure authentication flow
+      ▼
+ASP.NET Core API
+      │
+      ├── Access Token
+      └── Refresh Token
+```
+
+Keep the backend authoritative.
+
+If the implementation later uses a Backend-for-Frontend pattern, document that explicitly rather than silently duplicating API logic.
+
+---
+
+# 92. Customer Page Rendering
+
+Recommended:
+
+```text
+Homepage
+→ Server-first
+
+Product detail
+→ Server-first
+
+Category
+→ Server-first
+
+Store
+→ Server-first
+
+Cart
+→ Client interaction
+
+Checkout
+→ Client interaction
+
+Orders
+→ Authenticated data + client interactions
+
+Notifications
+→ Client + SignalR
+```
+
+This is a guideline, not a rigid rule.
+
+---
+
+# 93. Seller/Admin Rendering
+
+Seller and admin dashboards are primarily authenticated applications.
+
+Use:
+
+```text
+Server Components
++
+Client Components
++
+TanStack Query
+```
+
+based on the specific interaction.
+
+Heavy interactive dashboards should not be forced into purely server-rendered architecture.
+
+---
+
+# 94. Charts
+
+Use Recharts for:
+
+```text
+Revenue
+Orders
+Seller performance
+Category performance
+Customer growth
+Product performance
+Refund statistics
+```
+
+Charts should be placed inside Client Components.
+
+---
+
+# 95. Real-Time SignalR + TanStack Query
+
+When a SignalR event arrives:
+
+```text
+SignalR Event
+      ↓
+Identify affected resource
+      ↓
+Invalidate/update TanStack Query cache
+      ↓
+UI updates
+```
+
+Example:
+
+```text
+OrderUpdated
+      ↓
+invalidate orders query
+      ↓
+fetch updated order
+      ↓
+UI refreshes automatically
+```
+
+This avoids duplicating server state in Zustand.
+
+---
+
+# 96. Offline / Reconnection UI
+
+Handle:
+
+```text
+SignalR reconnecting
+SignalR reconnected
+SignalR disconnected
+API unavailable
+```
+
+Display subtle status information.
+
+Do not block the entire application unnecessarily.
+
+---
+
+# 97. UI Component Architecture
+
+Reusable components:
+
+```text
+Button
+Card
+Modal
+DataTable
+Pagination
+SearchInput
+FilterPanel
+StatusBadge
+PriceDisplay
+RatingStars
+ProductCard
+OrderTimeline
+EmptyState
+ErrorState
+LoadingState
+ConfirmDialog
+Toast
+NotificationDropdown
+Avatar
+Sidebar
+Navbar
+Breadcrumb
+```
+
+---
+
+# 98. Design System
+
+Centralize:
+
+```text
+Colors
+Spacing
+Typography
+Border radius
+Shadows
+Transitions
+Breakpoints
+```
+
+Use CSS variables.
+
+---
+
+# 99. Responsive Marketplace
+
+Desktop:
+
+```text
+Full navigation
+Multi-column product grid
+Persistent filters where appropriate
+```
+
+Tablet:
+
+```text
+Condensed navigation
+Flexible grids
+Collapsible filters
+```
+
+Mobile:
+
+```text
+Bottom actions where useful
+Offcanvas filters
+Stacked checkout
+Single-column product detail
+Responsive tables
+```
+
+---
+
+# 100. Final Development Phases
+
+## Phase 1 — Planning & Architecture
+
+Finalize:
+
+```text
+Requirements
+Use cases
+ER diagram
+Architecture
+API design
+Authentication strategy
+Authorization strategy
+Order design
+Payment design
+Inventory concurrency strategy
+Next.js rendering strategy
+SEO strategy
+Testing strategy
+```
+
+---
+
+## Phase 2 — Backend Solution Setup
+
+Create:
+
+```text
+Solution
+Projects
+Dependencies
+Configuration
+Git repository
+```
+
+---
+
+## Phase 3 — PostgreSQL + EF Core
+
+Implement:
+
+```text
+DbContext
+Entities
+Configurations
+Relationships
+Indexes
+Migrations
+Seed data
+```
+
+---
+
+## Phase 4 — Authentication
+
+Implement:
+
+```text
+Register
+Login
+JWT
+Refresh tokens
+Logout
+Current user
+```
+
+---
+
+## Phase 5 — Authorization
+
+Implement:
+
+```text
+Roles
+Policies
+Ownership
+Seller isolation
+Admin authorization
+```
+
+---
+
+## Phase 6 — Seller Management
+
+Implement:
+
+```text
+Seller application
+Approval
+Rejection
+Suspension
+Store
+```
+
+---
+
+## Phase 7 — Categories
+
+Implement:
+
+```text
+CRUD
+Hierarchy
+Slug
+Activation
+```
+
+---
+
+## Phase 8 — Products
+
+Implement:
+
+```text
+CRUD
+Images
+Variants
+Search
+Filtering
+Pagination
+Approval
+```
+
+---
+
+## Phase 9 — Inventory
+
+Implement:
+
+```text
+Stock
+Reservation
+Release
+Adjustment
+Transactions
+Low-stock detection
+Concurrency protection
+```
+
+---
+
+## Phase 10 — Cart
+
+Implement:
+
+```text
+Add
+Update
+Remove
+Clear
+Seller grouping
+```
+
+---
+
+## Phase 11 — Checkout
+
+Implement:
+
+```text
+Price validation
+Stock validation
+Coupon validation
+Address validation
+Inventory reservation
+Order creation
+Seller order splitting
+```
+
+---
+
+## Phase 12 — Orders
+
+Implement:
+
+```text
+Order history
+Seller orders
+Admin orders
+Status transitions
+Cancellation
+```
+
+---
+
+## Phase 13 — Payments
+
+Implement:
+
+```text
+Payment creation
+Payment verification
+Webhook
+Idempotency
+Payment history
+```
+
+---
+
+## Phase 14 — Refunds
+
+Implement:
+
+```text
+Request
+Approval
+Rejection
+Processing
+Completion
+```
+
+---
+
+## Phase 15 — Commissions
+
+Implement:
+
+```text
+Commission calculation
+Seller earnings
+Marketplace revenue
+```
+
+---
+
+## Phase 16 — Reviews
+
+Implement:
+
+```text
+Verified reviews
+Ratings
+Moderation
+Seller replies
+```
+
+---
+
+## Phase 17 — Coupons
+
+Implement:
+
+```text
+Create
+Validate
+Apply
+Usage limits
+Seller/product restrictions
+```
+
+---
+
+## Phase 18 — Notifications
+
+Implement:
+
+```text
+Notification entity
+API
+Unread count
+Read state
+```
+
+---
+
+## Phase 19 — SignalR
+
+Implement:
+
+```text
+MarketplaceHub
+User groups
+Seller groups
+Order groups
+Real-time notifications
+```
+
+---
+
+## Phase 20 — Redis
+
+Implement:
+
+```text
+Product cache
+Category cache
+Cache invalidation
+Distributed locking where justified
+```
+
+---
+
+## Phase 21 — Background Jobs
+
+Implement:
+
+```text
+Reservation cleanup
+Notifications
+Emails
+Abandoned carts
+Analytics jobs
+```
+
+---
+
+## Phase 22 — Audit Logs
+
+Implement:
+
+```text
+Audit entity
+Audit service
+Admin audit UI
+Filtering
+Pagination
+```
+
+---
+
+## Phase 23 — Next.js Foundation
+
+Create:
+
+```text
+Next.js application
+TypeScript
+App Router
+Bootstrap
+React-Bootstrap
+Providers
+Axios
+TanStack Query
+Zustand
+Global styles
+Theme
+```
+
+---
+
+## Phase 24 — Public Marketplace
+
+Build:
+
+```text
+Homepage
+Product listing
+Product detail
+Categories
+Stores
+Search
+SEO
+Sitemap
+Robots
+```
+
+---
+
+## Phase 25 — Customer Frontend
+
+Build:
+
+```text
+Login
+Register
+Dashboard
+Cart
+Checkout
+Orders
+Wishlist
+Profile
+Addresses
+Notifications
+```
+
+---
+
+## Phase 26 — Seller Frontend
+
+Build:
+
+```text
+Seller dashboard
+Products
+Inventory
+Orders
+Reviews
+Coupons
+Analytics
+Store
+Settings
+```
+
+---
+
+## Phase 27 — Admin Frontend
+
+Build:
+
+```text
+Admin dashboard
+Users
+Sellers
+Products
+Categories
+Orders
+Payments
+Refunds
+Coupons
+Commissions
+Reports
+Audit logs
+Settings
+```
+
+---
+
+## Phase 28 — Analytics
+
+Implement:
+
+```text
+Customer metrics
+Seller metrics
+Admin metrics
+Charts
+Date filtering
+```
+
+---
+
+## Phase 29 — Testing
+
+Complete:
+
+```text
+Unit tests
+Integration tests
+Security tests
+Business rule tests
+Frontend validation
+Production build validation
+```
+
+---
+
+## Phase 30 — CI/CD
+
+Implement:
+
+```text
+GitHub Actions
+Backend build
+Backend tests
+Frontend build
+Deployment workflow
+```
+
+---
+
+## Phase 31 — Deployment
+
+Deploy:
+
+```text
+ASP.NET Core API
+PostgreSQL
+Redis
+Next.js application
+```
+
+Configure:
+
+```text
+Environment variables
+HTTPS
+CORS
+Production logging
+Health checks
+```
+
+---
+
+## Phase 32 — Documentation
+
+Create:
+
+```text
+README.md
+ARCHITECTURE.md
+DATABASE_DESIGN.md
+API_DOCUMENTATION.md
+SECURITY.md
+DEPLOYMENT.md
+TESTING.md
+```
+
+---
+
+## Phase 33 — Portfolio Polish
+
+Add:
+
+```text
+Architecture diagram
+ER diagram
+API screenshots
+Customer screenshots
+Seller screenshots
+Admin screenshots
+Performance notes
+Technical highlights
+Demo link
+GitHub documentation
+```
+
+---
+
+# 101. Final Architecture
+
+```text
+                         ┌─────────────────────────┐
+                         │      User Browser       │
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │        Next.js          │
+                         │                         │
+                         │ App Router              │
+                         │ Server Components       │
+                         │ Client Components        │
+                         │ SEO / Metadata          │
+                         │ Image Optimization      │
+                         │ Loading/Error UI         │
+                         └────────────┬────────────┘
+                                      │
+                             REST / SignalR
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │    ASP.NET Core API     │
+                         │                         │
+                         │ Controllers             │
+                         │ Authentication          │
+                         │ Authorization           │
+                         │ Middleware              │
+                         │ SignalR Hubs            │
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │      Application        │
+                         │                         │
+                         │ Services                │
+                         │ Commands / Queries      │
+                         │ DTOs                    │
+                         │ Validators              │
+                         │ Business Rules          │
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │         Domain          │
+                         │                         │
+                         │ Entities                │
+                         │ Value Objects            │
+                         │ Domain Events            │
+                         │ Business Rules           │
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │     Infrastructure      │
+                         │                         │
+                         │ EF Core                 │
+                         │ PostgreSQL              │
+                         │ Redis                   │
+                         │ Payments                │
+                         │ Background Jobs         │
+                         │ External Services       │
+                         └─────────────────────────┘
+```
+
+---
+
+# 102. Final Feature Map
+
+```text
+AUTHENTICATION
+      ↓
+AUTHORIZATION
+      ↓
+SELLERS
+      ↓
+CATEGORIES
+      ↓
+PRODUCTS
+      ↓
+INVENTORY
+      ↓
+CART
+      ↓
+CHECKOUT
+      ↓
+ORDERS
+      ↓
+PAYMENTS
+      ↓
+REFUNDS
+      ↓
+COMMISSIONS
+      ↓
+REVIEWS
+      ↓
+COUPONS
+      ↓
+NOTIFICATIONS
+      ↓
+SIGNALR
+      ↓
+REDIS
+      ↓
+BACKGROUND JOBS
+      ↓
+AUDIT LOGS
+      ↓
+ANALYTICS
+      ↓
+NEXT.JS STOREFRONT
+      ↓
+CUSTOMER DASHBOARD
+      ↓
+SELLER DASHBOARD
+      ↓
+ADMIN DASHBOARD
+      ↓
+SEO
+      ↓
+TESTING
+      ↓
+CI/CD
+      ↓
+DEPLOYMENT
+      ↓
+DOCUMENTATION
+      ↓
+PORTFOLIO
+```
+
+---
+
+# 103. Definition of Done
+
+The project is complete only when:
+
+```text
+✓ Clean Architecture implemented
+✓ PostgreSQL implemented
+✓ Authentication implemented
+✓ Refresh token rotation implemented
+✓ RBAC implemented
+✓ Seller isolation implemented
+✓ Seller management implemented
+✓ Categories implemented
+✓ Products implemented
+✓ Product variants implemented
+✓ Inventory implemented
+✓ Inventory concurrency protection implemented
+✓ Cart implemented
+✓ Wishlist implemented
+✓ Multi-seller checkout implemented
+✓ Orders implemented
+✓ Payment architecture implemented
+✓ Payment webhook implemented
+✓ Idempotency implemented
+✓ Refunds implemented
+✓ Seller commissions implemented
+✓ Reviews implemented
+✓ Coupons implemented
+✓ Notifications implemented
+✓ SignalR implemented
+✓ Redis implemented
+✓ Background processing implemented
+✓ Audit logging implemented
+✓ Analytics implemented
+
+✓ Next.js App Router implemented
+✓ Server Components used appropriately
+✓ Client Components used appropriately
+✓ SEO metadata implemented
+✓ Dynamic product pages implemented
+✓ Dynamic category pages implemented
+✓ Dynamic seller pages implemented
+✓ Sitemap implemented
+✓ Robots configuration implemented
+✓ Optimized images implemented
+✓ Customer storefront implemented
+✓ Customer dashboard implemented
+✓ Seller dashboard implemented
+✓ Admin dashboard implemented
+✓ Responsive UI implemented
+✓ Dark mode implemented
+✓ Loading states implemented
+✓ Error states implemented
+✓ Empty states implemented
+✓ Accessibility considered
+
+✓ Unit tests implemented
+✓ Integration tests implemented
+✓ Security tested
+✓ GitHub Actions implemented
+✓ Health checks implemented
+✓ Production deployment completed
+✓ Documentation completed
+✓ README polished
+✓ Architecture documented
+✓ Screenshots added
+✓ Git history clean
+```
+
+---
+
+# 104. AI Coding Assistant Rules
+
+When using AI for this project:
+
+1. Inspect the existing code before modifying it.
+2. Preserve working functionality.
+3. Follow the established architecture.
+4. Do not introduce Docker.
+5. Do not introduce Tailwind.
+6. Do not introduce another UI framework.
+7. Do not move business logic into Next.js.
+8. Keep ASP.NET Core as the authoritative business API.
+9. Use Server Components where appropriate.
+10. Use Client Components only when interaction requires them.
+11. Never make the entire application a Client Component unnecessarily.
+12. Do not duplicate server state between TanStack Query and Zustand.
+13. Never trust frontend prices.
+14. Never trust frontend seller IDs.
+15. Never rely on frontend authorization for security.
+16. Validate all input.
+17. Use transactions for critical operations.
+18. Handle inventory concurrency.
+19. Handle duplicate payment webhooks.
+20. Implement idempotency where required.
+21. Never expose secrets.
+22. Never store long-lived sensitive tokens insecurely.
+23. Write tests for important business rules.
+24. Preserve API contracts.
+25. Provide complete files when requested.
+26. Provide exact commands when required.
+27. Verify builds after major changes.
+28. Keep documentation synchronized.
+29. Never claim a feature works without testing it.
+30. Follow the project's PLAN → DESIGN → IMPLEMENT → VALIDATE → TEST → DOCUMENT → COMMIT → PUSH workflow.
+
+---
+
+# 105. Current Project Status
+
+```text
+Phase: 0
+Status: Not Started
+Frontend: Next.js + TypeScript
+Backend: ASP.NET Core 8
+Architecture: Clean Architecture + Modular Monolith
+```
+
+Update after every development session.
+
+Example:
+
+```text
+## Current Progress
+
+Phase: 8
+Current Feature: Product Management
+Status: In Progress
+
+### Completed
+✓ Solution setup
+✓ PostgreSQL
+✓ Authentication
+✓ Authorization
+✓ Seller management
+✓ Categories
+
+### Current
+→ Product management
+
+### Next
+→ Inventory
+
+### Tests
+94/94
+```
+
+---
+
+# 106. Session Continuation Format
+
+At the end of every session:
+
+```text
+## Current Progress
+
+Phase:
+Feature:
+Status:
+
+### Completed
+-
+
+### Files Created
+-
+
+### Files Modified
+-
+
+### Database Changes
+-
+
+### API Endpoints Added
+-
+
+### Frontend Routes Added
+-
+
+### Components Added
+-
+
+### Tests Added
+-
+
+### Tests Passing
+-
+
+### Git Commit
+-
+
+### Git Push
+-
+
+### Current Problem
+-
+
+### Next Step
+-
+```
+
+---
+
+# 107. Final Project Goal
+
+The finished marketplace should demonstrate strong knowledge of:
+
+```text
+C#
+.NET 8
+ASP.NET Core
+Clean Architecture
+Domain Modeling
+PostgreSQL
+EF Core
+JWT
+RBAC
+Redis
+SignalR
+Background Jobs
+Payment Integration
+React
+Next.js
+TypeScript
+App Router
+Server Components
+Client Components
+SEO
+Bootstrap
+TanStack Query
+Zustand
+React Hook Form
+Zod
+Recharts
+Automated Testing
+GitHub Actions
+Cloud Deployment
+```
+
+The final system should feel like a **real marketplace product**, not a tutorial application.
+
+It should be:
+
+```text
+Secure
+Maintainable
+Scalable
+Testable
+Responsive
+Interactive
+SEO-friendly
+Real-Time
+Production-Oriented
+Portfolio-Ready
+```
+
+---
+
+# 108. Recommended Starting Point
+
+Start development with:
+
+```text
+PHASE 1 — PLANNING & ARCHITECTURE
+```
+
+Before writing application code, finalize:
+
+```text
+✓ Functional requirements
+✓ Non-functional requirements
+✓ User roles
+✓ Use cases
+✓ Entity model
+✓ ER diagram
+✓ Backend architecture
+✓ Next.js architecture
+✓ Route structure
+✓ Rendering strategy
+✓ Authentication strategy
+✓ Authorization strategy
+✓ Order architecture
+✓ Payment architecture
+✓ Inventory concurrency strategy
+✓ Redis strategy
+✓ SignalR strategy
+✓ SEO strategy
+✓ API conventions
+✓ Testing strategy
+```
+
+Then proceed sequentially.
+
+**Do not begin random feature implementation before Phase 1 is complete.**
+
+---
+
+# END OF MASTER REFERENCE
