@@ -21,14 +21,28 @@ namespace Marketplace.API.Controllers;
 [ApiController]
 [Route("api/seller/products")]
 [Authorize(Policy = Security.AuthorizationPolicies.SellerOnly)]
-public sealed class SellerProductsController(IProductService products) : ControllerBase
+public sealed class SellerProductsController(IProductService products, Marketplace.Application.Common.Interfaces.ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<ProductSummaryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List([FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? search, [FromQuery] string? status, CancellationToken cancellationToken) =>
         Ok(await products.ListAsync(new ProductQuery(
-            page, pageSize, search, null, null, null, null, null, null, null, null, null,
-            Enum.TryParse<ProductStatus>(status, true, out var parsed) ? parsed : null), cancellationToken));
+            Page: page,
+            PageSize: pageSize,
+            Search: search,
+            CategoryId: null,
+            CategorySlug: null,
+            // The scope comes from the token, never from the query string, and it is what
+            // makes drafts and rejected products visible to their own seller.
+            SellerId: currentUser.SellerId,
+            SellerSlug: null,
+            MinPrice: null,
+            MaxPrice: null,
+            MinRating: null,
+            InStock: null,
+            OnSale: null,
+            Status: Enum.TryParse<ProductStatus>(status, true, out var parsed) ? parsed : null,
+            IncludeUnpublished: true), cancellationToken));
 
     [HttpPost]
     [ProducesResponseType(typeof(ProductSummaryResponse), StatusCodes.Status201Created)]
@@ -81,8 +95,20 @@ public sealed class AdminProductsController(IProductService products) : Controll
     [ProducesResponseType(typeof(PagedResult<ProductSummaryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List([FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? search, [FromQuery] string? status, CancellationToken cancellationToken) =>
         Ok(await products.ListAsync(new ProductQuery(
-            page, pageSize, search, null, null, null, null, null, null, null, null, null,
-            Enum.TryParse<ProductStatus>(status, true, out var parsed) ? parsed : null), cancellationToken));
+            Page: page,
+            PageSize: pageSize,
+            Search: search,
+            CategoryId: null,
+            CategorySlug: null,
+            // An admin reviews the whole catalogue, so no seller scope is applied.
+            SellerId: null,
+            SellerSlug: null,
+            MinPrice: null,
+            MaxPrice: null,
+            MinRating: null,
+            InStock: null,
+            OnSale: null,
+            Status: Enum.TryParse<ProductStatus>(status, true, out var parsed) ? parsed : null), cancellationToken));
 
     [HttpPut("{id:guid}/approval")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
