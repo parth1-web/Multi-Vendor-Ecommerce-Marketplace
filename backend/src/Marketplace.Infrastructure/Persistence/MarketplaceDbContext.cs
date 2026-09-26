@@ -12,6 +12,7 @@ using Marketplace.Domain.Refunds;
 using Marketplace.Domain.Reviews;
 using Marketplace.Domain.Sellers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Marketplace.Infrastructure.Persistence;
 
@@ -83,7 +84,34 @@ public class MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> options
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MarketplaceDbContext).Assembly);
         modelBuilder.ApplyGlobalFilters();
+        DeclareApplicationGeneratedKeys(modelBuilder);
         base.OnModelCreating(modelBuilder);
+    }
+
+    /// <summary>
+    /// States that every primary key comes from the domain, never from the database.
+    /// </summary>
+    /// <remarks>
+    /// EF assumes a Guid key is store-generated, so an entity it discovers through a tracked
+    /// parent's collection looks like a row that is already stored: it is tracked as modified
+    /// and the insert becomes an update that matches nothing. Saying the key is application
+    /// generated is what lets change detection recognise those children as new, wherever in the
+    /// graph they are added.
+    /// </remarks>
+    private static void DeclareApplicationGeneratedKeys(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (entityType.FindPrimaryKey() is not { } key)
+            {
+                continue;
+            }
+
+            foreach (var property in key.Properties)
+            {
+                property.ValueGenerated = ValueGenerated.Never;
+            }
+        }
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
