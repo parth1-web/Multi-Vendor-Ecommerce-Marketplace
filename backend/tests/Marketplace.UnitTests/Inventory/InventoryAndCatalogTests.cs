@@ -173,9 +173,13 @@ public sealed class InventoryTests
         var inventory = Create(5);
         inventory.Reserve(2, Now);
 
-        var first = InventoryTransaction.Record(inventory, InventoryTransactionType.ReservationRelease, 2, "Order", reservation.OrderId, "release", null, Now);
+        // A release moves the reserved count, so the ledger brackets that rather than the
+        // quantity on hand, which the release does not touch.
+        var reservedBefore = inventory.ReservedQuantity;
+        var first = InventoryTransaction.Record(inventory, InventoryTransactionType.ReservationRelease, -2, reservedBefore, "Order", reservation.OrderId, "release", null, Now);
         inventory.ReleaseReservation(2, Now);
-        first.QuantityBefore.Should().Be(5);
+        first.QuantityBefore.Should().Be(reservedBefore);
+        first.QuantityAfter.Should().Be(reservedBefore - 2);
 
         var act = () => inventory.ReleaseReservation(2, Now);
         act.Should().Throw<BusinessRuleException>();

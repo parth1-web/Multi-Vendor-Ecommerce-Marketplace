@@ -73,10 +73,21 @@ public class InventoryTransaction : Entity
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>
+    /// Writes one movement into the ledger.
+    /// </summary>
+    /// <remarks>
+    /// The starting quantity is passed in rather than read from <paramref name="inventory"/>
+    /// because not every movement touches the same counter, and because the value has to be
+    /// read before the change is applied. An adjustment and a completed sale move what is
+    /// available; holding and releasing stock move what is reserved. Reading the wrong counter,
+    /// or reading it after the change, is how a stocktake ends up disagreeing with the ledger.
+    /// </remarks>
     public static InventoryTransaction Record(
         Inventory inventory,
         InventoryTransactionType type,
         int quantityDelta,
+        int quantityBefore,
         string? referenceType,
         Guid? referenceId,
         string? reason,
@@ -93,8 +104,8 @@ public class InventoryTransaction : Entity
             inventory.SellerId,
             type,
             quantityDelta,
-            inventory.AvailableQuantity,
-            inventory.AvailableQuantity + quantityDelta,
+            quantityBefore,
+            quantityBefore + quantityDelta,
             referenceType,
             referenceId,
             reason,

@@ -124,8 +124,9 @@ public sealed class InventoryService(
         var before = inventory.AvailableQuantity;
         var type = request.Delta > 0 ? InventoryTransactionType.Restock : InventoryTransactionType.Damage;
 
+        // The ledger brackets what is on hand, so the row is written before the change.
+        var transaction = InventoryTransaction.Record(inventory, type, request.Delta, before, "ManualAdjustment", null, request.Reason, currentUser.UserId, now);
         inventory.Adjust(request.Delta, now);
-        var transaction = InventoryTransaction.Record(inventory, type, request.Delta, "ManualAdjustment", null, request.Reason, currentUser.UserId, now);
         await transactions.AddAsync(transaction, cancellationToken).ConfigureAwait(false);
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -237,10 +238,14 @@ public sealed class InventoryService(
             .FirstAsync(i => i.Id == inventory.Id, cancellationToken)
             .ConfigureAwait(false);
 
+        // A hold does not touch what is on hand, only what is reserved, so the row
+        // brackets the reserved count: the value the conditional update started from.
+        var reservedBefore = refreshed.ReservedQuantity + quantity;
         var ledger = InventoryTransaction.Record(
             refreshed,
             InventoryTransactionType.Reservation,
-            -quantity,
+            quantity,
+            reservedBefore,
             nameof(Domain.Orders.Order),
             orderId,
             "checkout",
@@ -300,10 +305,13 @@ public sealed class InventoryService(
 
         reservation.Release(now, reason);
 
+        // Releasing a hold moves the reserved count back down, so the row brackets that.
+        var reservedBefore = inventory.ReservedQuantity;
         var ledger = InventoryTransaction.Record(
             inventory,
             InventoryTransactionType.ReservationRelease,
-            reservation.Quantity,
+            -reservation.Quantity,
+            reservedBefore,
             nameof(Domain.Orders.Order),
             reservation.OrderId,
             reason,
@@ -334,12 +342,15 @@ public sealed class InventoryService(
             return Result.Failure("Reserved quantity is inconsistent; manual review required.");
         }
 
+        // Completing a sale takes the units off the shelf, so the row brackets what is on hand.
+        var availableBefore = inventory.AvailableQuantity;
         inventory.CommitSale(reservation.Quantity, now);
 
         var ledger = InventoryTransaction.Record(
             inventory,
             InventoryTransactionType.Sale,
             -reservation.Quantity,
+            availableBefore,
             nameof(Domain.Orders.Order),
             reservation.OrderId,
             "payment-settled",
