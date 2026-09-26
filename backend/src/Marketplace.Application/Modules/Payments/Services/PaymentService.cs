@@ -59,7 +59,7 @@ public sealed class PaymentService(
 
         if (order is null)
         {
-            return Result<PaymentResponse>.Failure("Order not found.");
+            return Result<PaymentResponse>.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         if (order.IsPaid)
@@ -129,7 +129,7 @@ public sealed class PaymentService(
 
         if (payment is null)
         {
-            return Result<PaymentResponse>.Failure("Payment not found.");
+            return Result<PaymentResponse>.Failure("Payment not found.", ResultErrorCodes.NotFound);
         }
 
         return Result<PaymentResponse>.Success(await MapAsync(payment, cancellationToken).ConfigureAwait(false));
@@ -144,7 +144,7 @@ public sealed class PaymentService(
 
         if (payment is null)
         {
-            return Result<PaymentResponse>.Failure("Payment not found.");
+            return Result<PaymentResponse>.Failure("Payment not found.", ResultErrorCodes.NotFound);
         }
 
         if (payment.IsSettled)
@@ -249,7 +249,7 @@ public sealed class PaymentService(
         {
             record.MarkFailed("payment-not-found", now);
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            return Result<PaymentResponse>.Failure("Payment not found for this event.");
+            return Result<PaymentResponse>.Failure("Payment not found for this event.", ResultErrorCodes.NotFound);
         }
 
         record.MarkProcessed(payment.Id, now);

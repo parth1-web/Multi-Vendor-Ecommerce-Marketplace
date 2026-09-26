@@ -113,7 +113,7 @@ public sealed class ReviewService(
         var product = await products.Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result<ReviewResponse>.Failure("Product not found.");
+            return Result<ReviewResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
 
         if (orderItem!.ProductId != productId)
@@ -155,7 +155,7 @@ public sealed class ReviewService(
         var review = await reviews.Query().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
-            return Result<ReviewResponse>.Failure("Review not found.");
+            return Result<ReviewResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
         if (review.CustomerId != currentUser.UserId && !currentUser.IsAdmin)
@@ -179,7 +179,7 @@ public sealed class ReviewService(
         var review = await reviews.Query().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
-            return Result.Failure("Review not found.");
+            return Result.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
         if (review.CustomerId != currentUser.UserId && !currentUser.IsAdmin)
@@ -200,7 +200,7 @@ public sealed class ReviewService(
         var review = await reviews.Query().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
-            return Result<ReviewResponse>.Failure("Review not found.");
+            return Result<ReviewResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
         var now = clock.UtcNow;
@@ -224,7 +224,7 @@ public sealed class ReviewService(
         var review = await reviews.Query().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
-            return Result<ReviewReplyResponse>.Failure("Review not found.");
+            return Result<ReviewReplyResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
         var ownsProduct = await products.AnyAsync(p => p.Id == review.ProductId && p.SellerId == sellerId, cancellationToken).ConfigureAwait(false);
@@ -252,7 +252,7 @@ public sealed class ReviewService(
         var review = await reviews.Query().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
-            return Result.Failure("Review not found.");
+            return Result.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
         review.MarkHelpful();
@@ -265,7 +265,7 @@ public sealed class ReviewService(
         var review = await reviews.Query().AsNoTracking().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
-            return Result<ReviewResponse>.Failure("Review not found.");
+            return Result<ReviewResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
         var single = new PagedResult<ReviewResponse>(

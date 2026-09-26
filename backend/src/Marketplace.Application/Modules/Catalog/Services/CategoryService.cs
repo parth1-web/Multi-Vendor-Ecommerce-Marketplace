@@ -56,7 +56,7 @@ public sealed class CategoryService(
 
         if (category is null)
         {
-            return Result<CategoryResponse>.Failure("Category not found.");
+            return Result<CategoryResponse>.Failure("Category not found.", ResultErrorCodes.NotFound);
         }
 
         return Result<CategoryResponse>.Success(await BuildDetailAsync(category, cancellationToken).ConfigureAwait(false));
@@ -106,7 +106,7 @@ public sealed class CategoryService(
         var category = await categories.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (category is null)
         {
-            return Result<CategoryResponse>.Failure("Category not found.");
+            return Result<CategoryResponse>.Failure("Category not found.", ResultErrorCodes.NotFound);
         }
 
         category.Update(request.Name, request.Description, request.ImageUrl, request.DisplayOrder, clock.UtcNow);
@@ -137,7 +137,7 @@ public sealed class CategoryService(
         var category = await categories.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (category is null)
         {
-            return Result.Failure("Category not found.");
+            return Result.Failure("Category not found.", ResultErrorCodes.NotFound);
         }
 
         var childCount = await categories.CountAsync(c => c.ParentId == id && !c.IsDeleted, cancellationToken).ConfigureAwait(false);

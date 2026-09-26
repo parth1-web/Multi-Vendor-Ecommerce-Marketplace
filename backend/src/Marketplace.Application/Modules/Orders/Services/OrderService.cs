@@ -195,7 +195,7 @@ public sealed class OrderService(
 
         if (sellerOrder is null)
         {
-            return Result<SellerOrderSummaryResponse>.Failure("Order not found.");
+            return Result<SellerOrderSummaryResponse>.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         var dto = new SellerOrderSummaryResponse(

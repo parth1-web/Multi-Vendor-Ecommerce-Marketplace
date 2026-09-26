@@ -90,7 +90,7 @@ public sealed class WishlistService(
         var productExists = await products.AnyAsync(p => p.Id == productId && !p.IsDeleted, cancellationToken).ConfigureAwait(false);
         if (!productExists)
         {
-            return Result<IReadOnlyList<WishlistItemResponse>>.Failure("Product not found.");
+            return Result<IReadOnlyList<WishlistItemResponse>>.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
 
         var wishlist = await LoadTrackedAsync(cancellationToken).ConfigureAwait(false);
@@ -110,7 +110,7 @@ public sealed class WishlistService(
         var wishlist = await LoadTrackedAsync(cancellationToken).ConfigureAwait(false);
         if (wishlist is null)
         {
-            return Result.Failure("Wishlist not found.");
+            return Result.Failure("Wishlist not found.", ResultErrorCodes.NotFound);
         }
 
         wishlist.Remove(productId, clock.UtcNow);

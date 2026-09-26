@@ -112,7 +112,7 @@ public sealed class InventoryService(
         var inventory = await ScopedQuery().FirstOrDefaultAsync(i => i.ProductVariantId == variantId, cancellationToken).ConfigureAwait(false);
         if (inventory is null)
         {
-            return Result<InventoryItemResponse>.Failure("Inventory record not found.");
+            return Result<InventoryItemResponse>.Failure("Inventory record not found.", ResultErrorCodes.NotFound);
         }
 
         if (request.Delta < 0 && Math.Abs(request.Delta) > inventory.AvailableQuantity)
@@ -149,7 +149,7 @@ public sealed class InventoryService(
         var inventory = await ScopedQuery().FirstOrDefaultAsync(i => i.ProductVariantId == variantId, cancellationToken).ConfigureAwait(false);
         if (inventory is null)
         {
-            return Result.Failure("Inventory record not found.");
+            return Result.Failure("Inventory record not found.", ResultErrorCodes.NotFound);
         }
 
         inventory.SetLowStockThreshold(request.LowStockThreshold, clock.UtcNow);
@@ -281,7 +281,7 @@ public sealed class InventoryService(
         var inventory = await inventories.Query().FirstOrDefaultAsync(i => i.Id == reservation.InventoryId, cancellationToken).ConfigureAwait(false);
         if (inventory is null)
         {
-            return Result.Failure("Inventory record not found.");
+            return Result.Failure("Inventory record not found.", ResultErrorCodes.NotFound);
         }
 
         if (inventory.ReservedQuantity < reservation.Quantity)
@@ -327,14 +327,14 @@ public sealed class InventoryService(
     {
         if (reservation is null)
         {
-            return Result.Failure("Reservation not found.");
+            return Result.Failure("Reservation not found.", ResultErrorCodes.NotFound);
         }
 
         var now = clock.UtcNow;
         var inventory = await inventories.Query().FirstOrDefaultAsync(i => i.Id == reservation.InventoryId, cancellationToken).ConfigureAwait(false);
         if (inventory is null)
         {
-            return Result.Failure("Inventory record not found.");
+            return Result.Failure("Inventory record not found.", ResultErrorCodes.NotFound);
         }
 
         if (inventory.ReservedQuantity < reservation.Quantity)

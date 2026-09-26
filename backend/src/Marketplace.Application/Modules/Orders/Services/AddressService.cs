@@ -66,7 +66,7 @@ public sealed class AddressService(
 
         if (address is null)
         {
-            return Result<AddressResponse>.Failure("Address not found.");
+            return Result<AddressResponse>.Failure("Address not found.", ResultErrorCodes.NotFound);
         }
 
         address.Update(
@@ -86,7 +86,7 @@ public sealed class AddressService(
 
         if (address is null)
         {
-            return Result.Failure("Address not found.");
+            return Result.Failure("Address not found.", ResultErrorCodes.NotFound);
         }
 
         addresses.Remove(address);
@@ -102,7 +102,7 @@ public sealed class AddressService(
 
         if (address is null)
         {
-            return Result.Failure("Address not found.");
+            return Result.Failure("Address not found.", ResultErrorCodes.NotFound);
         }
 
         await ClearDefaultsAsync(currentUser.UserId, cancellationToken).ConfigureAwait(false);

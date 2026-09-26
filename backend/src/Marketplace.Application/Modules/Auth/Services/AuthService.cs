@@ -232,7 +232,7 @@ public sealed class AuthService(
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return Result<UserResponse>.Failure("User not found.");
+            return Result<UserResponse>.Failure("User not found.", ResultErrorCodes.NotFound);
         }
 
         var dto = await MapAsync(user, cancellationToken).ConfigureAwait(false);
@@ -244,7 +244,7 @@ public sealed class AuthService(
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return Result<UserResponse>.Failure("User not found.");
+            return Result<UserResponse>.Failure("User not found.", ResultErrorCodes.NotFound);
         }
 
         user.UpdateProfile(request.FirstName, request.LastName, request.PhoneNumber, request.AvatarUrl, clock.UtcNow);
@@ -259,7 +259,7 @@ public sealed class AuthService(
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
-            return Result.Failure("User not found.");
+            return Result.Failure("User not found.", ResultErrorCodes.NotFound);
         }
 
         if (!passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))

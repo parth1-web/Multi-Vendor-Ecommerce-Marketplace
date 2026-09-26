@@ -160,7 +160,7 @@ public sealed class RefundService(
 
         if (refund is null)
         {
-            return Result<RefundResponse>.Failure("Refund not found.");
+            return Result<RefundResponse>.Failure("Refund not found.", ResultErrorCodes.NotFound);
         }
 
         return Result<RefundResponse>.Success(await MapAsync(refund, cancellationToken).ConfigureAwait(false));
@@ -212,7 +212,7 @@ public sealed class RefundService(
 
         if (refund is null)
         {
-            return Result<RefundResponse>.Failure("Refund not found.");
+            return Result<RefundResponse>.Failure("Refund not found.", ResultErrorCodes.NotFound);
         }
 
         var now = clock.UtcNow;
@@ -270,7 +270,7 @@ public sealed class RefundService(
         {
             refund.MarkFailed("Payment record not found", now);
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            return Result<RefundResponse>.Failure("Payment record not found.");
+            return Result<RefundResponse>.Failure("Payment record not found.", ResultErrorCodes.NotFound);
         }
 
         var gateway = gateways.Resolve(payment.Provider);

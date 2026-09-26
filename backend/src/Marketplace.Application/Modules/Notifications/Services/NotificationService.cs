@@ -117,7 +117,7 @@ public sealed class NotificationService(
 
         if (notification is null)
         {
-            return Result.Failure("Notification not found.");
+            return Result.Failure("Notification not found.", ResultErrorCodes.NotFound);
         }
 
         notification.MarkRead(clock.UtcNow);
@@ -150,7 +150,7 @@ public sealed class NotificationService(
 
         if (notification is null)
         {
-            return Result.Failure("Notification not found.");
+            return Result.Failure("Notification not found.", ResultErrorCodes.NotFound);
         }
 
         notifications.Remove(notification);

@@ -55,7 +55,7 @@ public sealed class SellerService(
         var seller = await sellers.GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
         if (seller is null)
         {
-            return Result<SellerResponse>.Failure("Seller not found.");
+            return Result<SellerResponse>.Failure("Seller not found.", ResultErrorCodes.NotFound);
         }
 
         return Result<SellerResponse>.Success(await MapAsync(seller, cancellationToken).ConfigureAwait(false));
@@ -109,7 +109,7 @@ public sealed class SellerService(
         var seller = await sellers.GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
         if (seller is null)
         {
-            return Result<SellerResponse>.Failure("Seller not found.");
+            return Result<SellerResponse>.Failure("Seller not found.", ResultErrorCodes.NotFound);
         }
 
         seller.UpdateProfile(
@@ -135,7 +135,7 @@ public sealed class SellerService(
         var seller = await sellers.GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
         if (seller is null)
         {
-            return Result<SellerResponse>.Failure("Seller not found.");
+            return Result<SellerResponse>.Failure("Seller not found.", ResultErrorCodes.NotFound);
         }
 
         var previous = seller.Status;
@@ -191,13 +191,13 @@ public sealed class SellerService(
 
         if (store is null || !store.IsActive)
         {
-            return Result<StoreProfileResponse>.Failure("Store not found.");
+            return Result<StoreProfileResponse>.Failure("Store not found.", ResultErrorCodes.NotFound);
         }
 
         var seller = await sellers.GetByIdAsync(store.SellerId, cancellationToken).ConfigureAwait(false);
         if (seller is null || !seller.IsActive)
         {
-            return Result<StoreProfileResponse>.Failure("Store not found.");
+            return Result<StoreProfileResponse>.Failure("Store not found.", ResultErrorCodes.NotFound);
         }
 
         var productPage = await products.Query()
@@ -263,11 +263,11 @@ public sealed class SellerService(
         var store = await stores.Query().AsNoTracking().FirstOrDefaultAsync(s => s.SellerId == sellerId, cancellationToken).ConfigureAwait(false);
         if (store is null)
         {
-            return Result<StoreProfileResponse>.Failure("Store not found.");
+            return Result<StoreProfileResponse>.Failure("Store not found.", ResultErrorCodes.NotFound);
         }
 
         var result = await GetStoreBySlugAsync(store.SlugValue, new PageRequest(1, 24), cancellationToken).ConfigureAwait(false);
-        return result.IsSuccess ? result : Result<StoreProfileResponse>.Failure("Store not found.");
+        return result.IsSuccess ? result : Result<StoreProfileResponse>.Failure("Store not found.", ResultErrorCodes.NotFound);
     }
 
     public async Task<Result<StoreProfileResponse>> UpdateOwnStoreAsync(UpdateStoreRequest request, CancellationToken cancellationToken = default)
@@ -280,7 +280,7 @@ public sealed class SellerService(
         var store = await stores.Query().FirstOrDefaultAsync(s => s.SellerId == sellerId, cancellationToken).ConfigureAwait(false);
         if (store is null)
         {
-            return Result<StoreProfileResponse>.Failure("Store not found.");
+            return Result<StoreProfileResponse>.Failure("Store not found.", ResultErrorCodes.NotFound);
         }
 
         store.UpdateProfile(

@@ -104,19 +104,19 @@ public sealed class CartService(
         var cart = await ResolveCartAsync(guestToken, createIfMissing: false, cancellationToken).ConfigureAwait(false);
         if (cart is null)
         {
-            return Result<CartResponse>.Failure("Cart not found.");
+            return Result<CartResponse>.Failure("Cart not found.", ResultErrorCodes.NotFound);
         }
 
         var tracked = await LoadTrackedCartAsync(cart.Id, cancellationToken).ConfigureAwait(false);
         if (tracked is null)
         {
-            return Result<CartResponse>.Failure("Cart not found.");
+            return Result<CartResponse>.Failure("Cart not found.", ResultErrorCodes.NotFound);
         }
 
         var item = tracked.Items.FirstOrDefault(i => i.Id == itemId);
         if (item is null)
         {
-            return Result<CartResponse>.Failure("Item not found in this cart.");
+            return Result<CartResponse>.Failure("Item not found in this cart.", ResultErrorCodes.NotFound);
         }
 
         var sellable = await inventories.Query().AsNoTracking()
@@ -141,13 +141,13 @@ public sealed class CartService(
         var cart = await ResolveCartAsync(guestToken, createIfMissing: false, cancellationToken).ConfigureAwait(false);
         if (cart is null)
         {
-            return Result<CartResponse>.Failure("Cart not found.");
+            return Result<CartResponse>.Failure("Cart not found.", ResultErrorCodes.NotFound);
         }
 
         var tracked = await LoadTrackedCartAsync(cart.Id, cancellationToken).ConfigureAwait(false);
         if (tracked is null)
         {
-            return Result<CartResponse>.Failure("Cart not found.");
+            return Result<CartResponse>.Failure("Cart not found.", ResultErrorCodes.NotFound);
         }
 
         tracked.RemoveItem(itemId, clock.UtcNow);
@@ -161,13 +161,13 @@ public sealed class CartService(
         var cart = await ResolveCartAsync(guestToken, createIfMissing: false, cancellationToken).ConfigureAwait(false);
         if (cart is null)
         {
-            return Result<CartResponse>.Failure("Cart not found.");
+            return Result<CartResponse>.Failure("Cart not found.", ResultErrorCodes.NotFound);
         }
 
         var tracked = await LoadTrackedCartAsync(cart.Id, cancellationToken).ConfigureAwait(false);
         if (tracked is null)
         {
-            return Result<CartResponse>.Failure("Cart not found.");
+            return Result<CartResponse>.Failure("Cart not found.", ResultErrorCodes.NotFound);
         }
 
         tracked.ToggleSavedForLater(itemId, clock.UtcNow);

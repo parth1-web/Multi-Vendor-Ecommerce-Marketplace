@@ -128,7 +128,7 @@ public sealed class CouponService(
         var coupon = await coupons.Query().FirstOrDefaultAsync(c => c.Id == id, cancellationToken).ConfigureAwait(false);
         if (coupon is null)
         {
-            return Result<CouponResponse>.Failure("Coupon not found.");
+            return Result<CouponResponse>.Failure("Coupon not found.", ResultErrorCodes.NotFound);
         }
 
         if (!currentUser.IsAdmin)
@@ -163,7 +163,7 @@ public sealed class CouponService(
         var coupon = await coupons.Query().FirstOrDefaultAsync(c => c.Id == id, cancellationToken).ConfigureAwait(false);
         if (coupon is null)
         {
-            return Result.Failure("Coupon not found.");
+            return Result.Failure("Coupon not found.", ResultErrorCodes.NotFound);
         }
 
         if (!currentUser.IsAdmin && (currentUser.SellerId is not { } sellerId || coupon.SellerId != sellerId))
