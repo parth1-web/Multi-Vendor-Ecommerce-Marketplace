@@ -85,4 +85,50 @@ public class MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> options
         modelBuilder.ApplyGlobalFilters();
         base.OnModelCreating(modelBuilder);
     }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampConcurrencyTokens();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        StampConcurrencyTokens();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gives every inserted or updated row a fresh concurrency token.
+    /// </summary>
+    /// <remarks>
+    /// The token is a real column rather than a provider system column, so nothing fills it in
+    /// on the way in. Leaving it to the database would mean an <c>UPDATE</c> never changes the
+    /// value, the <c>WHERE RowVersion = @original</c> clause would then always match, and a
+    /// lost update would go undetected. Stamping here keeps the guarantee identical on every
+    /// provider: the value EF sends in the WHERE clause is the one it read, and the value it
+    /// writes is always new.
+    /// </remarks>
+    private void StampConcurrencyTokens()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified))
+            {
+                continue;
+            }
+
+            if (entry.Metadata.FindProperty(ConcurrencyTokenConfiguration.RowVersionPropertyName) is not { } property)
+            {
+                continue;
+            }
+
+            if (property.ClrType != typeof(byte[]))
+            {
+                continue;
+            }
+
+            entry.CurrentValues[property.Name] = ConcurrencyTokenConfiguration.NewToken();
+        }
+    }
 }

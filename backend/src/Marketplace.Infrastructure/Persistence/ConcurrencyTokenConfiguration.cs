@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Marketplace.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -5,42 +6,30 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace Marketplace.Infrastructure.Persistence;
 
 /// <summary>
-/// Configures optimistic-concurrency tokens in a provider-aware way.
+/// Maps the optimistic-concurrency token carried by every mutable aggregate root.
 /// </summary>
 /// <remarks>
-/// Production runs PostgreSQL, where <c>IsRowVersion()</c> maps the token to the
-/// <c>xmax</c> system column and EF issues
-/// <c>UPDATE … WHERE rowversion = @p</c>, giving true lost-update detection.
-///
-/// Providers without a native rowversion (SQLite, used by the integration suite) get a
-/// plain concurrency token with a blob default so the schema is still valid; the token is
-/// not auto-mutated there, so concurrency is exercised only on PostgreSQL. Everything the
-/// test suite asserts about correctness — conditional UPDATEs, unique indexes, check
-/// constraints and transactions — behaves identically on both.
+/// The token is stored as an ordinary column and a fresh value is stamped on insert and on
+/// every update by <see cref="MarketplaceDbContext"/>. It is deliberately not mapped with
+/// <c>IsRowVersion()</c>: that maps the property onto a provider system column, which no
+/// database will fill in for a column the migration actually creates, so every insert would
+/// fail the not-null constraint. Stamping the value in the change tracker instead keeps one
+/// behaviour on every provider, and EF still emits
+/// <c>UPDATE … WHERE RowVersion = @original</c> for genuine lost-update detection.
 /// </remarks>
 public static class ConcurrencyTokenConfiguration
 {
     /// <summary>Name of the concurrency token property on every mutable aggregate root.</summary>
     public const string RowVersionPropertyName = "RowVersion";
 
-    /// <summary>Applies the right concurrency mapping for the current provider.</summary>
+    /// <summary>Length of a generated token, in bytes.</summary>
+    private const int TokenLength = 8;
+
+    /// <summary>Applies the concurrency mapping to an entity's token property.</summary>
     public static PropertyBuilder<byte[]> ConfigureRowVersion<TEntity>(this EntityTypeBuilder<TEntity> builder)
-        where TEntity : class
-    {
-        var providerName = MarketplaceDbContext.CurrentProviderName;
-        var property = builder.Property<byte[]>(RowVersionPropertyName);
+        where TEntity : class =>
+        builder.Property<byte[]>(RowVersionPropertyName).IsConcurrencyToken();
 
-        if (IsPostgres(providerName))
-        {
-            return property.IsRowVersion();
-        }
-
-        // No native rowversion: keep the value EF-managed and treat it as a plain
-        // concurrency token. Correctness on this provider comes from conditional UPDATEs,
-        // unique indexes and transactions rather than from the token.
-        return property.IsConcurrencyToken();
-    }
-
-    private static bool IsPostgres(string? providerName) =>
-        providerName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+    /// <summary>Creates a new, random concurrency token.</summary>
+    public static byte[] NewToken() => RandomNumberGenerator.GetBytes(TokenLength);
 }
