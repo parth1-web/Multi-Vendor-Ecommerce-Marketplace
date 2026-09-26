@@ -67,6 +67,46 @@
   margin: 0;
 }
 
+/*
+ * Messages that interrupt a form. The colour is a second signal, never the only one: every
+ * alert says what happened in words, because a red box that only says "error" tells a person
+ * nothing they can act on.
+ */
+.mp-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: var(--fs-sm);
+}
+
+.mp-alert-danger {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+  border-color: color-mix(in srgb, var(--danger) 25%, transparent);
+}
+
+.mp-alert-success {
+  color: var(--success);
+  background-color: var(--success-bg);
+  border-color: color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+.mp-alert-warning {
+  color: var(--warning);
+  background-color: var(--warning-bg);
+  border-color: color-mix(in srgb, var(--warning) 25%, transparent);
+}
+
+.mp-alert-info {
+  color: var(--info);
+  background-color: var(--info-bg);
+  border-color: color-mix(in srgb, var(--info) 25%, transparent);
+}
+
 /* Focus is never removed, only restyled: a keyboard user must always see where they are. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-500);
