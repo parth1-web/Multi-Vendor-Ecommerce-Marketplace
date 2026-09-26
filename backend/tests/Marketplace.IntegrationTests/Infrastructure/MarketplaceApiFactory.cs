@@ -13,25 +13,31 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Data.Sqlite;
+using Npgsql;
 
 namespace Marketplace.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Boots the real API pipeline against an in-memory relational database, a frozen clock,
-/// an in-process cache and a no-op realtime notifier. No PostgreSQL or Redis required.
+/// Boots the real API pipeline against a real PostgreSQL database, a frozen clock, an
+/// in-process cache and a recording realtime notifier. Each factory owns a private database
+/// that is created, migrated and dropped around the run, so tests exercise the same provider,
+/// the same generated SQL and the same migrations as production without touching real data.
 /// </summary>
 public class MarketplaceApiFactory : WebApplicationFactory<Program>
 {
-    /// <summary>Connection string for the shared in-memory SQLite database.</summary>
-    public const string ConnectionName = "marketplace-tests";
+    /// <summary>Environment variable that overrides the server the test databases are created on.</summary>
+    public const string ServerVariable = "MARKETPLACE_TEST_POSTGRES";
 
-    private bool _schemaCreated;
+    private bool _databaseReady;
 
-    /// <summary>Held open for the factory's lifetime so the shared in-memory database survives.</summary>
-    private readonly SqliteConnection _keepAlive = new();
+    /// <summary>Name of the private database this factory owns.</summary>
+    private readonly string _databaseName = $"marketplace_test_{Guid.NewGuid():N}";
 
-    private readonly string _connectionString = $"DataSource=marketplace-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+    /// <summary>Connection string for the throwaway database under test.</summary>
+    private string? _connectionString;
+
+    /// <summary>Connection string used to create and drop the throwaway database.</summary>
+    private string? _controlConnectionString;
 
     /// <summary>Extra configuration values a test wants to override.</summary>
     private readonly Dictionary<string, string?> _overrides = new(StringComparer.OrdinalIgnoreCase);
@@ -58,6 +64,21 @@ public class MarketplaceApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureAppConfiguration(config =>
         {
+            // The app's own configuration is already registered here, so the test server
+            // credentials come from the same place a developer runs the API from. An
+            // environment variable wins for CI, where the password is a secret.
+            var loaded = config.Build();
+            var configured = loaded["ConnectionStrings:DefaultConnection"];
+            var server = Environment.GetEnvironmentVariable(ServerVariable)
+                         ?? configured
+
+                         ?? throw new InvalidOperationException(
+                             $"No PostgreSQL connection string. Set ConnectionStrings:DefaultConnection or the {ServerVariable} environment variable.");
+
+            var target = new NpgsqlConnectionStringBuilder(server) { Database = _databaseName };
+            _connectionString = target.ConnectionString;
+            _controlConnectionString = new NpgsqlConnectionStringBuilder(server) { Database = "postgres" }.ConnectionString;
+
             var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["ConnectionStrings:DefaultConnection"] = _connectionString,
@@ -92,22 +113,6 @@ public class MarketplaceApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Replace the Npgsql registration with SQLite.
-            services.RemoveAll<DbContextOptions<Marketplace.Infrastructure.Persistence.MarketplaceDbContext>>();
-            services.RemoveAll<DbContextOptions>();
-
-            services.AddDbContext<Marketplace.Infrastructure.Persistence.MarketplaceDbContext>(options =>
-            {
-                options.UseSqlite(_connectionString);
-
-                if (Environment.GetEnvironmentVariable("EF_SQL_LOG") == "1")
-                {
-                    var logPath = Path.Combine(Path.GetTempPath(), "ef-sql.log");
-                    options.LogTo(message => File.AppendAllText(logPath, message + Environment.NewLine), LogLevel.Information)
-                        .EnableSensitiveDataLogging();
-                }
-            });
-
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(Clock);
 
@@ -116,34 +121,83 @@ public class MarketplaceApiFactory : WebApplicationFactory<Program>
         });
     }
 
-    /// <summary>Creates the schema and seeds a deterministic marketplace.</summary>
     /// <summary>
-    /// Creates the schema once per factory and returns a seeder bound to a scope that stays
-    /// alive for the duration of the test class.
+    /// Creates this factory's private database, brings it up to date with the real migrations
+    /// and returns a seeder bound to a scope that stays alive for the duration of the class.
+    /// Applying the migrations rather than EnsureCreated means the suite also proves the
+    /// generated PostgreSQL schema is valid.
     /// </summary>
     public async Task<MarketplaceTestData> CreateDatabaseAsync()
     {
-        if (_schemaCreated)
+        if (_databaseReady)
         {
             return new MarketplaceTestData(Services, Clock);
         }
 
-        if (_keepAlive.State != System.Data.ConnectionState.Open)
-        {
-            _keepAlive.ConnectionString = _connectionString;
-            await _keepAlive.OpenAsync();
-        }
+        // Touching Services builds the host, which is what runs the configuration callback
+        // that works out which server and database this factory owns.
+        _ = Services;
+
+        await CreateDatabaseOnServerAsync(CancellationToken.None).ConfigureAwait(false);
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<Marketplace.Infrastructure.Persistence.MarketplaceDbContext>();
 
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.MigrateAsync().ConfigureAwait(false);
 
-        _schemaCreated = true;
+        _databaseReady = true;
         return new MarketplaceTestData(Services, Clock);
     }
-}
 
+    private async Task CreateDatabaseOnServerAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(RequireControlConnectionString());
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"CREATE DATABASE \"{_databaseName}\"";
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task DropDatabaseOnServerAsync(CancellationToken cancellationToken)
+    {
+        NpgsqlConnection.ClearAllPools();
+
+        await using var connection = new NpgsqlConnection(RequireControlConnectionString());
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"DROP DATABASE IF EXISTS \"{_databaseName}\" WITH (FORCE)";
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private string RequireControlConnectionString() =>
+        _controlConnectionString
+        ?? throw new InvalidOperationException(
+            "The test host was never configured, so there is no server to create a database on.");
+
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (!disposing || _controlConnectionString is null)
+        {
+            return;
+        }
+
+        try
+        {
+            DropDatabaseOnServerAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            // A database that cannot be dropped must never fail an otherwise green run; it is
+            // named after the run, so a later clean-up can remove it.
+            Console.WriteLine($"Could not drop test database {_databaseName}: {ex.Message}");
+        }
+    }
+}
 /// <summary>Deterministic clock so date-sensitive rules can be tested.</summary>
 public sealed class FixedClock(DateTimeOffset? now = null) : IClock
 {
