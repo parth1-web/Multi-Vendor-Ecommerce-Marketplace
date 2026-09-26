@@ -33,13 +33,26 @@ npm run build
 
 ### Backend
 
+Migrations and the demo seed only run outside Production, so a local run needs the
+Development environment. Without it the API starts against an empty schema and every
+catalogue request fails on a missing table.
+
 ```powershell
 # PowerShell
-$env:ConnectionStrings__DefaultConnection = "Host=localhost;Database=Marketplace;Username=postgres;Password=<password>"
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:ConnectionStrings__DefaultConnection = "Host=localhost;Database=marketplace;Username=postgres;Password=<password>"
 $env:Jwt__Key = "<at-least-32-characters-development-key>"
 $env:Redis__Enabled = "false"
 $env:Payment__DefaultProvider = "Mock"
 ```
+
+The database itself is not created for you: create it once with
+`createdb -U postgres marketplace`, or let `dotnet ef database update` make it. The
+connection string in `appsettings.json` names it in lower case, which is what a default
+PostgreSQL install uses.
+
+The checked-in `Jwt:Key` is a development key and the API refuses it when the environment
+is Production, so an unset secret cannot reach a deployed environment by accident.
 
 Development secrets can also live in user-secrets:
 
@@ -56,6 +69,10 @@ npm install
 cp .env.example .env.local
 npm run dev
 ```
+
+`NEXT_PUBLIC_API_URL` must be reachable from the browser as well as from the Next server,
+and the API's `Cors:AllowedOrigins` must list the address the frontend is served from. The
+default pair is `http://localhost:5000` and `http://localhost:3000`.
 
 ```dotenv
 NEXT_PUBLIC_API_URL=http://localhost:5000
