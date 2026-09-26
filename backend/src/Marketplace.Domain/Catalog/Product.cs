@@ -388,14 +388,26 @@ public class Product : Entity
         UpdatedAt = now;
     }
 
-    internal void AttachTags(IEnumerable<Tag> tags, DateTimeOffset now)
+    /// <summary>
+    /// Attaches tags that already exist in the catalogue's shared tag list.
+    /// </summary>
+    /// <remarks>
+    /// A tag name is unique across the whole marketplace and many products share one row, so
+    /// creating a second row with the same name would break the join. Callers resolve the
+    /// existing rows first and pass them in; only genuinely new names need new rows.
+    /// </remarks>
+    public void AttachTags(IEnumerable<Tag> tags, DateTimeOffset now)
     {
+        ArgumentNullException.ThrowIfNull(tags);
+
         foreach (var tag in tags)
         {
-            if (!_tags.Any(t => t.Id == tag.Id))
+            if (_tags.Any(t => t.Id == tag.Id || string.Equals(t.Name, tag.Name, StringComparison.OrdinalIgnoreCase)))
             {
-                _tags.Add(tag);
+                continue;
             }
+
+            _tags.Add(tag);
         }
 
         UpdatedAt = now;

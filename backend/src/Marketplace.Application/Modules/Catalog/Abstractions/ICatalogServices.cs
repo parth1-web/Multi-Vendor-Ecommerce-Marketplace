@@ -19,7 +19,8 @@ public sealed record ProductQuery(
     bool? OnSale,
     ProductStatus? Status,
     ProductSortOption Sort = ProductSortOption.Newest,
-    bool IncludeSubcategories = true);
+    bool IncludeSubcategories = true,
+    bool IncludeUnpublished = false);
 
 public interface ICategoryService
 {

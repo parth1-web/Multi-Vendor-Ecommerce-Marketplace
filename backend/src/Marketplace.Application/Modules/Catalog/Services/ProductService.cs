@@ -28,6 +28,7 @@ public sealed class ProductService(
     IRepository<SellerStore> stores,
     IRepository<InventoryRecord> inventories,
     IRepository<Review> reviews,
+    IRepository<Tag> tagEntities,
     ICurrentUser currentUser,
     ICacheService cache,
     IUnitOfWork unitOfWork,
@@ -158,13 +159,15 @@ public sealed class ProductService(
     {
         if (currentUser.SellerId is not { } sellerId)
         {
-            return Result<ProductSummaryResponse>.Failure("Only sellers can create products.");
+            return Result<ProductSummaryResponse>.Failure("Only sellers can create products.", ResultErrorCodes.Forbidden);
         }
 
         var seller = await sellers.GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
         if (seller is null || !seller.CanListProducts)
         {
-            return Result<ProductSummaryResponse>.Failure("Your seller account is not approved for listing products yet.");
+            // A pending or suspended seller is refused, not merely unprocessable: the request
+            // is well formed and the caller simply may not make it.
+            return Result<ProductSummaryResponse>.Failure("Your seller account is not approved for listing products yet.", ResultErrorCodes.Forbidden);
         }
 
         if (!await categories.AnyAsync(c => c.Id == request.CategoryId && !c.IsDeleted && c.IsActive, cancellationToken).ConfigureAwait(false))
@@ -220,10 +223,7 @@ public sealed class ProductService(
             product.AddSpecification(spec.Key, spec.Value, 0, now);
         }
 
-        foreach (var tag in request.Tags ?? [])
-        {
-            product.AddTag(tag, now);
-        }
+        await AttachTagsAsync(product, request.Tags, now, cancellationToken).ConfigureAwait(false);
 
         product.SubmitForApproval(now);
 
@@ -455,12 +455,43 @@ public sealed class ProductService(
         return Result.Success();
     }
 
+    /// <summary>
+    /// Resolves the requested tag names against the shared tag list, creating rows only for
+    /// names that do not exist yet, and attaches the result to the product.
+    /// </summary>
+    private async Task AttachTagsAsync(Product product, IReadOnlyList<string>? requested, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var names = (requested ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (names.Count == 0)
+        {
+            return;
+        }
+
+        var existing = await tagEntities.Query().AsNoTracking()
+            .Where(t => names.Contains(t.Name))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var known = existing.Select(t => t.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var resolved = new List<Tag>(existing);
+        resolved.AddRange(names.Where(name => !known.Contains(name)).Select(name => Tag.Create(name, now)));
+
+        product.AttachTags(resolved, now);
+    }
+
     private async Task<Product?> LoadOwnedProductAsync(Guid id, CancellationToken cancellationToken)
     {
         IQueryable<Product> query = products.Query()
             .Include(p => p.Images)
             .Include(p => p.Variants)
-            .Include(p => p.Variants.Select(v => v.Options));
+            // Two levels of collection navigation need ThenInclude; a projected Select inside
+            // Include is not a property access and EF rejects it at runtime.
+            .ThenInclude(v => v.Options);
 
         if (!currentUser.IsAdmin)
         {
@@ -483,13 +514,17 @@ public sealed class ProductService(
 
     private static IQueryable<Product> ApplyFilters(IQueryable<Product> source, ProductQuery query)
     {
-        if (currentUserIsAdmin())
-        {
-            // admins may list every state
-        }
-        else
+        // Only an admin, or a seller looking at their own catalogue, may see unpublished
+        // products. The flag is honoured solely alongside a seller scope, which the API fills
+        // from the token, so a public caller cannot use it to read other sellers' drafts.
+        var seesEveryState = currentUserIsAdmin() || (query.IncludeUnpublished && query.SellerId is not null);
+        if (!seesEveryState)
         {
             source = source.Where(p => p.Status == ProductStatus.Published);
+        }
+        else if (query.Status is { } requestedStatus)
+        {
+            source = source.Where(p => p.Status == requestedStatus);
         }
 
         source = source.Where(p => !p.IsDeleted);
