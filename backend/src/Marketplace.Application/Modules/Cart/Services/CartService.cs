@@ -21,6 +21,7 @@ namespace Marketplace.Application.Modules.Cart.Services;
 /// </summary>
 public sealed class CartService(
     IRepository<CartEntity> carts,
+    IRepository<CartItem> cartItems,
     IRepository<Domain.Catalog.Product> products,
     IRepository<ProductVariant> variants,
     IRepository<SellerStore> stores,
@@ -43,7 +44,10 @@ public sealed class CartService(
 
     public async Task<Result<CartResponse>> AddItemAsync(AddCartItemRequest request, string? guestToken, CancellationToken cancellationToken = default)
     {
+        // The variant is read off the product's own collection, so that collection has to be
+        // loaded. Without it every add failed with "please choose an available option".
         var product = await products.Query().AsNoTracking()
+            .Include(p => p.Variants)
             .FirstOrDefaultAsync(p => p.Id == request.ProductId && p.Status == ProductStatus.Published && !p.IsDeleted, cancellationToken)
             .ConfigureAwait(false);
 
@@ -89,7 +93,10 @@ public sealed class CartService(
             return Result<CartResponse>.Failure("Unable to update the cart.");
         }
 
+        var before = tracked.Items.Count;
         tracked.AddItem(product, variant, request.Quantity, variant.Price, clock.UtcNow);
+        await TrackNewItemsAsync(tracked, before, cancellationToken).ConfigureAwait(false);
+
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return Result<CartResponse>.Success(await BuildAsync(tracked, cancellationToken).ConfigureAwait(false));
@@ -234,7 +241,9 @@ public sealed class CartService(
             }
             else
             {
-                userCart.AddItem(product, variant, guestItem.Quantity, variant.Price, clock.UtcNow);
+                var before = userCart.Items.Count;
+        userCart.AddItem(product, variant, guestItem.Quantity, variant.Price, clock.UtcNow);
+        await TrackNewItemsAsync(userCart, before, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -303,6 +312,29 @@ public sealed class CartService(
         await carts.AddAsync(newCart, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return newCart;
+    }
+
+    /// <summary>
+    /// Marks cart lines created since <paramref name="countBefore"/> as inserted.
+    /// </summary>
+    /// <remarks>
+    /// A line only ever reaches the database through its cart's collection, and EF cannot
+    /// tell a brand-new line from an existing one: the key is a non-default Guid, which looks
+    /// like a row that is already stored, so change detection tracked it as Modified and the
+    /// insert became an update that matched nothing. Naming the new rows explicitly is the
+    /// difference between a cart that works and one that always fails on the first add.
+    /// </remarks>
+    private async Task TrackNewItemsAsync(CartEntity cart, int countBefore, CancellationToken cancellationToken)
+    {
+        if (cart.Items.Count <= countBefore)
+        {
+            return;
+        }
+
+        foreach (var item in cart.Items.Skip(countBefore))
+        {
+            await cartItems.AddAsync(item, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private Task<CartEntity?> LoadTrackedCartAsync(Guid cartId, CancellationToken cancellationToken) =>
