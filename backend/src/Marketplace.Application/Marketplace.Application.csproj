@@ -13,6 +13,12 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <!--
+      Provider-agnostic EF Core: the Application layer works against IQueryable and uses
+      the async LINQ operators (CountAsync / ToListAsync / FirstOrDefaultAsync). No Npgsql,
+      no DbContext, no migrations, no provider-specific behaviour leaks into this layer.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
 
   <ItemGroup>
