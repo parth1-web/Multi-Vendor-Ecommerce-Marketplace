@@ -324,50 +324,23 @@ public sealed class PaymentAndRefundTests : IClassFixture<MarketplaceApiFactory>
         return (response, (await ApiClient.ReadAsync<CheckoutResponse>(response))!);
     }
 
-    /// <summary>Builds a webhook body and signs it the way the provider would.</summary>
     private static string SignedBody(string eventId, string eventType, string? gatewayPaymentId, decimal amount) =>
-        JsonSerializer.Serialize(new
-        {
-            provider = "Mock",
-            event_id = eventId,
-            event_type = eventType,
-            gateway_payment_id = gatewayPaymentId,
-            amount,
-            currency = "USD"
-        });
+        WebhookHelper.Body(eventId, eventType, gatewayPaymentId, amount);
 
-    private static string Sign(string body) =>
-        Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(WebhookSecret), Encoding.UTF8.GetBytes(body)))
-            .ToLowerInvariant();
+    private Task<HttpResponseMessage> SendWebhookAsync(string body) =>
+        WebhookHelper.PostSignedAsync(_factory, body);
 
-    private Task<HttpResponseMessage> SendWebhookAsync(string body) => PostWebhookAsync(body, Sign(body));
+    private Task<HttpResponseMessage> PostWebhookAsync(string body, string? signature) =>
+        WebhookHelper.PostAsync(_factory, body, signature);
 
-    private Task<HttpResponseMessage> PostWebhookAsync(string body, string? signature)
-    {
-        var client = new ApiClient(_factory.CreateClient());
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/payments/webhook")
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json")
-        };
-
-        if (signature is not null)
-        {
-            request.Headers.Add("X-Signature", signature);
-        }
-
-        return client.Http.SendAsync(request);
-    }
 
     /// <summary>
     /// Takes an order all the way to delivered: a refund is only meaningful once the customer
-    /// has the goods, so the scenario has to walk the fulfilment path rather than jump there.
+    /// has the goods, so the scenario walks the fulfilment path rather than jumping there.
     /// </summary>
     private async Task DeliverAsync(ApiClient customer, CheckoutResponse order)
     {
-        var payment = (await customer.GetAsync<List<PaymentResponse>>("/api/payments/mine"))![0];
-
-        (await SendWebhookAsync(SignedBody($"evt-deliver-{Guid.NewGuid():N}", "completed", payment.GatewayPaymentId, payment.Amount)))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
+        await WebhookHelper.SettlePaymentAsync(_factory, customer, order.OrderId, "evt-deliver");
 
         var (seller, _) = await AuthHelper.SignInAsync(
             _factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
@@ -395,6 +368,7 @@ public sealed class PaymentAndRefundTests : IClassFixture<MarketplaceApiFactory>
         var delivered = await customer.GetAsync<OrderResponse>($"/api/orders/{order.OrderId}");
         delivered!.Status.Should().Be(OrderStatus.Delivered, "the parent order must follow the sub-order");
     }
+
     private async Task<Guid> FirstOrderItemIdAsync(Guid orderId)
     {
         using var scope = _factory.Services.CreateScope();

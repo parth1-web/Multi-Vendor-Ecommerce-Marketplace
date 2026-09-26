@@ -67,6 +67,9 @@ public sealed class MarketplaceTestData(IServiceProvider rootServices, FixedCloc
 
     public Guid SellerBProductVariantId { get; private set; }
 
+    /// <summary>The single-unit product, used for the oversell scenario.</summary>
+    public Guid SingleUnitProductId { get; private set; }
+
     public Guid SingleUnitVariantId { get; private set; }
 
     public string SellerAStoreSlug { get; private set; } = string.Empty;
@@ -126,6 +129,7 @@ public sealed class MarketplaceTestData(IServiceProvider rootServices, FixedCloc
 
         // A single-unit variant used for the concurrency test.
         var productC = CreateProduct(SellerAId, "Last Unit", "last-unit", 499m, null, 1, now, out var variantC);
+        SingleUnitProductId = productC.Id;
         SingleUnitVariantId = variantC.Id;
 
         var coupon = Coupon.Create(null, CouponScope.Global, "TEST10", "10% off", CouponDiscountType.Percentage, 10m, 50m, 25m, 100, 5,
@@ -163,6 +167,7 @@ public sealed class MarketplaceTestData(IServiceProvider rootServices, FixedCloc
         SellerBProductVariantId = (await Context.ProductVariants.FirstAsync(v => v.ProductId == productB.Id)).Id;
 
         var productC = await Context.Products.FirstAsync(p => p.SlugValue == "last-unit");
+        SingleUnitProductId = productC.Id;
         SingleUnitVariantId = (await Context.ProductVariants.FirstAsync(v => v.ProductId == productC.Id)).Id;
     }
 
