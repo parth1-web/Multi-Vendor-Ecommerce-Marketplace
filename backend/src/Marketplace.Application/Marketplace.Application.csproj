@@ -19,6 +19,9 @@
       no DbContext, no migrations, no provider-specific behaviour leaks into this layer.
     -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!-- JWT issuing lives in the Application layer so the token contract is testable
+         without spinning up the HTTP host. Validation is configured in the API layer. -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
   </ItemGroup>
 
   <ItemGroup>

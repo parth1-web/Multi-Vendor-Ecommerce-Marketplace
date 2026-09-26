@@ -148,4 +148,12 @@ public class User : Entity
         DeletedAt = now;
         UpdatedAt = now;
     }
+
+    /// <summary>Links the account to a seller record once an application has been created.</summary>
+    public void AttachSeller(Guid sellerId, DateTimeOffset now)
+    {
+        Guard.NotEmpty(sellerId, nameof(sellerId));
+        SellerId = sellerId;
+        UpdatedAt = now;
+    }
 }
