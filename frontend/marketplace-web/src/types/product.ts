@@ -35,13 +35,17 @@ export interface ProductVariant {
   id: string;
   sku: string;
   name: string;
-  price: number | null;
+  price: number;
   isActive: boolean;
   availableQuantity: number;
-  reservedQuantity: number;
+  isInStock: boolean;
   lowStockThreshold: number;
-  isLowStock: boolean;
-  isOutOfStock: boolean;
+  options: ProductVariantOption[];
+}
+
+export interface ProductVariantOption {
+  name: string;
+  value: string;
 }
 
 export interface ProductImage {
@@ -58,52 +62,88 @@ export interface ProductSpecification {
   sortOrder: number;
 }
 
-export interface ReviewSummary {
+export interface ReviewReply {
   id: string;
-  authorName: string;
-  rating: number;
-  title: string | null;
   body: string;
+  authorName: string;
   createdAt: string;
-  isVerifiedPurchase: boolean;
 }
 
-export interface ProductDetail extends ProductSummary {
+export interface ReviewSummary {
+  id: string;
+  rating: number;
+  title: string;
+  body: string;
+  authorName: string;
+  isVerifiedPurchase: boolean;
+  helpfulCount: number;
+  createdAt: string;
+  reply: ReviewReply | null;
+}
+
+export interface RatingBreakdown {
+  average: number;
+  total: number;
+  fiveStar: number;
+  fourStar: number;
+  threeStar: number;
+  twoStar: number;
+  oneStar: number;
+}
+
+/** The trimmed shape the API returns for anything that only needs to be shown, not clicked. */
+export interface RelatedProduct {
+  id: string;
+  name: string;
+  slug: string;
+  basePrice: number;
+  compareAtPrice: number | null;
+  discountPercentage: number;
+  primaryImageUrl: string | null;
+  ratingAverage: number;
+  ratingCount: number;
+  storeName: string;
+  isInStock: boolean;
+}
+
+export interface ProductDetail extends Omit<ProductSummary, "primaryImageUrl" | "primaryImageAlt" | "isNew" | "availableQuantity" | "categoryId"> {
   description: string;
   brand: string | null;
   model: string | null;
+  status: ProductStatus;
+  storeLogoUrl: string | null;
+  storeRating: number;
+  storeRatingCount: number;
+  reviewCount: number;
+  viewCount: number;
+  availableQuantity: number;
   images: ProductImage[];
   variants: ProductVariant[];
   specifications: ProductSpecification[];
-  reviews: ReviewSummary[];
   tags: string[];
+  relatedProducts: RelatedProduct[];
+  reviews: ReviewSummary[];
+  ratingBreakdown: RatingBreakdown;
+}
+
+export interface BreadcrumbItem {
+  name: string;
+  slug: string;
+  url: string;
 }
 
 export interface Category {
   id: string;
+  parentId: string | null;
   name: string;
   slug: string;
   description: string | null;
-  parentId: string | null;
+  imageUrl: string | null;
   displayOrder: number;
-  iconUrl: string | null;
   isActive: boolean;
   productCount: number;
   children: Category[];
-}
-
-export interface StoreSummary {
-  sellerId: string;
-  storeName: string;
-  storeSlug: string;
-  description: string | null;
-  logoUrl: string | null;
-  bannerUrl: string | null;
-  ratingAverage: number;
-  ratingCount: number;
-  productCount: number;
-  joinedAt: string;
-  isVerified: boolean;
+  breadcrumb: BreadcrumbItem[];
 }
 
 export type ProductSort = "Newest" | "PriceAsc" | "PriceDesc" | "Rating" | "Popular" | "NameAsc" | "NameDesc" | "Discount";

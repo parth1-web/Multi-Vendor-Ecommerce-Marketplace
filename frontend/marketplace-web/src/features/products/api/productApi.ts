@@ -2,7 +2,8 @@
 
 import { apiClient } from "@/api/axiosClient";
 import { PAGE_SIZE } from "@/lib/constants";
-import type { Category, ProductDetail, ProductPage, ProductQuery, ProductSummary, StoreSummary } from "@/types/product";
+import type { Category, ProductDetail, ProductPage, ProductQuery, ProductSummary } from "@/types/product";
+import type { StoreProfile } from "@/types/store";
 
 /**
  * Turns the query object into a query string, dropping anything unset.
@@ -73,10 +74,11 @@ export const categoryApi = {
     return data;
   },
 };
-
 export const storeApi = {
-  async bySlug(slug: string, signal?: AbortSignal): Promise<StoreSummary> {
-    const { data } = await apiClient.get<StoreSummary>(`/api/stores/${encodeURIComponent(slug)}`, { signal });
+  /** The storefront, with one page of its products already attached. */
+  async bySlug(slug: string, signal?: AbortSignal): Promise<StoreProfile> {
+    const { data } = await apiClient.get<StoreProfile>(`/api/stores/${encodeURIComponent(slug)}`, { signal });
+
     return data;
   },
 };
