@@ -252,8 +252,18 @@ public class Order : Entity
 
         IsPaid = true;
         PaidAt = now;
+
+        // A paid order is a confirmed order. Leaving the status at Pending makes the customer's
+        // own history read as though payment were still outstanding, and leaves the seller with
+        // nothing to fulfil against.
+        if (Status == OrderStatus.Pending)
+        {
+            RecordStatusChange(OrderStatus.Pending, OrderStatus.Confirmed, "Payment received", null, now);
+        }
+
         UpdatedAt = now;
     }
+
 
     public void RecordRefund(decimal amount, DateTimeOffset now)
     {
