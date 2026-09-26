@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Marketplace.Application.Common.Interfaces;
 using Marketplace.Application.Modules.Auth.Abstractions;
 using Marketplace.Application.Modules.Auth.DTOs;
@@ -291,12 +292,20 @@ public sealed class RecordingRealtimeNotifier : IRealtimeNotifier
 /// <summary>HTTP helpers so each test reads as a scenario rather than plumbing.</summary>
 public sealed class ApiClient(HttpClient client)
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    /// <summary>
+    /// The API's own JSON conventions, so a test reads what a real client would. Enums in
+    /// particular: the API sends names, and a test that deserialised them as ordinals would
+    /// quietly accept a payload the product does not send.
+    /// </summary>
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public HttpClient Http { get; } = client;
 
     public async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default) =>
-        await Http.GetFromJsonAsync<T>(url, cancellationToken).ConfigureAwait(false);
+        await Http.GetFromJsonAsync<T>(url, Json, cancellationToken).ConfigureAwait(false);
 
     public async Task<HttpResponseMessage> PostAsync<T>(string url, T body, CancellationToken cancellationToken = default) =>
         await Http.PostAsJsonAsync(url, body, cancellationToken).ConfigureAwait(false);

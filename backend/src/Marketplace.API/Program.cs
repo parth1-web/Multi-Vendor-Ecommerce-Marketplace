@@ -66,6 +66,11 @@ try
         {
             options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
             options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+
+            // Enums travel as their names. A status of 2 tells a client nothing about what it is
+            // and nothing about what it is allowed to become, and the ordinals are an
+            // implementation detail that changes the moment anyone reorders the enum.
+            options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         });
 
     builder.Services.AddProblemDetails();
