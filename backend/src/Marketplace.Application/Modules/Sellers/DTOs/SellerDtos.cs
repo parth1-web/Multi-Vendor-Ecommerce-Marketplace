@@ -57,6 +57,8 @@ public sealed record SellerResponse(
     int SellerOrderCount,
     decimal TotalRevenue,
     decimal PendingEarnings,
+    decimal PaidEarnings,
+    decimal CommissionPaid,
     string? StoreName,
     string? StoreSlug,
     decimal StoreRating,
