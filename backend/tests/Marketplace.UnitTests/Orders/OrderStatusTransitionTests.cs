@@ -170,7 +170,7 @@ public sealed class SellerOrderSplitTests
     {
         var address = new OrderAddressSnapshot("Home", "A", "1", "Street", null, "City", null, "1", "NP");
 
-        var act = () => Order.Place(Guid.NewGuid(), address, null, null, 50m, 60m, 0m, 0m, "USD", "Mock", null, Now);
+        var act = () => Order.Place(Guid.NewGuid(), address, null, null, null, 50m, 60m, 0m, 0m, "USD", "Mock", null, Now);
 
         act.Should().Throw<ValidationException>();
     }
@@ -200,6 +200,6 @@ public sealed class SellerOrderSplitTests
     private static Order CreateOrder(decimal subtotal = 150m)
     {
         var address = new OrderAddressSnapshot("Home", "Aarav Sharma", "+9779800000000", "12 Ratna Marg", null, "Kathmandu", "Bagmati", "44600", "NP");
-        return Order.Place(Guid.NewGuid(), address, null, null, subtotal, 0m, 0m, 0m, "USD", "Mock", null, Now);
+        return Order.Place(Guid.NewGuid(), address, null, null, null, subtotal, 0m, 0m, 0m, "USD", "Mock", null, Now);
     }
 }

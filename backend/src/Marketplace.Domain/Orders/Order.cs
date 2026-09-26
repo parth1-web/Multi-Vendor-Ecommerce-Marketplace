@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Marketplace.Domain.Common;
 using Marketplace.Domain.Enums;
 using Marketplace.Domain.Identity;
@@ -29,7 +30,9 @@ public class Order : Entity
         OrderAddressSnapshot shippingAddress,
         Guid? couponId,
         string? couponCode,
-        decimal subtotal,        decimal discountAmount,
+        string? idempotencyKey,
+        decimal subtotal,
+        decimal discountAmount,
         decimal shippingAmount,
         decimal taxAmount,
         string currency,
@@ -43,6 +46,8 @@ public class Order : Entity
         ShippingAddressSnapshot = shippingAddress;
         CouponId = couponId;
         CouponCode = couponCode;
+        IdempotencyKey = idempotencyKey;
+
         Subtotal = subtotal;
         DiscountAmount = discountAmount;
         ShippingAmount = shippingAmount;
@@ -88,6 +93,13 @@ public class Order : Entity
 
     public string? CouponCode { get; private set; }
 
+    /// <summary>
+    /// Client-supplied key that makes a retried checkout return the order it already created.
+    /// It is stored on its own column: reusing the coupon column would let a real coupon code
+    /// match someone else's retry, and would report a discount the order never had.
+    /// </summary>
+    public string? IdempotencyKey { get; private set; }
+
     public OrderAddressSnapshot ShippingAddressSnapshot { get; private set; } = new();
 
     public string? CustomerNote { get; private set; }
@@ -127,6 +139,7 @@ public class Order : Entity
         OrderAddressSnapshot shippingAddress,
         Guid? couponId,
         string? couponCode,
+        string? idempotencyKey,
         decimal subtotal,
         decimal discountAmount,
         decimal shippingAmount,
@@ -138,6 +151,7 @@ public class Order : Entity
     {
         Guard.NotEmpty(customerId, nameof(customerId));
         ArgumentNullException.ThrowIfNull(shippingAddress);
+
         Guard.GreaterThanOrEqualToZero(subtotal, nameof(subtotal));
         Guard.GreaterThanOrEqualToZero(discountAmount, nameof(discountAmount));
         Guard.GreaterThanOrEqualToZero(shippingAmount, nameof(shippingAmount));
@@ -161,7 +175,9 @@ public class Order : Entity
             shippingAddress,
             couponId,
             couponCode?.Trim().ToUpperInvariant(),
+            string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim(),
             decimal.Round(subtotal, 2),
+
             decimal.Round(discountAmount, 2),
             decimal.Round(shippingAmount, 2),
             decimal.Round(taxAmount, 2),
@@ -295,9 +311,17 @@ public class Order : Entity
         }
     }
 
-    public static string GenerateOrderNumber(DateTimeOffset now)
-    {
-        var suffix = Convert.ToHexString(SequentialGuid.New(now).ToByteArray())[..8];
-        return $"MP-{now:yyyyMMdd}-{suffix}";
-    }
+    /// <summary>
+    /// Builds the customer-facing order number, e.g. <c>MP-20260226-7F3A9C21B4D0</c>.
+    /// </summary>
+    /// <remarks>
+    /// The random part has to be genuinely random. Deriving it from the order's sequential id
+    /// looks attractive because that id is already unique, but a sequential id leads with its
+    /// own timestamp, so two orders placed in the same tick come out with the same number and
+    /// the unique index rejects the second one. 48 bits of entropy makes that unreachable in
+    /// practice while keeping the number short enough to read out over the phone.
+    /// </remarks>
+    public static string GenerateOrderNumber(DateTimeOffset now) =>
+        $"MP-{now:yyyyMMdd}-{Convert.ToHexString(RandomNumberGenerator.GetBytes(6))}";
 }
+

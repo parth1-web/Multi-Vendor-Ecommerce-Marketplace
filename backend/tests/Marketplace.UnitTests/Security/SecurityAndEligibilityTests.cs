@@ -214,7 +214,7 @@ public sealed class ReviewEligibilityTests
     private static (OrderItem Item, Order Order) PendingOrder()
     {
         var address = new OrderAddressSnapshot("Home", "Aarav", "+9779800000000", "Street", null, "Kathmandu", null, "44600", "NP");
-        var order = Order.Place(CustomerId, address, null, null, 200m, 0m, 0m, 0m, "USD", "Mock", null, Now);
+        var order = Order.Place(CustomerId, address, null, null, null, 200m, 0m, 0m, 0m, "USD", "Mock", null, Now);
 
         var sellerOrder = SellerOrder.Create(order.Id, Guid.NewGuid(), "MP-2-01", 200m, 0m, 0m, 0m, 10m, Now);
         order.AddSellerOrder(sellerOrder);
@@ -231,7 +231,7 @@ public sealed class ReviewEligibilityTests
     private static (OrderItem Item, Order Order) DeliveredOrder()
     {
         var address = new OrderAddressSnapshot("Home", "Aarav", "+9779800000000", "Street", null, "Kathmandu", null, "44600", "NP");
-        var order = Order.Place(CustomerId, address, null, null, 200m, 0m, 0m, 0m, "USD", "Mock", null, Now.AddDays(-5));
+        var order = Order.Place(CustomerId, address, null, null, null, 200m, 0m, 0m, 0m, "USD", "Mock", null, Now.AddDays(-5));
 
         var sellerOrder = SellerOrder.Create(order.Id, Guid.NewGuid(), "MP-1-01", 200m, 0m, 0m, 0m, 10m, Now.AddDays(-5));
         order.AddSellerOrder(sellerOrder);

@@ -37,6 +37,8 @@ public sealed class CheckoutService(
     IRepository<UserAddress> addresses,
     IRepository<Seller> sellers,
     IRepository<Domain.Orders.Order> orders,
+    IRepository<SellerOrder> sellerOrders,
+    IRepository<OrderItem> orderItems,
     IRepository<Payment> payments,
     IRepository<InventoryReservation> reservations,
     IInventoryService inventory,
@@ -113,7 +115,7 @@ public sealed class CheckoutService(
         if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
         {
             var existing = await orders.Query().AsNoTracking()
-                .FirstOrDefaultAsync(o => o.CustomerId == currentUser.UserId && o.CouponCode == request.IdempotencyKey, cancellationToken)
+                .FirstOrDefaultAsync(o => o.CustomerId == currentUser.UserId && o.IdempotencyKey == request.IdempotencyKey, cancellationToken)
                 .ConfigureAwait(false);
 
             if (existing is not null)
@@ -146,7 +148,8 @@ public sealed class CheckoutService(
             return Result<CheckoutResponse>.Failure("Your cart is empty.");
         }
 
-        var (discountBySeller, _) = await ResolveCouponAsync(cart, request.CouponCode, cancellationToken).ConfigureAwait(false);
+        var (discountBySeller, resolvedCoupon) = await ResolveCouponAsync(cart, request.CouponCode, cancellationToken).ConfigureAwait(false);
+        var couponCode = resolvedCoupon?.Code ?? request.CouponCode;
         var totals = OrderPricingCalculator.Calculate(
             lines,
             discountBySeller,
@@ -171,6 +174,7 @@ public sealed class CheckoutService(
             currentUser.UserId,
             snapshot,
             null,
+            couponCode,
             string.IsNullOrWhiteSpace(request.IdempotencyKey) ? null : request.IdempotencyKey,
             totals.Subtotal,
             totals.DiscountAmount,
@@ -231,6 +235,10 @@ public sealed class CheckoutService(
                 now);
 
             order.AddSellerOrder(sellerOrder);
+
+            // The sub-order joins an order that is already tracked, so it is named as an insert
+            // explicitly. Left to change detection it is mistaken for a stored row.
+            await sellerOrders.AddAsync(sellerOrder, cancellationToken).ConfigureAwait(false);
         }
 
         // ---- 3. line items with snapshotted purchase data -------------------------
@@ -287,7 +295,12 @@ public sealed class CheckoutService(
             order.AddItem(item);
             sellerOrder.AddItem(item);
 
+            // Same reason as the sub-order above: this line is new, and only the caller knows
+            // that, because its key is generated in the domain rather than by the database.
+            await orderItems.AddAsync(item, cancellationToken).ConfigureAwait(false);
+
             soldCounts[line.ProductId] = soldCounts.GetValueOrDefault(line.ProductId) + line.Quantity;
+
         }
 
         foreach (var (productId, quantity) in soldCounts)

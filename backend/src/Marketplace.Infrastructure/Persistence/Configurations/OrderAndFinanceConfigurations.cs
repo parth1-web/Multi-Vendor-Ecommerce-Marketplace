@@ -59,6 +59,12 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(o => new { o.CustomerId, o.PlacedAt }).HasDatabaseName("ix_orders_customer");
         builder.HasIndex(o => new { o.Status, o.PlacedAt }).HasDatabaseName("ix_orders_status");
 
+        // A retried checkout must never create a second order. The key is unique per customer,
+        // and the database enforces it so two concurrent retries cannot both slip through.
+        builder.HasIndex(o => new { o.CustomerId, o.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_orders_customer_idempotency");
+
         builder.HasMany(o => o.SellerOrders)
             .WithOne(so => so.Order!)
             .HasForeignKey(so => so.OrderId)
