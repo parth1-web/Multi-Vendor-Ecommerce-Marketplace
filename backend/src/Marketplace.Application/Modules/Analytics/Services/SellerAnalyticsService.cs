@@ -163,11 +163,73 @@ public sealed class SellerAnalyticsService(
             .ConfigureAwait(false);
 
         var imageMap = images.ToDictionary(i => i.Id, i => i.Url);
+        var commissions = await CommissionByProductAsync(
+            sellerId, range, rows.Select(r => r.ProductId).ToList(), cancellationToken).ConfigureAwait(false);
 
         return rows.Select(r => new TopProductResponse(
             r.ProductId, r.ProductName, imageMap.GetValueOrDefault(r.ProductId),
-            r.Quantity, decimal.Round(r.Revenue, 2), 0m)).ToList();
+            r.Quantity, decimal.Round(r.Revenue, 2),
+            decimal.Round(CommissionFor(commissions, r.ProductId), 2))).ToList();
     }
+
+    /// <summary>
+    /// The commission booked against one product, in the window.
+    /// </summary>
+    /// <remarks>
+    /// A commission is booked per seller order, not per line, so it is shared out in proportion
+    /// to what each line contributed. Reporting zero, or the seller's current rate applied to
+    /// revenue, would both be a number the finance ledger does not agree with.
+    /// </remarks>
+    private async Task<Dictionary<Guid, decimal>> CommissionByProductAsync(
+        Guid sellerId, DateTimeRange range, IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken)
+    {
+        if (productIds.Count == 0)
+        {
+            return new Dictionary<Guid, decimal>();
+        }
+
+        var orders = await commissions.Query().AsNoTracking()
+            .Where(c => c.SellerId == sellerId)
+            .Select(c => new { c.SellerOrderId, c.CommissionAmount })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (orders.Count == 0)
+        {
+            return new Dictionary<Guid, decimal>();
+        }
+
+        var orderIds = orders.Select(o => o.SellerOrderId).ToList();
+
+        var lines = await orderItems.Query().AsNoTracking()
+            .Where(i => orderIds.Contains(i.SellerOrderId) && productIds.Contains(i.ProductId))
+            .Select(i => new { i.SellerOrderId, i.ProductId, Revenue = i.LineTotal })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var commissionByOrder = orders.ToDictionary(o => o.SellerOrderId, o => o.CommissionAmount);
+        var result = new Dictionary<Guid, decimal>();
+
+        foreach (var group in lines.GroupBy(l => l.SellerOrderId))
+        {
+            var orderRevenue = group.Sum(l => l.Revenue);
+            if (orderRevenue <= 0m || !commissionByOrder.TryGetValue(group.Key, out var commission))
+            {
+                continue;
+            }
+
+            foreach (var line in group)
+            {
+                var share = decimal.Round(commission * line.Revenue / orderRevenue, 4);
+                result[line.ProductId] = result.GetValueOrDefault(line.ProductId) + share;
+            }
+        }
+
+        return result;
+    }
+
+    private static decimal CommissionFor(Dictionary<Guid, decimal> commissions, Guid productId) =>
+        commissions.GetValueOrDefault(productId);
 
     public async Task<IReadOnlyList<CategorySalesResponse>> GetSalesByCategoryAsync(DateTimeRange range, CancellationToken cancellationToken = default)
     {

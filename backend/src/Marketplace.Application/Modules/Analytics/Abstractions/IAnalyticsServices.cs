@@ -57,8 +57,10 @@ public sealed record DateTimeRange(DateTimeOffset From, DateTimeOffset To, Analy
 
         var (start, end, interval) = resolved switch
         {
-            DateTimePreset.Last7Days => (now.AddDays(-7), now, AnalyticsInterval.Day),
-            DateTimePreset.Last30Days => (now.AddDays(-30), now, AnalyticsInterval.Day),
+            // A day-interval window is inclusive of today, so "last 7 days" is seven buckets,
+            // not eight: a chart that contradicts its own label is worse than no chart.
+            DateTimePreset.Last7Days => (now.AddDays(-6), now, AnalyticsInterval.Day),
+            DateTimePreset.Last30Days => (now.AddDays(-29), now, AnalyticsInterval.Day),
             DateTimePreset.Last90Days => (now.AddDays(-90), now, AnalyticsInterval.Week),
             DateTimePreset.ThisMonth => (new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero), now, AnalyticsInterval.Day),
             DateTimePreset.LastMonth => (MonthStart(now.AddMonths(-1)), MonthStart(now), AnalyticsInterval.Day),
