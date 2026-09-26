@@ -132,6 +132,11 @@ public class MarketplaceApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IRealtimeNotifier>();
             services.AddSingleton<IRealtimeNotifier, RecordingRealtimeNotifier>();
+
+            // No SMTP server in a test run, so e-mail is captured instead of skipped. A test that
+            // needs to follow a link from an inbox has to be able to read the inbox.
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender, RecordingEmailSender>();
         });
 
     }
@@ -388,4 +393,37 @@ public static class AuthHelper
         client.UseBearer(body.AccessToken);
         return (client, new SessionTokens(body.AccessToken, refreshToken, body));
     }
+}
+
+/// <summary>
+/// Captures e-mail instead of sending it, so a test can follow a link the way a user would.
+/// </summary>
+public sealed class RecordingEmailSender : IEmailSender
+{
+    private readonly List<EmailMessage> _messages = [];
+
+    public IReadOnlyList<EmailMessage> Messages
+    {
+        get
+        {
+            lock (_messages)
+            {
+                return _messages.ToList();
+            }
+        }
+    }
+
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        lock (_messages)
+        {
+            _messages.Add(message);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The single message sent to an address, or null when there was not exactly one.</summary>
+    public EmailMessage? For(string to) =>
+        Messages.LastOrDefault(m => string.Equals(m.To, to, StringComparison.OrdinalIgnoreCase));
 }
