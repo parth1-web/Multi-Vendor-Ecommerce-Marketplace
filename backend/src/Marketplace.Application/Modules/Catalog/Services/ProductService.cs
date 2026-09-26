@@ -313,6 +313,7 @@ public sealed class ProductService(
 
         product.SoftDelete(clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await SyncStoreProductCountAsync(product.SellerId, cancellationToken).ConfigureAwait(false);
         await auditService.RecordAsync(AuditAction.ProductDeleted, nameof(Product), product.Id, product.Name, null, cancellationToken).ConfigureAwait(false);
         await InvalidateAsync(product, cancellationToken).ConfigureAwait(false);
 
@@ -430,6 +431,7 @@ public sealed class ProductService(
         product.AddDomainEvent(new ProductApprovalChangedEvent(product.Id, product.SellerId, product.Status, request.Note, now));
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await SyncStoreProductCountAsync(product.SellerId, cancellationToken).ConfigureAwait(false);
         await auditService.RecordAsync(
             request.Approve ? AuditAction.ProductApproved : AuditAction.ProductRejected,
             nameof(Product), product.Id, product.Name,
@@ -832,6 +834,32 @@ public sealed class ProductService(
             imageUrl, imageAlt, p.SellerId, sellerName ?? string.Empty, storeName ?? string.Empty, storeSlug ?? string.Empty,
             p.CategoryId, categoryName ?? string.Empty, categoryName ?? string.Empty, p.RatingAverage, ratingCount,
             available > 0, available, p.IsFeatured, false, p.SoldCount, p.CreatedAt);
+
+    /// <summary>
+    /// Recounts a seller's live products onto their storefront.
+    ///
+    /// The count is denormalised because a storefront page reads it directly, so it has to be
+    /// corrected wherever a product enters or leaves the published set. Recounting is cheap next
+    /// to being wrong: a storefront advertising "0 products" is worse than a slow one.
+    /// </summary>
+    private async Task SyncStoreProductCountAsync(Guid sellerId, CancellationToken cancellationToken)
+    {
+        var store = await stores.Query().FirstOrDefaultAsync(s => s.SellerId == sellerId, cancellationToken).ConfigureAwait(false);
+        if (store is null)
+        {
+            return;
+        }
+
+        var published = await products.Query().AsNoTracking()
+            .CountAsync(p => p.SellerId == sellerId && p.Status == ProductStatus.Published && !p.IsDeleted, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (store.ProductCount != published)
+        {
+            store.UpdateProductCount(published, clock.UtcNow);
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <summary>
     /// The product, loaded with everything a detail page needs.

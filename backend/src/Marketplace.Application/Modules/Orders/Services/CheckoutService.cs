@@ -36,6 +36,7 @@ public sealed class CheckoutService(
     IRepository<CouponUsage> couponUsages,
     IRepository<UserAddress> addresses,
     IRepository<Seller> sellers,
+    IRepository<SellerStore> stores,
     IRepository<Domain.Orders.Order> orders,
     IRepository<Payment> payments,
     IRepository<InventoryReservation> reservations,
@@ -258,6 +259,7 @@ public sealed class CheckoutService(
 
         var remainingDiscount = new Dictionary<Guid, decimal>(totals.DiscountBySeller);
         var soldCounts = new Dictionary<Guid, int>();
+        var sellersSold = new HashSet<Guid>();
 
         foreach (var line in lines)
         {
@@ -292,13 +294,22 @@ public sealed class CheckoutService(
 
 
             soldCounts[line.ProductId] = soldCounts.GetValueOrDefault(line.ProductId) + line.Quantity;
-
+            sellersSold.Add(line.SellerId);
         }
 
         foreach (var (productId, quantity) in soldCounts)
         {
             var product = await products.Query().FirstOrDefaultAsync(p => p.Id == productId, cancellationToken).ConfigureAwait(false);
             product?.RecordSale(quantity, now);
+        }
+
+        // A storefront's sales figure is read on its own page, so it is counted here where the
+        // sale actually happens rather than left to a nightly job that may not run. One count
+        // per seller, not per line: an order is what a store was paid for.
+        foreach (var sellerId in sellersSold)
+        {
+            var store = await stores.Query().FirstOrDefaultAsync(s => s.SellerId == sellerId, cancellationToken).ConfigureAwait(false);
+            store?.RecordSale(now);
         }
 
         // ---- 4. payment ----------------------------------------------------------
