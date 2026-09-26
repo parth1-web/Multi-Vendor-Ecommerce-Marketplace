@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -113,12 +114,26 @@ public class MarketplaceApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Set MARKETPLACE_TEST_SQL=1 to see the statements a failing scenario issued.
+            if (Environment.GetEnvironmentVariable("MARKETPLACE_TEST_SQL") == "1")
+            {
+                services.AddDbContext<Marketplace.Infrastructure.Persistence.MarketplaceDbContext>((provider, options) =>
+                {
+                    options.UseNpgsql(_connectionString);
+                    var logPath = Path.Combine(Path.GetTempPath(), "marketplace-test-sql.log");
+                    options
+                        .LogTo(message => File.AppendAllText(logPath, message + Environment.NewLine), LogLevel.Information)
+                        .EnableSensitiveDataLogging();
+                });
+            }
+
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(Clock);
 
             services.RemoveAll<IRealtimeNotifier>();
             services.AddSingleton<IRealtimeNotifier, RecordingRealtimeNotifier>();
         });
+
     }
 
     /// <summary>
