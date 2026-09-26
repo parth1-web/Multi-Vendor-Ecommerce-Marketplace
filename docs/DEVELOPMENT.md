@@ -51,14 +51,17 @@ dotnet user-secrets set "Jwt:Key" "..." --project src/Marketplace.API
 ### Frontend
 
 ```bash
+cd frontend/marketplace-web
+npm install
 cp .env.example .env.local
+npm run dev
 ```
 
 ```dotenv
 NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXT_PUBLIC_SIGNALR_URL=http://localhost:5000/hubs/marketplace
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-NEXT_PUBLIC_SITE_NAME=Marketplace
+NEXT_PUBLIC_PAYMENT_RETURN_URL=http://localhost:3000/checkout
 ```
 
 ## 4. Database migrations

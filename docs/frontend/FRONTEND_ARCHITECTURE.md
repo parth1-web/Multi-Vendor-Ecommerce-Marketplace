@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-> Next.js 15 App Router · TypeScript strict · Bootstrap 5 + React-Bootstrap · TanStack Query · Zustand · Axios · React Hook Form + Zod · Recharts · Lucide React · `@microsoft/signalr`.
+> Next.js 16 App Router Â· TypeScript strict Â· Bootstrap 5 + React-Bootstrap Â· TanStack Query Â· Zustand Â· Axios Â· React Hook Form + Zod Â· Recharts Â· Lucide React Â· `@microsoft/signalr`.
 
 ## 1. Rendering strategy
 
@@ -29,79 +29,79 @@ Concrete rules:
 
 ```text
 frontend/marketplace-web/src/
-├── app/
-│   ├── layout.tsx                 root: fonts, theme script, providers
-│   ├── (public)/
-│   │   ├── layout.tsx             public shell: header, mega menu, footer
-│   │   ├── page.tsx               homepage
-│   │   ├── products/page.tsx      listing
-│   │   ├── products/[slug]/       detail + generateMetadata
-│   │   ├── categories/page.tsx
-│   │   ├── categories/[slug]/page.tsx
-│   │   ├── stores/[slug]/page.tsx
-│   │   ├── search/page.tsx
-│   │   └── deals/page.tsx
-│   ├── (auth)/
-│   │   ├── layout.tsx             centered card, split illustration
-│   │   ├── login/page.tsx
-│   │   ├── register/page.tsx
-│   │   └── forgot-password/page.tsx
-│   ├── (customer)/
-│   │   ├── layout.tsx             requires session; account sidebar
-│   │   ├── dashboard/page.tsx
-│   │   ├── cart/page.tsx
-│   │   ├── checkout/page.tsx
-│   │   ├── orders/page.tsx
-│   │   ├── orders/[id]/page.tsx
-│   │   ├── wishlist/page.tsx
-│   │   ├── profile/page.tsx
-│   │   ├── addresses/page.tsx
-│   │   └── notifications/page.tsx
-│   ├── (seller)/seller/           sidebar shell
-│   │   ├── dashboard/ products/ inventory/ orders/ reviews/
-│   │   ├── coupons/ analytics/ store/ settings/
-│   ├── (admin)/admin/             dark sidebar shell
-│   │   ├── dashboard/ users/ sellers/ products/ categories/ orders/
-│   │   ├── payments/ refunds/ coupons/ commissions/ reports/
-│   │   ├── audit-logs/ settings/
-│   ├── loading.tsx  error.tsx  not-found.tsx  global-error.tsx
-│   ├── sitemap.ts  robots.ts  manifest.ts
-│   └── api/                       only webhooks/edge adapters, no business logic
-├── components/
-│   ├── ui/            Button, Card, Modal, DataTable, Pagination, Badge,
-│   │                  Skeleton, EmptyState, ErrorState, Toast, Tabs,
-│   │                  SearchInput, FilterPanel, ConfirmDialog, Avatar,
-│   │                  StatCard, ProgressBar, Toggle, Tooltip
-│   ├── layout/        PublicHeader, PublicFooter, MegaMenu, MobileNav,
-│   │                  DashboardShell, DashboardSidebar, DashboardTopbar,
-│   │                  Breadcrumbs, NotificationBell, UserMenu, ThemeToggle
-│   ├── charts/        RevenueAreaChart, OrdersBarChart, DonutBreakdownChart,
-│   │                  SparklineChart, TopProductsList, CategoryBarChart
-│   ├── products/      ProductCard, ProductGrid, ProductGallery, VariantPicker,
-│   │                  QuantityStepper, ProductFilters, SortSelect, PriceRange,
-│   │                  RatingStars, StockBadge, AddToCartButton, WishlistButton
-│   ├── cart/          CartLineItem, SellerGroup, CartSummary
-│   ├── checkout/      CheckoutSteps, AddressForm, DeliveryOption, PaymentOption,
-│   │                  OrderReview, PlaceOrderButton
-│   ├── orders/        OrderTimeline, OrderStatusBadge, OrderCard, OrderItems
-│   ├── shared/        StorefrontRating, PriceDisplay, DiscountBadge, EmptyState...
-│   └── seller/ admin/ customer/  area-specific composites
-├── features/          per domain: api hooks + views (products, cart, orders,
-│                      payments, sellers, reviews, coupons, notifications,
-│                      auth, analytics, reports, addresses, wishlist, inventory)
-├── api/               axiosClient, authApi, productApi, categoryApi, cartApi,
-│                      orderApi, paymentApi, sellerApi, reviewApi, couponApi,
-│                      notificationApi, reportApi, addressApi, analyticsApi
-├── hooks/             useDebounce, useMediaQuery, usePagination, useCopy,
-│                      useCountdown, useOnClickOutside, useDocumentTitle
-├── providers/         AppProviders, QueryProvider, AuthProvider,
-│                      SignalRProvider, ThemeProvider, ToastProvider
-├── store/             authStore, cartStore, uiStore, notificationStore
-├── types/             api.d.ts, product.ts, order.ts, ...
-├── schemas/           auth.ts, product.ts, checkout.ts, seller.ts, address.ts
-├── lib/               queryKeys.ts, format.ts, constants.ts, seo.ts
-├── styles/            globals.css, theme.css, variables.css, utilities.css
-└── public/            static assets
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ layout.tsx                 root: fonts, theme script, providers
+â”‚   â”œâ”€â”€ (public)/
+â”‚   â”‚   â”œâ”€â”€ layout.tsx             public shell: header, mega menu, footer
+â”‚   â”‚   â”œâ”€â”€ page.tsx               homepage
+â”‚   â”‚   â”œâ”€â”€ products/page.tsx      listing
+â”‚   â”‚   â”œâ”€â”€ products/[slug]/       detail + generateMetadata
+â”‚   â”‚   â”œâ”€â”€ categories/page.tsx
+â”‚   â”‚   â”œâ”€â”€ categories/[slug]/page.tsx
+â”‚   â”‚   â”œâ”€â”€ stores/[slug]/page.tsx
+â”‚   â”‚   â”œâ”€â”€ search/page.tsx
+â”‚   â”‚   â””â”€â”€ deals/page.tsx
+â”‚   â”œâ”€â”€ (auth)/
+â”‚   â”‚   â”œâ”€â”€ layout.tsx             centered card, split illustration
+â”‚   â”‚   â”œâ”€â”€ login/page.tsx
+â”‚   â”‚   â”œâ”€â”€ register/page.tsx
+â”‚   â”‚   â””â”€â”€ forgot-password/page.tsx
+â”‚   â”œâ”€â”€ (customer)/
+â”‚   â”‚   â”œâ”€â”€ layout.tsx             requires session; account sidebar
+â”‚   â”‚   â”œâ”€â”€ dashboard/page.tsx
+â”‚   â”‚   â”œâ”€â”€ cart/page.tsx
+â”‚   â”‚   â”œâ”€â”€ checkout/page.tsx
+â”‚   â”‚   â”œâ”€â”€ orders/page.tsx
+â”‚   â”‚   â”œâ”€â”€ orders/[id]/page.tsx
+â”‚   â”‚   â”œâ”€â”€ wishlist/page.tsx
+â”‚   â”‚   â”œâ”€â”€ profile/page.tsx
+â”‚   â”‚   â”œâ”€â”€ addresses/page.tsx
+â”‚   â”‚   â””â”€â”€ notifications/page.tsx
+â”‚   â”œâ”€â”€ (seller)/seller/           sidebar shell
+â”‚   â”‚   â”œâ”€â”€ dashboard/ products/ inventory/ orders/ reviews/
+â”‚   â”‚   â”œâ”€â”€ coupons/ analytics/ store/ settings/
+â”‚   â”œâ”€â”€ (admin)/admin/             dark sidebar shell
+â”‚   â”‚   â”œâ”€â”€ dashboard/ users/ sellers/ products/ categories/ orders/
+â”‚   â”‚   â”œâ”€â”€ payments/ refunds/ coupons/ commissions/ reports/
+â”‚   â”‚   â”œâ”€â”€ audit-logs/ settings/
+â”‚   â”œâ”€â”€ loading.tsx  error.tsx  not-found.tsx  global-error.tsx
+â”‚   â”œâ”€â”€ sitemap.ts  robots.ts  manifest.ts
+â”‚   â””â”€â”€ api/                       only webhooks/edge adapters, no business logic
+â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ ui/            Button, Card, Modal, DataTable, Pagination, Badge,
+â”‚   â”‚                  Skeleton, EmptyState, ErrorState, Toast, Tabs,
+â”‚   â”‚                  SearchInput, FilterPanel, ConfirmDialog, Avatar,
+â”‚   â”‚                  StatCard, ProgressBar, Toggle, Tooltip
+â”‚   â”œâ”€â”€ layout/        PublicHeader, PublicFooter, MegaMenu, MobileNav,
+â”‚   â”‚                  DashboardShell, DashboardSidebar, DashboardTopbar,
+â”‚   â”‚                  Breadcrumbs, NotificationBell, UserMenu, ThemeToggle
+â”‚   â”œâ”€â”€ charts/        RevenueAreaChart, OrdersBarChart, DonutBreakdownChart,
+â”‚   â”‚                  SparklineChart, TopProductsList, CategoryBarChart
+â”‚   â”œâ”€â”€ products/      ProductCard, ProductGrid, ProductGallery, VariantPicker,
+â”‚   â”‚                  QuantityStepper, ProductFilters, SortSelect, PriceRange,
+â”‚   â”‚                  RatingStars, StockBadge, AddToCartButton, WishlistButton
+â”‚   â”œâ”€â”€ cart/          CartLineItem, SellerGroup, CartSummary
+â”‚   â”œâ”€â”€ checkout/      CheckoutSteps, AddressForm, DeliveryOption, PaymentOption,
+â”‚   â”‚                  OrderReview, PlaceOrderButton
+â”‚   â”œâ”€â”€ orders/        OrderTimeline, OrderStatusBadge, OrderCard, OrderItems
+â”‚   â”œâ”€â”€ shared/        StorefrontRating, PriceDisplay, DiscountBadge, EmptyState...
+â”‚   â””â”€â”€ seller/ admin/ customer/  area-specific composites
+â”œâ”€â”€ features/          per domain: api hooks + views (products, cart, orders,
+â”‚                      payments, sellers, reviews, coupons, notifications,
+â”‚                      auth, analytics, reports, addresses, wishlist, inventory)
+â”œâ”€â”€ api/               axiosClient, authApi, productApi, categoryApi, cartApi,
+â”‚                      orderApi, paymentApi, sellerApi, reviewApi, couponApi,
+â”‚                      notificationApi, reportApi, addressApi, analyticsApi
+â”œâ”€â”€ hooks/             useDebounce, useMediaQuery, usePagination, useCopy,
+â”‚                      useCountdown, useOnClickOutside, useDocumentTitle
+â”œâ”€â”€ providers/         AppProviders, QueryProvider, AuthProvider,
+â”‚                      SignalRProvider, ThemeProvider, ToastProvider
+â”œâ”€â”€ store/             authStore, cartStore, uiStore, notificationStore
+â”œâ”€â”€ types/             api.d.ts, product.ts, order.ts, ...
+â”œâ”€â”€ schemas/           auth.ts, product.ts, checkout.ts, seller.ts, address.ts
+â”œâ”€â”€ lib/               queryKeys.ts, format.ts, constants.ts, seo.ts
+â”œâ”€â”€ styles/            globals.css, theme.css, variables.css, utilities.css
+â””â”€â”€ public/            static assets
 ```
 
 ## 3. State model
@@ -125,7 +125,7 @@ Non-negotiables:
 ## 4. Data-fetching layers
 
 ```ts
-// 1. Server Component — direct fetch, no axios instance, no token
+// 1. Server Component â€” direct fetch, no axios instance, no token
 //    src/lib/serverApi.ts
 export async function serverGet<T>(path: string, revalidate = 60): Promise<T> {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
@@ -135,7 +135,7 @@ export async function serverGet<T>(path: string, revalidate = 60): Promise<T> {
   return res.json();
 }
 
-// 2. Client Component — TanStack Query over the api/ modules
+// 2. Client Component â€” TanStack Query over the api/ modules
 //    src/features/products/api/useProducts.ts
 export const useProducts = (params: ProductQuery) =>
   useQuery({
@@ -145,8 +145,8 @@ export const useProducts = (params: ProductQuery) =>
     staleTime: 30_000,
   });
 
-// 3. Route Handlers — only for browser-facing concerns
-//    app/api/webhooks/payment/route.ts  → verifies + relays to the API
+// 3. Route Handlers â€” only for browser-facing concerns
+//    app/api/webhooks/payment/route.ts  â†’ verifies + relays to the API
 ```
 
 ## 5. API client
@@ -156,16 +156,16 @@ export const useProducts = (params: ProductQuery) =>
 - `baseURL` from `NEXT_PUBLIC_API_URL`.
 - Request interceptor injects the in-memory access token and the correlation id.
 - Response interceptor normalizes errors into a typed `ApiError { status, type, title, detail, fieldErrors, correlationId }`.
-- A single-flight refresh: on the first `401`, one `POST /auth/refresh` runs while other 401s queue behind it; on success the queue replays, on failure the session is cleared and the user is routed to `/login?returnUrl=…`.
+- A single-flight refresh: on the first `401`, one `POST /auth/refresh` runs while other 401s queue behind it; on success the queue replays, on failure the session is cleared and the user is routed to `/login?returnUrl=â€¦`.
 - The refresh token rides in an `HttpOnly` cookie; the client never reads it.
 
 ## 6. Real-time integration
 
 ```text
 SignalR event
-    → map to a TanStack Query key
-    → invalidateQueries / setQueryData
-    → components re-render with fresh server data
+    â†’ map to a TanStack Query key
+    â†’ invalidateQueries / setQueryData
+    â†’ components re-render with fresh server data
 ```
 
 ```ts
@@ -182,13 +182,13 @@ hub.on('NotificationCreated', (n: NotificationDto) => {
 });
 ```
 
-Connection state is surfaced subtly: an amber dot + "Reconnecting…" pill in the dashboard topbar. The app never blocks on it, and it forces a full refetch after reconnecting so nothing is missed.
+Connection state is surfaced subtly: an amber dot + "Reconnectingâ€¦" pill in the dashboard topbar. The app never blocks on it, and it forces a full refetch after reconnecting so nothing is missed.
 
 ## 7. SEO implementation
 
 | Concern | Implementation |
 | --- | --- |
-| Titles | `generateMetadata` per route; template `"%s · {siteName}"` in the root layout |
+| Titles | `generateMetadata` per route; template `"%s Â· {siteName}"` in the root layout |
 | Canonical | `alternates.canonical` with `NEXT_PUBLIC_SITE_URL` |
 | Open Graph / Twitter | Shared builder in `lib/seo.ts` |
 | Product JSON-LD | `Product` + `AggregateRating` + `Offer` + `Brand` from the product DTO |
@@ -212,10 +212,10 @@ Connection state is surfaced subtly: an amber dot + "Reconnecting…" pill in th
 
 | Width | Behaviour |
 | --- | --- |
-| ≥ 1400 px | full nav, 4–5 column product grid, persistent filter rail, wide dashboards |
-| 1200–1399 px | 3-column grid, condensed topbar |
-| 992–1199 px | 2–3 column grid, collapsible filter drawer |
-| 768–991 px | 2-column grid, off-canvas dashboard sidebar, hamburger nav |
+| â‰¥ 1400 px | full nav, 4â€“5 column product grid, persistent filter rail, wide dashboards |
+| 1200â€“1399 px | 3-column grid, condensed topbar |
+| 992â€“1199 px | 2â€“3 column grid, collapsible filter drawer |
+| 768â€“991 px | 2-column grid, off-canvas dashboard sidebar, hamburger nav |
 | < 768 px | 2-column compact grid, off-canvas filters, stacked checkout, card-style tables, bottom cart bar |
 
 Tables use a `responsiveTable` wrapper that converts to stacked definition cards below 768 px rather than forcing horizontal scroll.
@@ -241,13 +241,13 @@ not-found.tsx      helpful 404 with search + category shortcuts
 global-error.tsx   root fallback that also survives a root-layout crash
 ```
 
-Every list view renders one of four explicit states: `loading` → `error` → `empty` → `data`. The `EmptyState` component always offers the next useful action (clear filters, add a product, start shopping) rather than a dead end.
+Every list view renders one of four explicit states: `loading` â†’ `error` â†’ `empty` â†’ `data`. The `EmptyState` component always offers the next useful action (clear filters, add a product, start shopping) rather than a dead end.
 
 ## 12. Conventions
 
 - Components: `PascalCase.tsx`, one component per file except tiny variant sets.
 - Hooks: `useThing.ts`, returning `{ data, isLoading, error, ...actions }`.
 - Types: `interface` for objects, `type` for unions; no `any`; `unknown` at boundaries.
-- Import order enforced by ESLint: react → next → external → internal → styles.
-- No direct `fetch` in components — always `api/*` or `lib/serverApi`.
+- Import order enforced by ESLint: react â†’ next â†’ external â†’ internal â†’ styles.
+- No direct `fetch` in components â€” always `api/*` or `lib/serverApi`.
 - No business logic in components: pricing, totals and permissions come from the API.

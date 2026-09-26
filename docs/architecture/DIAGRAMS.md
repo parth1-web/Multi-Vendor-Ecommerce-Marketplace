@@ -6,29 +6,29 @@
 graph TB
     Browser["User Browser"]
 
-    subgraph FE["Next.js 15 · App Router"]
+    subgraph FE["Next.js 16 Â· App Router"]
         RSC["Server Components<br/>public + SEO pages"]
         CC["Client Components<br/>interactions"]
         API["Server-side fetch layer"]
     end
 
-    subgraph BE["ASP.NET Core 8 Web API · Marketplace.API"]
-        MW["Middleware pipeline<br/>logging · exceptions · rate limit · CORS"]
+    subgraph BE["ASP.NET Core 8 Web API Â· Marketplace.API"]
+        MW["Middleware pipeline<br/>logging Â· exceptions Â· rate limit Â· CORS"]
         CTL["Controllers"]
         HUB["SignalR Hub<br/>/hubs/marketplace"]
         SVC["Application Services"]
     end
 
     subgraph IN["Marketplace.Infrastructure"]
-        EF["EF Core DbContext<br/>repositories · UoW"]
+        EF["EF Core DbContext<br/>repositories Â· UoW"]
         RD["Redis cache"]
         JOB["Hangfire / BackgroundService"]
-        PG["Payment gateways<br/>Mock · CoD · Khalti · eSewa · Stripe"]
+        PG["Payment gateways<br/>Mock Â· CoD Â· Khalti Â· eSewa Â· Stripe"]
     end
 
     subgraph DOM["Marketplace.Domain"]
-        ENT["Entities · Value Objects"]
-        RULE["Business rules · State machines"]
+        ENT["Entities Â· Value Objects"]
+        RULE["Business rules Â· State machines"]
     end
 
     DB[("PostgreSQL")]
@@ -86,19 +86,19 @@ The Domain has **no NuGet package references**. A unit test fails the build if t
 ```mermaid
 graph TD
     C["Cart<br/>4 items from 3 sellers"]
-    C --> V{"Validate<br/>price · stock · coupon · address"}
+    C --> V{"Validate<br/>price Â· stock Â· coupon Â· address"}
     V --> R["Reserve inventory<br/>atomic + concurrency token"]
     R --> O["Order #1001<br/>single marketplace order"]
-    O --> SA["SellerOrder A · TechWorld<br/>OrderItem A1, A2"]
-    O --> SB["SellerOrder B · FashionHub<br/>OrderItem B1"]
-    O --> SC["SellerOrder C · HomeEssentials<br/>OrderItem C1"]
-    SA --> CA["Commission A · 10% snapshot"]
-    SB --> CB["Commission B · 12% snapshot"]
-    SC --> CC["Commission C · 8% snapshot"]
+    O --> SA["SellerOrder A Â· TechWorld<br/>OrderItem A1, A2"]
+    O --> SB["SellerOrder B Â· FashionHub<br/>OrderItem B1"]
+    O --> SC["SellerOrder C Â· HomeEssentials<br/>OrderItem C1"]
+    SA --> CA["Commission A Â· 10% snapshot"]
+    SB --> CB["Commission B Â· 12% snapshot"]
+    SC --> CC["Commission C Â· 8% snapshot"]
     SA --> P["Payment"]
     SB --> P
     SC --> P
-    P --> W["Webhook → verify signature<br/>idempotency → confirm"]
+    P --> W["Webhook â†’ verify signature<br/>idempotency â†’ confirm"]
     W --> N["Notify customer + 3 sellers"]
 
     style O fill:#1b1436,stroke:#7c5cff,color:#eae6ff
@@ -160,13 +160,13 @@ graph LR
     O["Order (paid=false)"] --> PC["POST /api/payments"]
     PC --> G["IPaymentGateway.CreateAsync"]
     G --> P["Payment (Initiated)"]
-    P --> R{"Redirect / QR<br/>(Khalti·eSewa·Stripe)"}
+    P --> R{"Redirect / QR<br/>(KhaltiÂ·eSewaÂ·Stripe)"}
     R --> WH["POST /api/payments/webhook"]
     WH --> S{"HMAC signature<br/>valid?"}
     S -- no --> RJ["409 rejected + logged"]
     S -- yes --> ID{"Event id already<br/>processed?"}
     ID -- yes --> OK["200 OK (idempotent no-op)"]
-    ID -- no --> TX["BEGIN · verify amount+order<br/>mark succeeded · release reservation"]
+    ID -- no --> TX["BEGIN Â· verify amount+order<br/>mark succeeded Â· release reservation"]
     TX --> CM["Create commissions"]
     TX --> CM
     TX --> NT["Notifications + SignalR"]
@@ -177,7 +177,7 @@ graph LR
     style FIN fill:#132a1f,stroke:#2fa36b,color:#e6fff0
 ```
 
-Refund path: customer request → admin review → approve → gateway refund → payment refunded → inventory returned → order state updated → both parties notified. Rejected refunds record a mandatory reason and stay auditable.
+Refund path: customer request â†’ admin review â†’ approve â†’ gateway refund â†’ payment refunded â†’ inventory returned â†’ order state updated â†’ both parties notified. Rejected refunds record a mandatory reason and stay auditable.
 
 ## 7. Multi-layer caching
 
