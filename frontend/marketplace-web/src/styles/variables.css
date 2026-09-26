@@ -1,0 +1,127 @@
+/**
+ * Design tokens for the storefront and all three dashboards.
+ *
+ * These are the tokens from the UI design system, verbatim and complete. Components reference
+ * them by name and never reach for a raw hex value, which is what lets the dark theme be a
+ * variable swap rather than a second set of styles.
+ */
+
+:root {
+  /* Brand */
+  --brand-50: #f2f0ff;
+  --brand-100: #e6e1ff;
+  --brand-200: #cec6ff;
+  --brand-300: #aea1ff;
+  --brand-400: #8b78ff;
+  --brand-500: #7c5cff;
+  --brand-600: #6a44f5;
+  --brand-700: #5734d1;
+  --brand-800: #452aa5;
+
+  /* Neutrals */
+  --bg-body: #f6f7fb;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f3f9;
+  --bg-elevated: #ffffff;
+  --border: #e4e7f0;
+  --border-strong: #cfd4e4;
+  --text: #151a2e;
+  --text-muted: #5b6480;
+  --text-subtle: #8b93ab;
+
+  /* Sidebar: the one dark surface in the product */
+  --sidebar-bg: #0f1222;
+  --sidebar-bg-2: #171b31;
+  --sidebar-text: #a7aecb;
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: #252b45;
+
+  /* Semantic */
+  --success: #16a34a;
+  --success-bg: #e8f7ee;
+  --warning: #d97706;
+  --warning-bg: #fdf2e0;
+  --danger: #dc2626;
+  --danger-bg: #fdeaea;
+  --info: #2563eb;
+  --info-bg: #e8efff;
+  --violet: #7c5cff;
+  --violet-bg: #f2f0ff;
+  --cyan: #0891b2;
+  --teal: #0d9488;
+  --orange: #ea580c;
+
+  /* Chart series, in the order a series is assigned */
+  --chart-1: #7c5cff;
+  --chart-2: #22c55e;
+  --chart-3: #f97316;
+  --chart-4: #0ea5e9;
+  --chart-5: #ec4899;
+  --chart-6: #eab308;
+
+  /* Typography */
+  --font-sans: var(--font-jakarta), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sora), var(--font-sans);
+
+  --fs-display: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+  --fs-h1: 1.5rem;
+  --fs-h2: 1.25rem;
+  --fs-h3: 1.0625rem;
+  --fs-body: 0.9375rem;
+  --fs-sm: 0.8125rem;
+  --fs-xs: 0.75rem;
+  --fs-metric: 2rem;
+  --fs-metric-lg: 2.5rem;
+
+  --lh-tight: 1.15;
+  --lh-normal: 1.55;
+  --tracking-tight: -0.02em;
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgba(21, 26, 46, 0.06), 0 1px 3px rgba(21, 26, 46, 0.04);
+  --shadow-2: 0 2px 6px rgba(21, 26, 46, 0.07), 0 6px 16px rgba(21, 26, 46, 0.05);
+  --shadow-pop: 0 10px 30px rgba(21, 26, 46, 0.14);
+
+  /* Geometry: a 4px step scale, 12px radius base */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius-sm: 0.375rem;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+
+  --border-width: 1.5px;
+
+  /* Chrome */
+  --header-height: 4.25rem;
+  --sidebar-width: 16.5rem;
+  --sidebar-width-collapsed: 4.75rem;
+  --content-max: 84rem;
+  --row-height: 3.25rem;
+
+  --transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  --bg-body: #0b0e1a;
+  --bg-surface: #141829;
+  --bg-subtle: #1b2036;
+  --border: #262c44;
+  --border-strong: #343c5c;
+  --text: #eef1fa;
+  --text-muted: #a3abc6;
+  --text-subtle: #7b84a1;
+  --sidebar-bg: #0a0c16;
+  --sidebar-bg-2: #12162a;
+  --success-bg: #0f2a1c;
+  --warning-bg: #33240c;
+  --danger-bg: #3a1616;
+  --info-bg: #12234a;
+  --violet-bg: #1c1740;
+}

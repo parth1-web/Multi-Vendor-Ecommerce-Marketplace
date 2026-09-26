@@ -1,0 +1,299 @@
+/**
+ * Bootstrap is the layout substrate, not the design. These rules map Bootstrap's own variables
+ * onto the design tokens and then add the handful of component classes the product needs.
+ * Anything that needed real design work gets a token and a rule here rather than a fork of a
+ * Bootstrap component.
+ */
+
+@import "bootstrap/dist/css/bootstrap.min.css";
+@import "./variables.css";
+@import "./utilities.css";
+
+:root {
+  --bs-body-font-family: var(--font-sans);
+  --bs-body-font-size: var(--fs-body);
+  --bs-body-color: var(--text);
+  --bs-body-bg: var(--bg-body);
+  --bs-border-color: var(--border);
+  --bs-border-radius: var(--radius-sm);
+  --bs-primary: var(--brand-600);
+  --bs-primary-rgb: 106, 68, 245;
+  --bs-link-color: var(--brand-600);
+  --bs-link-hover-color: var(--brand-700);
+  --bs-secondary-color: var(--text-muted);
+  --bs-emphasis-color: var(--text);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-normal);
+  color: var(--text);
+  background-color: var(--bg-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---- surfaces ---------------------------------------------------------------- */
+
+.mp-card {
+  background-color: var(--bg-surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+}
+
+.mp-card-elevated {
+  background-color: var(--bg-elevated);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+}
+
+.mp-page {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+
+.mp-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.mp-page-title {
+  font-size: var(--fs-h1);
+  margin: 0;
+}
+
+.mp-page-subtitle {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin: var(--space-1) 0 0;
+}
+
+/* ---- metric ------------------------------------------------------------------ */
+
+.mp-metric {
+  font-family: var(--font-display);
+  font-size: var(--fs-metric);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-metric-lg {
+  font-size: var(--fs-metric-lg);
+}
+
+.mp-metric-label {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* ---- tables ------------------------------------------------------------------ */
+
+.mp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-sm);
+}
+
+.mp-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--border);
+  white-space: nowrap;
+}
+
+.mp-table tbody td {
+  padding: var(--space-3) var(--space-4);
+  height: var(--row-height);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.mp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mp-table tbody tr:hover td {
+  background-color: var(--bg-subtle);
+}
+
+.mp-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- sidebar ----------------------------------------------------------------- */
+
+.mp-sidebar {
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  border-right: var(--border-width) solid var(--sidebar-border);
+}
+
+.mp-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--sidebar-text-active);
+  font-family: var(--font-display);
+  font-weight: 600;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.mp-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  color: var(--sidebar-text);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition), color var(--transition);
+}
+
+.mp-sidebar-link:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--sidebar-text-active);
+  text-decoration: none;
+}
+
+.mp-sidebar-link.is-active {
+  background-color: var(--brand-600);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.mp-sidebar-section {
+  padding: var(--space-4) var(--space-4) var(--space-1);
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---- badges ------------------------------------------------------------------ */
+
+.mp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.mp-badge-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background-color: currentColor;
+  flex: none;
+}
+
+.mp-badge-success {
+  background-color: var(--success-bg);
+  color: var(--success);
+}
+
+.mp-badge-warning {
+  background-color: var(--warning-bg);
+  color: var(--warning);
+}
+
+.mp-badge-danger {
+  background-color: var(--danger-bg);
+  color: var(--danger);
+}
+
+.mp-badge-info {
+  background-color: var(--info-bg);
+  color: var(--info);
+}
+
+.mp-badge-neutral {
+  background-color: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+.mp-badge-violet {
+  background-color: var(--violet-bg);
+  color: var(--violet);
+}
+
+/* ---- skeletons --------------------------------------------------------------- */
+
+.mp-skeleton {
+  background: linear-gradient(90deg, var(--bg-subtle) 25%, var(--border) 37%, var(--bg-subtle) 63%);
+  background-size: 400% 100%;
+  animation: mp-shimmer 1.4s ease infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes mp-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-skeleton {
+    animation: none;
+  }
+}

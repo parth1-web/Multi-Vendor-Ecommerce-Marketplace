@@ -1,0 +1,75 @@
+/**
+ * Utilities for the few layout needs Bootstrap does not cover. Anything that looks like a
+ * general-purpose utility belongs in Bootstrap itself; this file is for the two or three the
+ * design system needs and Bootstrap has no opinion on.
+ */
+
+.mp-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mp-stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mp-row-tight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mp-spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.mp-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mp-price {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-price-strike {
+  color: var(--text-subtle);
+  text-decoration: line-through;
+  font-size: var(--fs-sm);
+  margin-inline-start: var(--space-2);
+}
+
+.mp-section-title {
+  font-size: var(--fs-h2);
+  margin: 0;
+}
+
+/* Focus is never removed, only restyled: a keyboard user must always see where they are. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
