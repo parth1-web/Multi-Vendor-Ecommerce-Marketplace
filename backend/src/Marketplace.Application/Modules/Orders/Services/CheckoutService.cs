@@ -37,8 +37,6 @@ public sealed class CheckoutService(
     IRepository<UserAddress> addresses,
     IRepository<Seller> sellers,
     IRepository<Domain.Orders.Order> orders,
-    IRepository<SellerOrder> sellerOrders,
-    IRepository<OrderItem> orderItems,
     IRepository<Payment> payments,
     IRepository<InventoryReservation> reservations,
     IInventoryService inventory,
@@ -236,9 +234,6 @@ public sealed class CheckoutService(
 
             order.AddSellerOrder(sellerOrder);
 
-            // The sub-order joins an order that is already tracked, so it is named as an insert
-            // explicitly. Left to change detection it is mistaken for a stored row.
-            await sellerOrders.AddAsync(sellerOrder, cancellationToken).ConfigureAwait(false);
         }
 
         // ---- 3. line items with snapshotted purchase data -------------------------
@@ -295,9 +290,6 @@ public sealed class CheckoutService(
             order.AddItem(item);
             sellerOrder.AddItem(item);
 
-            // Same reason as the sub-order above: this line is new, and only the caller knows
-            // that, because its key is generated in the domain rather than by the database.
-            await orderItems.AddAsync(item, cancellationToken).ConfigureAwait(false);
 
             soldCounts[line.ProductId] = soldCounts.GetValueOrDefault(line.ProductId) + line.Quantity;
 

@@ -300,6 +300,31 @@ public sealed class PaymentService(
         return Result<PaymentResponse>.Success(await MapAsync(payment, cancellationToken).ConfigureAwait(false));
     }
 
+    /// <summary>
+    /// The caller's own payments, newest first.
+    /// </summary>
+    /// <remarks>
+    /// A customer has to be able to see what they were charged and what state it is in, so
+    /// the scope comes from the token rather than from a parameter a caller could widen.
+    /// </remarks>
+    public async Task<IReadOnlyList<PaymentResponse>> ListOwnAsync(CancellationToken cancellationToken = default)
+    {
+        var owned = await payments.Query().AsNoTracking()
+            .Include(p => p.Transactions)
+            .Where(p => p.CustomerId == currentUser.UserId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var results = new List<PaymentResponse>(owned.Count);
+        foreach (var payment in owned)
+        {
+            results.Add(await MapAsync(payment, cancellationToken).ConfigureAwait(false));
+        }
+
+        return results;
+    }
+
     public async Task<PagedResult<PaymentResponse>> ListAllAsync(PaymentListQuery query, CancellationToken cancellationToken = default)
     {
         var page = new PageRequest(query.Page, query.PageSize);
