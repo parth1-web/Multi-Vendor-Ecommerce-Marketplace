@@ -16,7 +16,7 @@ public sealed class InventoryConfiguration : IEntityTypeConfiguration<Inventory>
         builder.Property(i => i.ReservedQuantity).IsRequired();
         builder.Property(i => i.SoldQuantity).IsRequired();
         builder.Property(i => i.LowStockThreshold).IsRequired();
-        builder.Property(i => i.RowVersion).IsRowVersion();
+        builder.ConfigureRowVersion();
 
         builder.HasIndex(i => i.ProductVariantId).IsUnique().HasDatabaseName("ux_inventory_variant");
         builder.HasIndex(i => new { i.SellerId, i.AvailableQuantity }).HasDatabaseName("ix_inventory_seller");
@@ -76,8 +76,8 @@ public sealed class CartConfiguration : IEntityTypeConfiguration<Cart>
         builder.Property(c => c.OwnerType).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(c => c.GuestToken).HasColumnType("varchar(128)");
 
-        builder.HasIndex(c => c.UserId).IsUnique().HasFilter("user_id IS NOT NULL").HasDatabaseName("ux_carts_user");
-        builder.HasIndex(c => c.GuestToken).IsUnique().HasFilter("guest_token IS NOT NULL").HasDatabaseName("ux_carts_guest");
+        builder.HasIndex(c => c.UserId).IsUnique().HasDatabaseName("ux_carts_user");
+        builder.HasIndex(c => c.GuestToken).IsUnique().HasDatabaseName("ux_carts_guest");
         builder.HasIndex(c => c.LastActivityAt).HasDatabaseName("ix_carts_activity");
 
 

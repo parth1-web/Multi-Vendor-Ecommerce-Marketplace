@@ -29,7 +29,7 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CouponCode).HasColumnType("varchar(50)");
         builder.Property(o => o.CustomerNote).HasColumnType("varchar(1000)");
         builder.Property(o => o.CancellationReason).HasColumnType("varchar(500)");
-        builder.Property(o => o.RowVersion).IsRowVersion();
+        builder.ConfigureRowVersion();
 
         // The address is snapshotted into its own table so later edits to the address book
         // can never rewrite what was shipped.
@@ -101,7 +101,7 @@ public sealed class SellerOrderConfiguration : IEntityTypeConfiguration<SellerOr
         builder.Property(so => so.TrackingUrl).HasColumnType("varchar(512)");
         builder.Property(so => so.CancellationReason).HasColumnType("varchar(500)");
         builder.Property(so => so.SellerNote).HasColumnType("varchar(1000)");
-        builder.Property(so => so.RowVersion).IsRowVersion();
+        builder.ConfigureRowVersion();
 
         builder.HasIndex(so => so.SellerOrderNumber).IsUnique().HasDatabaseName("ux_seller_orders_number");
         builder.HasIndex(so => new { so.SellerId, so.Status, so.CreatedAt }).HasDatabaseName("ix_seller_orders_seller");
@@ -200,7 +200,7 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(p => p.GatewayRedirectUrl).HasColumnType("varchar(512)");
         builder.Property(p => p.FailureReason).HasColumnType("varchar(500)");
         builder.Property(p => p.RefundedAmount).HasColumnType("numeric(18,2)").IsRequired();
-        builder.Property(p => p.RowVersion).IsRowVersion();
+        builder.ConfigureRowVersion();
 
         builder.HasIndex(p => p.TransactionReference).IsUnique().HasDatabaseName("ux_payments_reference");
         builder.HasIndex(p => new { p.Provider, p.GatewayPaymentId }).HasDatabaseName("ix_payments_gateway");
@@ -271,7 +271,7 @@ public sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.Property(r => r.RejectionReason).HasColumnType("varchar(1000)");
         builder.Property(r => r.GatewayRefundId).HasColumnType("varchar(128)");
         builder.Property(r => r.FailureReason).HasColumnType("varchar(500)");
-        builder.Property(r => r.RowVersion).IsRowVersion();
+        builder.ConfigureRowVersion();
 
         builder.HasIndex(r => new { r.Status, r.RequestedAt }).HasDatabaseName("ix_refunds_status");
         builder.HasIndex(r => r.CustomerId).HasDatabaseName("ix_refunds_customer");

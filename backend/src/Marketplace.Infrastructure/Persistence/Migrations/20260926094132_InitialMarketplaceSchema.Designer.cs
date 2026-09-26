@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Marketplace.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MarketplaceDbContext))]
-    [Migration("20260926092446_InitialMarketplaceSchema")]
+    [Migration("20260926094132_InitialMarketplaceSchema")]
     partial class InitialMarketplaceSchema
     {
         /// <inheritdoc />
@@ -113,16 +113,14 @@ namespace Marketplace.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GuestToken")
                         .IsUnique()
-                        .HasDatabaseName("ux_carts_guest")
-                        .HasFilter("guest_token IS NOT NULL");
+                        .HasDatabaseName("ux_carts_guest");
 
                     b.HasIndex("LastActivityAt")
                         .HasDatabaseName("ix_carts_activity");
 
                     b.HasIndex("UserId")
                         .IsUnique()
-                        .HasDatabaseName("ux_carts_user")
-                        .HasFilter("user_id IS NOT NULL");
+                        .HasDatabaseName("ux_carts_user");
 
                     b.ToTable("carts", (string)null);
                 });

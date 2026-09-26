@@ -23,7 +23,7 @@ public sealed class SellerConfiguration : IEntityTypeConfiguration<Seller>
         builder.Property(s => s.DefaultCommissionRate).HasColumnType("numeric(5,2)").IsRequired();
         builder.Property(s => s.RejectionReason).HasColumnType("varchar(500)");
         builder.Property(s => s.SuspensionReason).HasColumnType("varchar(500)");
-        builder.Property(s => s.RowVersion).IsRowVersion();
+        builder.ConfigureRowVersion();
 
         builder.HasIndex(s => s.UserId).IsUnique().HasDatabaseName("ux_sellers_user");
         builder.HasIndex(s => s.Status).HasDatabaseName("ix_sellers_status");

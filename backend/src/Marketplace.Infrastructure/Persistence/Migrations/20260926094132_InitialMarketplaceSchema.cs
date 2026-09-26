@@ -1127,15 +1127,13 @@ namespace Marketplace.Infrastructure.Persistence.Migrations
                 name: "ux_carts_guest",
                 table: "carts",
                 column: "GuestToken",
-                unique: true,
-                filter: "guest_token IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ux_carts_user",
                 table: "carts",
                 column: "UserId",
-                unique: true,
-                filter: "user_id IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_categories_active",

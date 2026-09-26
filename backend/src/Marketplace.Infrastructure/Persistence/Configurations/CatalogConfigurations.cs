@@ -50,7 +50,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.RejectionReason).HasConversion<string>().HasMaxLength(48);
         builder.Property(p => p.RejectionNote).HasColumnType("varchar(1000)");
         builder.Property(p => p.RatingAverage).HasColumnType("numeric(3,2)").IsRequired();
-        builder.Property(p => p.RowVersion).IsRowVersion();
+        builder.ConfigureRowVersion();
 
         builder.HasIndex(p => p.SlugValue).IsUnique().HasDatabaseName("ux_products_slug");
         builder.HasIndex(p => new { p.SellerId, p.Status, p.CreatedAt }).HasDatabaseName("ix_products_seller_status");

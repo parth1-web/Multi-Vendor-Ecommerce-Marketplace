@@ -71,8 +71,16 @@ public class MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> options
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    /// <summary>
+    /// Provider name captured before the configurations run, so the concurrency-token
+    /// configuration can adapt to the current provider.
+    /// </summary>
+    internal static string? CurrentProviderName { get; private set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        CurrentProviderName = Database.ProviderName;
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MarketplaceDbContext).Assembly);
         modelBuilder.ApplyGlobalFilters();
         base.OnModelCreating(modelBuilder);
