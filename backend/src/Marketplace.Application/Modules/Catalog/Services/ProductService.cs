@@ -10,7 +10,7 @@ using Marketplace.Domain.Catalog;
 using Marketplace.Domain.Common;
 using Marketplace.Domain.Enums;
 using Marketplace.Domain.Events;
-using Marketplace.Domain.Inventory;
+using InventoryRecord = Marketplace.Domain.Inventory.Inventory;
 using Marketplace.Domain.Reviews;
 using Marketplace.Domain.Sellers;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +26,7 @@ public sealed class ProductService(
     IRepository<Category> categories,
     IRepository<Seller> sellers,
     IRepository<SellerStore> stores,
-    IRepository<Inventory> inventories,
+    IRepository<InventoryRecord> inventories,
     IRepository<Review> reviews,
     ICurrentUser currentUser,
     ICacheService cache,
@@ -210,7 +210,7 @@ public sealed class ProductService(
             }
 
             var stock = Math.Max(0, variant.InitialStock);
-            var inventory = Inventory.Create(created.Id, product.Id, sellerId, stock,
+            var inventory = InventoryRecord.Create(created.Id, product.Id, sellerId, stock,
                 variant.LowStockThreshold ?? 5, now);
             await inventories.AddAsync(inventory, cancellationToken).ConfigureAwait(false);
         }
@@ -352,7 +352,7 @@ public sealed class ProductService(
             variant.AddOption(option.Name, option.Value, now);
         }
 
-        var inventory = Inventory.Create(variant.Id, product.Id, product.SellerId, Math.Max(0, request.InitialStock),
+        var inventory = InventoryRecord.Create(variant.Id, product.Id, product.SellerId, Math.Max(0, request.InitialStock),
             request.LowStockThreshold ?? 5, now);
 
         await inventories.AddAsync(inventory, cancellationToken).ConfigureAwait(false);

@@ -103,5 +103,11 @@ public sealed class Result<T> : Result
 
     public new static Result<T> Failure(string error) => new(false, default, error, null);
 
+    /// <summary>
+    /// Failure that still carries a value — used when the failure payload matters, for
+    /// example the stock that was actually available when a reservation was refused.
+    /// </summary>
+    public static Result<T> Failure(T value, string? error = null) => new(false, value, error, null);
+
     public static Result<T> Failure(IReadOnlyDictionary<string, string[]> errors) => new(false, default, "One or more validation errors occurred.", errors);
 }
