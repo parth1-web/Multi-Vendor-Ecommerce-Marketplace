@@ -107,6 +107,128 @@
   border-color: color-mix(in srgb, var(--info) 25%, transparent);
 }
 
+/*
+ * Checkout steps. The number is a second signal: the step is named as well as numbered, so
+ * nothing depends on recognising a circle.
+ */
+.mp-steps {
+  display: flex;
+  gap: var(--space-4);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
+  flex-wrap: wrap;
+}
+
+.mp-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mp-step > span {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: var(--fs-xs);
+}
+
+.mp-step.is-current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mp-step.is-current > span {
+  border-color: var(--brand-600);
+  background-color: var(--brand-600);
+  color: #fff;
+}
+
+.mp-step.is-done {
+  color: var(--text-muted);
+}
+
+/* A radio that looks like a card: the whole row is the target, not a small dot in it. */
+.mp-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.mp-choice:hover {
+  border-color: var(--brand-500);
+}
+
+.mp-choice input {
+  margin-top: 0.2rem;
+}
+
+/* Order progress. A dot and a name, never colour on its own. */
+.mp-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.mp-timeline-step {
+  position: relative;
+  display: flex;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  color: var(--text-subtle);
+}
+
+.mp-timeline-step::before {
+  content: "";
+  position: absolute;
+  left: 0.3rem;
+  top: 0.9rem;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--border);
+}
+
+.mp-timeline-step:last-child {
+  padding-bottom: 0;
+}
+
+.mp-timeline-step:last-child::before {
+  display: none;
+}
+
+.mp-timeline-dot {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background-color: var(--border);
+}
+
+.mp-timeline-step.is-done {
+  color: var(--text);
+}
+
+.mp-timeline-step.is-done .mp-timeline-dot {
+  background-color: var(--success);
+}
+
+.mp-timeline-step.is-current .mp-timeline-dot {
+  background-color: var(--brand-600);
+  box-shadow: 0 0 0 3px var(--violet-bg);
+}
+
 /* Focus is never removed, only restyled: a keyboard user must always see where they are. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-500);
