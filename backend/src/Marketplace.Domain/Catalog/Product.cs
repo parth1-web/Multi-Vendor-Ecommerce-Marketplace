@@ -91,6 +91,9 @@ public class Product : Entity
 
     public DateTimeOffset? PublishedAt { get; private set; }
 
+    /// <summary>Optimistic concurrency token (PostgreSQL <c>xmax</c>).</summary>
+    public byte[] RowVersion { get; private set; } = [];
+
     public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
 
     public IReadOnlyCollection<ProductVariant> Variants => _variants.AsReadOnly();

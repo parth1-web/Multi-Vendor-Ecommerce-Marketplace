@@ -52,6 +52,9 @@ public class SellerOrder : Entity
 
     public Guid OrderId { get; private set; }
 
+    /// <summary>Owning marketplace order. Navigation only — set by EF Core.</summary>
+    public Order? Order { get; internal set; }
+
     public Guid SellerId { get; private set; }
 
     public string SellerOrderNumber { get; private set; }

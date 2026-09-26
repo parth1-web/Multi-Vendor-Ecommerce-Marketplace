@@ -23,6 +23,9 @@ public class CartItem : Entity
 
     public Guid CartId { get; private set; }
 
+    /// <summary>Owning cart. Navigation only — set by EF Core.</summary>
+    public Cart? Cart { get; internal set; }
+
     public Guid ProductId { get; private set; }
 
     public Guid ProductVariantId { get; private set; }

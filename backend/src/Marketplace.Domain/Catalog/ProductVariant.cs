@@ -30,6 +30,9 @@ public class ProductVariant : Entity
 
     public Guid ProductId { get; private set; }
 
+    /// <summary>Owning product. Navigation only — set by EF Core.</summary>
+    public Product? Product { get; internal set; }
+
     public string Sku { get; private set; }
 
     public string Name { get; private set; }
@@ -107,6 +110,9 @@ public class ProductVariantOption : Entity
     }
 
     public Guid VariantId { get; private set; }
+
+    /// <summary>Owning variant. Navigation only — set by EF Core.</summary>
+    public ProductVariant? Variant { get; internal set; }
 
     public string Name { get; private set; }
 

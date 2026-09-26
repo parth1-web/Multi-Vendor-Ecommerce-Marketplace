@@ -22,6 +22,9 @@ public class ProductSpecification : Entity
 
     public Guid ProductId { get; private set; }
 
+    /// <summary>Owning product. Navigation only — set by EF Core.</summary>
+    public Product? Product { get; internal set; }
+
     public string Key { get; private set; }
 
     public string Value { get; private set; }
@@ -61,6 +64,9 @@ public class Tag : Entity
     public string Name { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <summary>Products carrying this tag.</summary>
+    public List<Product> Products { get; private set; } = [];
 
     public static Tag Create(string name, DateTimeOffset now)
     {

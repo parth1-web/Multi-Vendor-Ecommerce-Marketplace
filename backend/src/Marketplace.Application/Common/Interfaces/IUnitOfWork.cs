@@ -29,7 +29,7 @@ public interface IRepository<TEntity>
 
     Task<TEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task AddAsync(TEntity entity, CancellationToken cancellationToken = default);
+    Task<TEntity> AddAsync(TEntity entity, CancellationToken cancellationToken = default);
 
     void Update(TEntity entity);
 

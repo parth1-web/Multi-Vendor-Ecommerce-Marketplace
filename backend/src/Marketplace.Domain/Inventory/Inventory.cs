@@ -45,6 +45,9 @@ public class Inventory : Entity
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>Optimistic concurrency token (PostgreSQL <c>xmax</c>).</summary>
+    public byte[] RowVersion { get; private set; } = [];
+
     /// <summary>Stock a new order can draw from: physical stock minus what is already held.</summary>
     public int SellableQuantity => AvailableQuantity - ReservedQuantity;
 

@@ -72,6 +72,9 @@ public class Seller : Entity
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>Optimistic concurrency token (PostgreSQL <c>xmax</c>).</summary>
+    public byte[] RowVersion { get; private set; } = [];
+
     public bool IsActive => Status == SellerStatus.Active;
 
     public bool CanListProducts => Status == SellerStatus.Active;
