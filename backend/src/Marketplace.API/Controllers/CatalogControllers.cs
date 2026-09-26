@@ -33,12 +33,14 @@ public sealed class ProductsController(IProductService products) : ControllerBas
         [FromQuery] decimal? minRating,
         [FromQuery] bool? inStock,
         [FromQuery] bool? onSale,
+        [FromQuery] bool? includeSubcategories,
         [FromQuery] string? sort,
         CancellationToken cancellationToken)
     {
         var query = new ProductQuery(
             page, pageSize, search, categoryId, categorySlug, sellerId, sellerSlug,
-            minPrice, maxPrice, minRating, inStock, onSale, null, ParseSort(sort));
+            minPrice, maxPrice, minRating, inStock, onSale, null, ParseSort(sort),
+            includeSubcategories ?? true);
 
         return Ok(await products.ListAsync(query, cancellationToken));
     }

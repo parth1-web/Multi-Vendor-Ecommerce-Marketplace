@@ -9,6 +9,7 @@ using Marketplace.Application.Modules.Sellers.DTOs;
 using Marketplace.Domain.Catalog;
 using Marketplace.Domain.Common;
 using Marketplace.Domain.Enums;
+using Marketplace.Domain.Identity;
 using Marketplace.Domain.Events;
 using InventoryRecord = Marketplace.Domain.Inventory.Inventory;
 using Marketplace.Domain.Reviews;
@@ -28,6 +29,7 @@ public sealed class ProductService(
     IRepository<SellerStore> stores,
     IRepository<InventoryRecord> inventories,
     IRepository<Review> reviews,
+    IRepository<User> users,
     IRepository<Tag> tagEntities,
     ICurrentUser currentUser,
     ICacheService cache,
@@ -44,7 +46,18 @@ public sealed class ProductService(
     {
         var page = new PageRequest(query.Page, query.PageSize);
 
-        var source = ApplyFilters(products.Query().AsNoTracking(), query);
+        // A slug is a name, not a scope. It is resolved to real ids here so that the filter is
+        // applied as a predicate; a slug that names nothing resolves to no ids, and the honest
+        // answer to "products in a category that does not exist" is an empty page rather than
+        // the whole catalogue.
+        var scope = await ResolveScopeAsync(query, cancellationToken).ConfigureAwait(false);
+
+        if (scope.MatchesNothing)
+        {
+            return new PagedResult<ProductSummaryResponse>([], page.Page, page.PageSize, 0);
+        }
+
+        var source = ApplyScope(ApplyFilters(products.Query().AsNoTracking(), query), scope);
 
         source = query.Sort switch
         {
@@ -119,14 +132,13 @@ public sealed class ProductService(
             return Result<ProductDetailResponse>.Success(cached);
         }
 
-        var product = await products.Query()
-            .AsNoTracking()
+        var product = await DetailQuery()
             .FirstOrDefaultAsync(p => p.SlugValue == slug.ToLowerInvariant() && !p.IsDeleted, cancellationToken)
             .ConfigureAwait(false);
 
         if (product is null)
         {
-            return Result<ProductDetailResponse>.Failure("Product not found.");
+            return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
 
         var dto = await BuildDetailAsync(product, cancellationToken).ConfigureAwait(false);
@@ -143,11 +155,11 @@ public sealed class ProductService(
         {
             return Result<ProductDetailResponse>.Success(cached);
         }
+        var product = await DetailQuery().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, cancellationToken).ConfigureAwait(false);
 
-        var product = await products.Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result<ProductDetailResponse>.Failure("Product not found.");
+            return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
 
         var dto = await BuildDetailAsync(product, cancellationToken).ConfigureAwait(false);
@@ -251,7 +263,7 @@ public sealed class ProductService(
         var product = await LoadOwnedProductAsync(id, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result<ProductSummaryResponse>.Failure("Product not found or not accessible.");
+            return Result<ProductSummaryResponse>.Failure("Product not found or not accessible.", ResultErrorCodes.NotFound);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Slug) && request.Slug.Trim().ToLowerInvariant() != product.SlugValue)
@@ -296,7 +308,7 @@ public sealed class ProductService(
         var product = await LoadOwnedProductAsync(id, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result.Failure("Product not found or not accessible.");
+            return Result.Failure("Product not found or not accessible.", ResultErrorCodes.NotFound);
         }
 
         product.SoftDelete(clock.UtcNow);
@@ -312,7 +324,7 @@ public sealed class ProductService(
         var product = await LoadOwnedProductAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result<ProductImageResponse>.Failure("Product not found or not accessible.");
+            return Result<ProductImageResponse>.Failure("Product not found or not accessible.", ResultErrorCodes.NotFound);
         }
 
         var image = product.AddImage(request.Url, request.AltText ?? product.Name, request.IsPrimary, clock.UtcNow);
@@ -327,7 +339,7 @@ public sealed class ProductService(
         var product = await LoadOwnedProductAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result.Failure("Product not found or not accessible.");
+            return Result.Failure("Product not found or not accessible.", ResultErrorCodes.NotFound);
         }
 
         product.RemoveImage(imageId, clock.UtcNow);
@@ -342,7 +354,7 @@ public sealed class ProductService(
         var product = await LoadOwnedProductAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result<ProductVariantResponse>.Failure("Product not found or not accessible.");
+            return Result<ProductVariantResponse>.Failure("Product not found or not accessible.", ResultErrorCodes.NotFound);
         }
 
         var now = clock.UtcNow;
@@ -370,7 +382,7 @@ public sealed class ProductService(
         var product = await LoadOwnedProductAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result.Failure("Product not found or not accessible.");
+            return Result.Failure("Product not found or not accessible.", ResultErrorCodes.NotFound);
         }
 
         product.RemoveVariant(variantId, clock.UtcNow);
@@ -385,7 +397,7 @@ public sealed class ProductService(
         var product = await LoadOwnedProductAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result.Failure("Product not found or not accessible.");
+            return Result.Failure("Product not found or not accessible.", ResultErrorCodes.NotFound);
         }
 
         product.SubmitForApproval(clock.UtcNow);
@@ -400,7 +412,7 @@ public sealed class ProductService(
         var product = await products.GetByIdAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result.Failure("Product not found.");
+            return Result.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
 
         var now = clock.UtcNow;
@@ -443,7 +455,7 @@ public sealed class ProductService(
         var product = await products.GetByIdAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null)
         {
-            return Result.Failure("Product not found.");
+            return Result.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
 
         product.SetFeatured(isFeatured, clock.UtcNow);
@@ -512,6 +524,158 @@ public sealed class ProductService(
         return seller?.UserId ?? Guid.Empty;
     }
 
+    /// <summary>
+    /// The parts of a listing query that cannot be expressed as a predicate over products
+    /// alone, because they are names that have to become ids first: a category slug (and, by
+    /// default, everything beneath it), a seller slug, and the set of products that can
+    /// actually be bought right now.
+    /// </summary>
+    private sealed record ListingScope(
+        IReadOnlyList<Guid>? CategoryIds,
+        IReadOnlyList<Guid>? SellerIds,
+        IReadOnlyList<Guid>? SellableProductIds)
+    {
+        public static ListingScope None => new(null, null, null);
+
+        /// <summary>A name was supplied and resolved to nothing, so nothing can match.</summary>
+        public bool MatchesNothing =>
+            CategoryIds is { Count: 0 } || SellerIds is { Count: 0 } || SellableProductIds is { Count: 0 };
+    }
+
+    private async Task<ListingScope> ResolveScopeAsync(ProductQuery query, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<Guid>? categoryIds = null;
+
+        if (!string.IsNullOrWhiteSpace(query.CategorySlug))
+        {
+            categoryIds = await ResolveCategoryIdsAsync(query.CategorySlug.Trim(), query.IncludeSubcategories, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        IReadOnlyList<Guid>? sellerIds = null;
+
+        if (!string.IsNullOrWhiteSpace(query.SellerSlug))
+        {
+            sellerIds = await ResolveSellerIdsAsync(query.SellerSlug.Trim(), cancellationToken).ConfigureAwait(false);
+        }
+
+        // "In stock" has to mean sellable. A variant that is switched on but has nothing left is
+        // not something a shopper can buy, and listing it as available is how a storefront
+        // promises something it cannot deliver.
+        IReadOnlyList<Guid>? sellableIds = null;
+
+        if (query.InStock == true)
+        {
+            sellableIds = await inventories.Query()
+                .AsNoTracking()
+                .Where(i => i.AvailableQuantity - i.ReservedQuantity > 0)
+                .Select(i => i.ProductId)
+                .Distinct()
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return new ListingScope(categoryIds, sellerIds, sellableIds);
+    }
+
+    private async Task<IReadOnlyList<Guid>> ResolveCategoryIdsAsync(string slug, bool includeSubcategories, CancellationToken cancellationToken)
+    {
+        var root = await categories.Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.SlugValue == slug && c.IsActive, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (root is null)
+        {
+            return [];
+        }
+
+        if (!includeSubcategories)
+        {
+            return [root.Id];
+        }
+
+        // The category tree is small and read whole, because a parent page is expected to show
+        // what is filed beneath it rather than only what is filed directly on it.
+        var branches = await categories.Query()
+            .AsNoTracking()
+            .Where(c => c.IsActive)
+            .Select(c => new { c.Id, c.ParentId })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var byParent = branches
+            .Where(b => b.ParentId is not null)
+            .GroupBy(b => b.ParentId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(b => b.Id).ToList());
+
+        var collected = new List<Guid> { root.Id };
+        var pending = new Queue<Guid>();
+        pending.Enqueue(root.Id);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Dequeue();
+
+            if (!byParent.TryGetValue(current, out var children))
+            {
+                continue;
+            }
+
+            foreach (var child in children)
+            {
+                collected.Add(child);
+                pending.Enqueue(child);
+            }
+        }
+
+        return collected;
+    }
+
+    private async Task<IReadOnlyList<Guid>> ResolveSellerIdsAsync(string slug, CancellationToken cancellationToken)
+    {
+        // A storefront belongs to a seller through its store record, and a seller whose account
+        // is no longer active has no storefront to show, however good the slug still looks.
+        var sellerId = await stores.Query()
+            .AsNoTracking()
+            .Where(s => s.SlugValue == slug && s.IsActive)
+            .Select(s => s.SellerId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (sellerId == Guid.Empty)
+        {
+            return [];
+        }
+
+        var isActive = await sellers.Query()
+            .AsNoTracking()
+            .AnyAsync(s => s.Id == sellerId && s.Status == SellerStatus.Active, cancellationToken)
+            .ConfigureAwait(false);
+
+        return isActive ? [sellerId] : [];
+    }
+
+    private static IQueryable<Product> ApplyScope(IQueryable<Product> source, ListingScope scope)
+    {
+        if (scope.CategoryIds is not null)
+        {
+            source = source.Where(p => scope.CategoryIds.Contains(p.CategoryId));
+        }
+
+        if (scope.SellerIds is not null)
+        {
+            source = source.Where(p => scope.SellerIds.Contains(p.SellerId));
+        }
+
+        if (scope.SellableProductIds is not null)
+        {
+            source = source.Where(p => scope.SellableProductIds.Contains(p.Id));
+        }
+
+        return source;
+    }
+
     private static IQueryable<Product> ApplyFilters(IQueryable<Product> source, ProductQuery query)
     {
         // Only an admin, or a seller looking at their own catalogue, may see unpublished
@@ -569,11 +733,9 @@ public sealed class ProductService(
             source = source.Where(p => p.CompareAtPrice != null && p.CompareAtPrice > p.BasePrice);
         }
 
-        if (query.InStock == true)
-        {
-            source = source.Where(p => p.Variants.Any(v => v.IsActive));
-        }
-
+        // Stock lives in the inventory table, so the in-stock filter is applied by the caller as
+        // a set of product ids that can actually be sold. Approximating it here with "has an
+        // active variant" would list products whose stock is gone.
         if (query.Status is { } status)
         {
             source = source.Where(p => p.Status == status);
@@ -671,6 +833,19 @@ public sealed class ProductService(
             p.CategoryId, categoryName ?? string.Empty, categoryName ?? string.Empty, p.RatingAverage, ratingCount,
             available > 0, available, p.IsFeatured, false, p.SoldCount, p.CreatedAt);
 
+    /// <summary>
+    /// The product, loaded with everything a detail page needs.
+    ///
+    /// The collections are included rather than read afterwards: nothing here lazy-loads, so a
+    /// product fetched without its variants projects as a product with no options to buy.
+    /// </summary>
+    private IQueryable<Product> DetailQuery() => products.Query()
+        .AsNoTracking()
+        .Include(p => p.Images)
+        .Include(p => p.Variants).ThenInclude(v => v.Options)
+        .Include(p => p.Specifications)
+        .Include(p => p.Tags);
+
     private async Task<ProductDetailResponse> BuildDetailAsync(Product product, CancellationToken cancellationToken)
     {
         var seller = await sellers.GetByIdAsync(product.SellerId, cancellationToken).ConfigureAwait(false);
@@ -700,6 +875,15 @@ public sealed class ProductService(
             .Where(r => r.ProductId == product.Id && r.IsVisible)
             .Select(r => r.Rating)
             .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        // A review is signed by a person, not by an identifier. The name is resolved here rather
+        // than exposed as a customer id, because this payload goes straight onto a product page.
+        var authorIds = productReviews.Select(r => r.CustomerId).Distinct().ToList();
+
+        var authorNames = await users.Query().AsNoTracking()
+            .Where(u => authorIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.FullName, cancellationToken)
             .ConfigureAwait(false);
 
         var related = await products.Query().AsNoTracking()
@@ -774,10 +958,17 @@ public sealed class ProductService(
                 r.Id, r.Name, r.Slug, r.BasePrice, r.CompareAtPrice, r.DiscountPercentage, r.PrimaryImageUrl,
                 r.RatingAverage, r.RatingCount, r.StoreName, r.IsInStock)).ToList(),
             productReviews.Select(r => new ReviewSummaryResponse(
-                r.Id, r.Rating, r.Title, r.Body, r.CustomerId.ToString(), r.IsVerifiedPurchase, r.HelpfulCount, r.CreatedAt,
+                r.Id, r.Rating, r.Title, r.Body, ReviewerName(authorNames, r.CustomerId), r.IsVerifiedPurchase, r.HelpfulCount, r.CreatedAt,
                 r.Reply is null ? null : new ReviewReplyResponse(r.Reply.Id, r.Reply.Body, seller?.BusinessName ?? "Seller", r.Reply.CreatedAt))).ToList(),
             BuildBreakdown(allRatings));
     }
+
+    /// <summary>
+    /// Falls back to initials rather than to an id: a deleted account should leave a review that
+    /// still reads like a review, not a row of hex.
+    /// </summary>
+    private static string ReviewerName(IReadOnlyDictionary<Guid, string> names, Guid customerId) =>
+        names.TryGetValue(customerId, out var name) && !string.IsNullOrWhiteSpace(name) ? name : "A customer";
 
     internal static RatingBreakdownResponse BuildBreakdown(IReadOnlyCollection<int> ratings) =>
         new(
