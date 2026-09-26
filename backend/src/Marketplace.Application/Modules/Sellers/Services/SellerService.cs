@@ -2,6 +2,7 @@ using Marketplace.Application.Common.Extensions;
 using Marketplace.Application.Common.Interfaces;
 using Marketplace.Application.Common.Models;
 using Marketplace.Application.Modules.Analytics.DTOs;
+using Marketplace.Application.Modules.Catalog.Abstractions;
 using Marketplace.Application.Modules.Catalog.DTOs;
 using Marketplace.Application.Modules.Auth.Abstractions;
 using Marketplace.Application.Modules.Sellers.Abstractions;
@@ -31,6 +32,7 @@ public sealed class SellerService(
     IRepository<SellerOrder> sellerOrders,
     IRepository<Commission> commissions,
     IRepository<Domain.Catalog.Product> products,
+  IProductService catalogue,
     ICurrentUser currentUser,
     ICacheService cache,
     IUnitOfWork unitOfWork,
@@ -200,36 +202,13 @@ public sealed class SellerService(
             return Result<StoreProfileResponse>.Failure("Store not found.", ResultErrorCodes.NotFound);
         }
 
-        var productPage = await products.Query()
-            .AsNoTracking()
-            .Where(p => p.SellerId == store.SellerId && p.Status == ProductStatus.Published && !p.IsDeleted)
-            .OrderByDescending(p => p.SoldCount)
-            .ThenByDescending(p => p.CreatedAt)
-            .ToPagedResultAsync(page, p => new ProductSummaryResponse(
-                p.Id,
-                p.Name,
-                p.SlugValue,
-                p.ShortDescription,
-                p.BasePrice,
-                p.CompareAtPrice,
-                p.DiscountPercentage,
-                p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url,
-                p.Images.FirstOrDefault(i => i.IsPrimary)?.AltText,
-                p.SellerId,
-                seller.BusinessName,
-                store.Name,
-                store.SlugValue,
-                p.CategoryId,
-                string.Empty,
-                string.Empty,
-                p.RatingAverage,
-                p.RatingCount,
-                true,
-                0,
-                p.IsFeatured,
-                false,
-                p.SoldCount,
-                p.CreatedAt), cancellationToken).ConfigureAwait(false);
+        // A storefront shows the same cards as the catalogue, so it asks the catalogue service
+        // for them rather than projecting a second, thinner copy here. That copy had no stock, no
+        // category and no inventory, and a storefront that claims everything is in stock is
+        // worse than one that shows nothing.
+        var productPage = await catalogue.ListAsync(
+            new ProductQuery(page.Page, page.PageSize, null, null, null, store.SellerId, null, null, null, null, null, null, null, ProductSortOption.Popular),
+            cancellationToken).ConfigureAwait(false);
 
         return Result<StoreProfileResponse>.Success(new StoreProfileResponse(
             store.SellerId,
@@ -246,7 +225,11 @@ public sealed class SellerService(
             store.FoundedYear,
             store.RatingAverage,
             store.RatingCount,
-            store.ProductCount,
+
+            // Counted from what the storefront is actually showing, because a denormalised
+            // counter drifts the moment anything writes a product without going through the
+            // service that maintains it.
+            productPage.TotalCount,
             store.TotalSalesCount,
             store.IsActive,
             store.CreatedAt,
