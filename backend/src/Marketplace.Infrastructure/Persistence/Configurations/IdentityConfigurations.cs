@@ -54,6 +54,26 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
     }
 }
 
+public sealed class PasswordResetTokenConfiguration : IEntityTypeConfiguration<PasswordResetToken>
+{
+    public void Configure(EntityTypeBuilder<PasswordResetToken> builder)
+    {
+        builder.ToTable("password_reset_tokens");
+        builder.HasKey(t => t.Id);
+
+        builder.Property(t => t.TokenHash).HasColumnType("varchar(128)").IsRequired();
+        builder.Property(t => t.CreatedByIp).HasColumnType("varchar(64)");
+
+        builder.HasIndex(t => t.TokenHash).IsUnique().HasDatabaseName("ux_password_reset_tokens_hash");
+        builder.HasIndex(t => new { t.UserId, t.UsedAt }).HasDatabaseName("ix_password_reset_tokens_user");
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public sealed class UserAddressConfiguration : IEntityTypeConfiguration<UserAddress>
 {
     public void Configure(EntityTypeBuilder<UserAddress> builder)

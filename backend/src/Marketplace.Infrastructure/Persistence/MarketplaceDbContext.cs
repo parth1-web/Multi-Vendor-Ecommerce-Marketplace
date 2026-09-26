@@ -24,6 +24,8 @@ public class MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> options
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
 
     public DbSet<Seller> Sellers => Set<Seller>();

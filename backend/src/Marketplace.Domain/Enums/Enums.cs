@@ -252,7 +252,9 @@ public enum AuditAction
     CouponUpdated = 41,
     CouponDeleted = 42,
     SettingsUpdated = 43,
-    ReportExported = 44
+    ReportExported = 44,
+    PasswordResetRequested = 45,
+    PasswordResetCompleted = 46
 }
 
 /// <summary>Audience grouping of a notification.</summary>
