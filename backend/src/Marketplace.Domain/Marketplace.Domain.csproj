@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Marketplace.Domain</RootNamespace>
+    <AssemblyName>Marketplace.Domain</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!--
+      The Domain layer is intentionally framework-free: no PackageReference
+      element may be added to this project. `DomainPurityTests` and the
+      `domain-purity` CI job both enforce it.
+    -->
+  </PropertyGroup>
+
+</Project>
