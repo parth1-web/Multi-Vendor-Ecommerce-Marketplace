@@ -41,6 +41,12 @@ public sealed class PaymentsController(IPaymentService payments) : ControllerBas
     public async Task<IActionResult> Verify(Guid id, CancellationToken cancellationToken) =>
         (await payments.VerifyAsync(id, cancellationToken)).ToActionResult();
 
+    /// <summary>The caller's own payments. Scoped by the token, never by a query parameter.</summary>
+    [HttpGet("mine")]
+    [ProducesResponseType(typeof(IReadOnlyList<PaymentResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListOwn(CancellationToken cancellationToken) =>
+        Ok(await payments.ListOwnAsync(cancellationToken));
+
     [HttpGet]
     [Authorize(Policy = Security.AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(typeof(PagedResult<PaymentResponse>), StatusCodes.Status200OK)]

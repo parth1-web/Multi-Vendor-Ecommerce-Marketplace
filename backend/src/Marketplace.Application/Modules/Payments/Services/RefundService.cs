@@ -51,7 +51,9 @@ public sealed class RefundService(
 
         if (order is null)
         {
-            return Result<RefundResponse>.Failure("Order not found.");
+            // Reported exactly like a missing order, so the endpoint never confirms that an
+            // order id exists for somebody else.
+            return Result<RefundResponse>.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         if (order.Status is not (OrderStatus.Delivered or OrderStatus.Completed))

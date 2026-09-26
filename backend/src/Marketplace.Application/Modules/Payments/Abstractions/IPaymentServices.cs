@@ -19,6 +19,13 @@ public interface IPaymentService
     Task<Result<PaymentResponse>> HandleWebhookAsync(WebhookEnvelope envelope, CancellationToken cancellationToken = default);
 
     Task<PagedResult<PaymentResponse>> ListAllAsync(PaymentListQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The caller's own payments, newest first. A customer has to be able to see what they were
+    /// charged and what state it is in, so this is scoped by the token rather than by a query
+    /// parameter the caller could widen.
+    /// </summary>
+    Task<IReadOnlyList<PaymentResponse>> ListOwnAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IRefundService
