@@ -15,8 +15,15 @@ namespace Marketplace.Application.Modules.Auth.Services;
 /// Issues HS256 JWTs. The signing key comes from configuration only — never from a
 /// request, never from a hard-coded fallback in production.
 /// </summary>
-public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
+public sealed class TokenService(IOptions<JwtOptions> options, IClock clock) : ITokenService
 {
+    /// <summary>
+    /// Identifier written into the token's <c>kid</c> header. The validator matches keys by
+    /// this value, and IdentityModel refuses a key whose id is empty when the token has no
+    /// <c>kid</c>, so signing and validating must publish the same id.
+    /// </summary>
+    public const string SigningKeyId = "mp-hs256-v1";
+
     /// <summary>Claim carrying the seller id, so seller scope is derived from the token.</summary>
     public const string SellerClaim = "sid";
 
@@ -24,6 +31,7 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
     public const string RoleClaim = "role";
 
     private readonly JwtOptions _options = options.Value;
+    private readonly IClock _clock = clock;
 
     public (string Token, DateTimeOffset ExpiresAt) CreateAccessToken(UserResponse user)
     {
@@ -34,7 +42,10 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
             throw new InvalidOperationException("Jwt:Key must be configured with at least 32 characters.");
         }
 
-        var now = DateTimeOffset.UtcNow;
+        // Issued and expiry claims must come from the application clock: the rest of the
+        // session (refresh tokens, cookie expiry, DTO payloads) is measured with it, and a
+        // token stamped with a different source would disagree with its own response.
+        var now = _clock.UtcNow;
         var expires = now.AddMinutes(_options.AccessTokenMinutes);
 
         var claims = new List<Claim>
@@ -52,7 +63,7 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
             claims.Add(new Claim(SellerClaim, user.SellerId.Value.ToString()));
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key)) { KeyId = SigningKeyId };
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
