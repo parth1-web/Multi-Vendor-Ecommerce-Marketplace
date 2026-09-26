@@ -63,7 +63,15 @@ public sealed class RefreshTokenRequestValidator : AbstractValidator<RefreshToke
 
 public sealed class LogoutRequestValidator : AbstractValidator<LogoutRequest>
 {
-    public LogoutRequestValidator() => RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("A refresh token is required.");
+    public LogoutRequestValidator()
+    {
+        // The refresh token normally arrives in the HttpOnly cookie, so an absent body token
+        // is legitimate. A value that is present but blank, however, is a client that meant
+        // to send one and got it wrong.
+        RuleFor(x => x.RefreshToken)
+            .Must(token => token is null || !string.IsNullOrWhiteSpace(token))
+            .WithMessage("The refresh token cannot be blank.");
+    }
 }
 
 public sealed class ForgotPasswordRequestValidator : AbstractValidator<ForgotPasswordRequest>
