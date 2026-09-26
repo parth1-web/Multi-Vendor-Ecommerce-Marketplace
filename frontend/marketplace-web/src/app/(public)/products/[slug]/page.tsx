@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/shared/Feedback";
 import { BuyBox } from "@/features/products/components/BuyBox";
 import { ApiError, serverGet } from "@/lib/serverApi";
 import { formatDate } from "@/lib/format";
+import { breadcrumbJsonLd, canonical, jsonLdScript, pageMetadata } from "@/lib/seo";
 import type { ProductDetail, RatingBreakdown } from "@/types/product";
 
 export const dynamic = "force-dynamic";
@@ -29,21 +30,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   try {
     const product = await load(slug);
     const description = product.shortDescription || product.description.slice(0, 155);
-    const image = primaryImage(product);
 
-    return {
+    return pageMetadata({
       title: product.name,
       description,
-      openGraph: {
-        title: product.name,
-        description,
-        images: image ? [{ url: image, alt: product.name }] : undefined,
-      },
-    };
+      path: `/products/${product.slug}`,
+      image: primaryImage(product),
+    });
   } catch {
     // A page that cannot describe itself must not invent a title.
-    return { title: "Product not found" };
+    return { title: "Product not found", robots: { index: false, follow: true } };
   }
+
 }
 
 export default async function ProductPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
@@ -63,24 +61,37 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
   }
 
   const variant = query.variant as string | undefined;
+  const crumbs = [
+    { name: "Home", path: "/" },
+    { name: product.categoryName, path: `/categories/${product.categorySlug}` },
+    { name: product.name, path: `/products/${product.slug}` },
+  ];
 
   return (
     <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
+      <script
+        type="application/ld+json"
+        // The payload is built from our own API and escaped, so it cannot close the script tag.
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(productJsonLd(product, crumbs)) }}
+      />
+
       <nav aria-label="Breadcrumb" className="mb-3">
         <ol className="list-unstyled d-flex align-items-center flex-wrap mb-0" style={{ gap: "0.35rem", fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-          <li>
-            <Link href="/">Home</Link>
-          </li>
-          <ChevronRight size={12} aria-hidden />
-          <li>
-            <Link href={`/products?categorySlug=${product.categorySlug}`}>{product.categoryName}</Link>
-          </li>
-          <ChevronRight size={12} aria-hidden />
-          <li aria-current="page" style={{ color: "var(--text)" }}>
-            {product.name}
-          </li>
+          {crumbs.map((crumb, index) => (
+            <li key={crumb.path} className="d-flex align-items-center" style={{ gap: "0.35rem" }}>
+              {index > 0 ? <ChevronRight size={12} aria-hidden /> : null}
+              {index === crumbs.length - 1 ? (
+                <span aria-current="page" style={{ color: "var(--text)" }}>
+                  {crumb.name}
+                </span>
+              ) : (
+                <Link href={crumb.path}>{crumb.name}</Link>
+              )}
+            </li>
+          ))}
         </ol>
       </nav>
+
 
       <div className="row g-4">
         <div className="col-12 col-lg-7">
@@ -344,6 +355,46 @@ function Gallery({ product }: { product: ProductDetail }) {
 function primaryImage(product: ProductDetail): string | null {
   return product.images.find((image) => image.isPrimary)?.url ?? product.images[0]?.url ?? null;
 }
+
+/**
+ * The product as structured data.
+ *
+ * Price, availability and rating are the three things a search result shows, and all three are
+ * here facts rather than text to be scraped. The offer is the cheapest sellable variant, which
+ * is what a shopper would actually be asked to pay.
+ */
+function productJsonLd(product: ProductDetail, crumbs: { name: string; path: string }[]) {
+  const cheapest = product.variants
+    .filter((variant) => variant.isActive && variant.availableQuantity > 0)
+    .sort((a, b) => a.price - b.price)[0];
+
+  const price = cheapest?.price ?? product.basePrice;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.shortDescription || product.description.slice(0, 300),
+    sku: cheapest?.sku,
+    image: product.images.map((image) => image.url),
+    category: product.categoryName,
+    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    offers: {
+      "@type": "Offer",
+      url: canonical(`/products/${product.slug}`),
+      price: price.toFixed(2),
+      priceCurrency: "USD",
+      availability: product.availableQuantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: product.storeName, url: canonical(`/stores/${product.storeSlug}`) },
+    },
+    aggregateRating:
+      product.ratingCount > 0
+        ? { "@type": "AggregateRating", ratingValue: product.ratingAverage, reviewCount: product.ratingCount }
+        : undefined,
+    breadcrumb: breadcrumbJsonLd(crumbs),
+  };
+}
+
 
 /** A variant can carry its own price; the product price is the fallback. */
 function variantPrice(product: ProductDetail, variantId: string | undefined): number {

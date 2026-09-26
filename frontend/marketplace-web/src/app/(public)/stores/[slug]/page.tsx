@@ -18,6 +18,7 @@ import { ListingSkeleton } from "@/features/products/components/ListingSkeleton"
 import { ProductBrowser } from "@/features/products/components/ProductBrowser";
 import { ApiError, serverGet } from "@/lib/serverApi";
 import { formatDate } from "@/lib/format";
+import { breadcrumbJsonLd, jsonLdScript, pageMetadata } from "@/lib/seo";
 import type { StoreProfile } from "@/types/store";
 
 export const dynamic = "force-dynamic";
@@ -33,13 +34,16 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   try {
     const store = await load(slug);
 
-    return {
+    return pageMetadata({
       title: store.name,
       description: store.description || `Browse everything ${store.name} sells.`,
-    };
+      path: `/stores/${store.slug}`,
+      image: store.bannerUrl ?? store.logoUrl,
+    });
   } catch {
-    return { title: "Store not found" };
+    return { title: "Store not found", robots: { index: false, follow: true } };
   }
+
 }
 
 export default async function StorePage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
@@ -63,6 +67,16 @@ export default async function StorePage({ params, searchParams }: { params: Para
   return (
     <div style={{ paddingBlock: "var(--space-5)" }}>
       <header className="mp-container" style={{ marginBottom: "var(--space-5)" }}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: jsonLdScript(breadcrumbJsonLd([
+              { name: "Home", path: "/" },
+              { name: store.name, path: `/stores/${store.slug}` },
+
+            ])),
+          }}
+        />
         {store.bannerUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

@@ -16,6 +16,7 @@ import { readProductQuery } from "@/features/products/api/readProductQuery";
 import { ListingSkeleton } from "@/features/products/components/ListingSkeleton";
 import { ProductBrowser } from "@/features/products/components/ProductBrowser";
 import { ApiError, serverGet } from "@/lib/serverApi";
+import { breadcrumbJsonLd, jsonLdScript, pageMetadata } from "@/lib/seo";
 import type { Category } from "@/types/product";
 
 export const dynamic = "force-dynamic";
@@ -31,14 +32,17 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   try {
     const category = await load(slug);
 
-    return {
+    return pageMetadata({
       title: category.name,
       description: category.description ?? `Everything filed under ${category.name}.`,
-    };
+      path: `/categories/${category.slug}`,
+      image: category.imageUrl,
+    });
   } catch {
-    return { title: "Category not found" };
+    return { title: "Category not found", robots: { index: false, follow: true } };
   }
 }
+
 
 export default async function CategoryPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { slug } = await params;
@@ -59,27 +63,37 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   // The path owns the category, so the query keeps it even if a link tried to change it.
   const query = { ...requested, categorySlug: category.slug, includeSubcategories: true };
 
+  const crumbs = [
+    { name: "Home", path: "/" },
+    { name: "Categories", path: "/categories" },
+    ...category.breadcrumb.map(crumb => ({ name: crumb.name, path: `/categories/${crumb.slug}` })),
+  ];
+
+
   return (
     <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbJsonLd(crumbs)) }}
+      />
+
       <nav aria-label="Breadcrumb" className="mb-3">
         <ol className="list-unstyled d-flex align-items-center flex-wrap mb-0" style={{ gap: "0.35rem", fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-          <li>
-            <Link href="/">Home</Link>
-          </li>
-          {category.breadcrumb.map((crumb) => (
-            <li key={crumb.slug} className="d-flex align-items-center" style={{ gap: "0.35rem" }}>
-              <ChevronRight size={12} aria-hidden />
-              {crumb.slug === category.slug ? (
+          {crumbs.map((crumb, index) => (
+            <li key={crumb.path} className="d-flex align-items-center" style={{ gap: "0.35rem" }}>
+              {index > 0 ? <ChevronRight size={12} aria-hidden /> : null}
+              {index === crumbs.length - 1 ? (
                 <span aria-current="page" style={{ color: "var(--text)" }}>
                   {crumb.name}
                 </span>
               ) : (
-                <Link href={`/categories/${crumb.slug}`}>{crumb.name}</Link>
+                <Link href={crumb.path}>{crumb.name}</Link>
               )}
             </li>
           ))}
         </ol>
       </nav>
+
 
       <div className="mp-page-header">
         <div>
