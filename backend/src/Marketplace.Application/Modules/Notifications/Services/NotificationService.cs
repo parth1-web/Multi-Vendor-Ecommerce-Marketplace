@@ -162,6 +162,7 @@ public sealed class NotificationService(
 /// <summary>Writes audit rows, redacting any sensitive field before serialising.</summary>
 public sealed class AuditService(
     IRepository<AuditLog> auditLogs,
+    IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IRequestContext requestContext,
     IClock clock) : IAuditService
@@ -182,6 +183,11 @@ public sealed class AuditService(
             clock.UtcNow);
 
         await auditLogs.AddAsync(entry, cancellationToken).ConfigureAwait(false);
+
+        // The entry is saved here rather than left to the caller's next save. Most call sites
+        // record after their last save of the mutation itself, so an unsaved entry is an audit
+        // trail that quietly stops existing exactly where it would matter most.
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static string? Serialize(object? changes)
