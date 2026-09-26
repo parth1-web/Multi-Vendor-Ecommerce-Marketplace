@@ -242,8 +242,8 @@ public sealed class ReviewEligibilityTests
         order.AddItem(item);
         sellerOrder.AddItem(item);
 
+        // MarkPaid confirms the order, so fulfilment starts from Confirmed.
         order.MarkPaid(Now.AddDays(-5));
-        order.ChangeStatus(OrderStatus.Confirmed, null, null, Now.AddDays(-4));
         order.ChangeStatus(OrderStatus.Processing, null, null, Now.AddDays(-4));
         order.ChangeStatus(OrderStatus.Packed, null, null, Now.AddDays(-3));
         order.ChangeStatus(OrderStatus.Shipped, null, null, Now.AddDays(-2));
