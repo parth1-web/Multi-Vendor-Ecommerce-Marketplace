@@ -5,10 +5,11 @@ namespace Marketplace.Domain.Orders;
 
 /// <summary>A single priced line offered to the pricing engine.</summary>
 /// <param name="ProductId">Product the line refers to.</param>
+/// <param name="ProductVariantId">Variant (SKU) being purchased.</param>
 /// <param name="SellerId">Owning seller, used for grouping and seller-scoped coupons.</param>
 /// <param name="UnitPrice">Authoritative unit price from the catalogue.</param>
 /// <param name="Quantity">Units requested.</param>
-public readonly record struct PricedLine(Guid ProductId, Guid SellerId, decimal UnitPrice, int Quantity)
+public readonly record struct PricedLine(Guid ProductId, Guid ProductVariantId, Guid SellerId, decimal UnitPrice, int Quantity)
 {
     public decimal LineTotal => decimal.Round(UnitPrice * Quantity, 2, MidpointRounding.AwayFromZero);
 }
