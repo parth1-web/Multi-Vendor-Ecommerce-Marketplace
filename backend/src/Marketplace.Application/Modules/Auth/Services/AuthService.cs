@@ -1,3 +1,4 @@
+using System.Net;
 using Marketplace.Application.Common.Interfaces;
 using Marketplace.Application.Common.Models;
 using Marketplace.Application.Modules.Auth.Abstractions;
@@ -21,20 +22,24 @@ namespace Marketplace.Application.Modules.Auth.Services;
 /// entire token family.
 /// </summary>
 public sealed class AuthService(
-    IRepository<User> users,
-    IRepository<RefreshToken> refreshTokens,
-    IRepository<Seller> sellers,
-    IRepository<SellerStore> stores,
-    IPasswordHasher passwordHasher,
-    ITokenService tokenService,
-    IRefreshTokenProtector tokenProtector,
-    IUnitOfWork unitOfWork,
-    IClock clock,
-    IAuditService auditService,
-    INotificationService notificationService,
-    IOptions<JwtOptions> jwtOptions,
-    ILogger<AuthService> logger) : IAuthService
+  IRepository<User> users,
+  IRepository<RefreshToken> refreshTokens,
+  IRepository<PasswordResetToken> passwordResetTokens,
+  IRepository<Seller> sellers,
+  IRepository<SellerStore> stores,
+  IPasswordHasher passwordHasher,
+  ITokenService tokenService,
+  IRefreshTokenProtector tokenProtector,
+  IUnitOfWork unitOfWork,
+  IClock clock,
+  IAuditService auditService,
+  INotificationService notificationService,
+  IEmailSender emailSender,
+  IOptions<JwtOptions> jwtOptions,
+  IOptions<MarketplaceOptions> marketplaceOptions,
+  ILogger<AuthService> logger) : IAuthService
 {
+
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
     public async Task<Result<TokenResponse>> RegisterAsync(RegisterRequest request, string? ipAddress, string? userAgent, CancellationToken cancellationToken = default)
@@ -283,6 +288,110 @@ public sealed class AuthService(
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await auditService.RecordAsync(AuditAction.PasswordChanged, nameof(User), user.Id, user.Email, null, cancellationToken).ConfigureAwait(false);
+
+        return Result.Success();
+    }
+
+    // A reset link is an inbox compromise away from an account takeover, so it is short-lived.
+    private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromHours(2);
+
+    public async Task<Result> ForgotPasswordAsync(ForgotPasswordRequest request, string? ipAddress, CancellationToken cancellationToken = default)
+    {
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await users.Query().FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted, cancellationToken).ConfigureAwait(false);
+
+        // The answer is the same whether or not anyone has that address. A different reply is a
+        // way to find out who has an account here, which is not something this endpoint should
+        // hand over to whoever asks.
+        if (user is null || !user.IsActive)
+        {
+            logger.LogInformation("Password reset requested for an address with no usable account.");
+            return Result.Success();
+        }
+
+        var now = clock.UtcNow;
+        var rawToken = RefreshTokenProtector.CreateRawToken();
+
+        // One live token per account: a second request retires the first, so two links cannot be
+        // used side by side and only the newest one works.
+        var superseded = await passwordResetTokens.Query()
+            .Where(t => t.UserId == user.Id && t.UsedAt == null)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var token in superseded)
+        {
+            token.Use(now);
+        }
+
+        await passwordResetTokens.AddAsync(PasswordResetToken.Create(
+            user.Id,
+            tokenProtector.Protect(rawToken),
+            now,
+            ResetTokenLifetime,
+            ipAddress), cancellationToken).ConfigureAwait(false);
+
+
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await auditService.RecordAsync(AuditAction.PasswordResetRequested, nameof(User), user.Id, user.Email, null, cancellationToken).ConfigureAwait(false);
+
+        var link = $"{marketplaceOptions.Value.FrontendBaseUrl.TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(rawToken)}";
+
+        await emailSender.SendAsync(
+            new EmailMessage(
+                user.Email,
+                "Reset your marketplace password",
+                $"""
+                 <p>Hello {WebUtility.HtmlEncode(user.FirstName)},</p>
+                 <p>Use the link below to choose a new password. It works once and expires in {ResetTokenLifetime.TotalHours:0} hours.</p>
+                 <p><a href="{WebUtility.HtmlEncode(link)}">Reset my password</a></p>
+                 <p>If you did not ask for this, you can ignore this message: nothing has changed and no session has ended.</p>
+                 """,
+                $"Open this link to reset your password: {link}"),
+            cancellationToken).ConfigureAwait(false);
+
+        return Result.Success();
+    }
+
+    public async Task<Result> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var now = clock.UtcNow;
+        var hash = tokenProtector.Protect(request.Token.Trim());
+
+        var record = await passwordResetTokens.Query()
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken)
+            .ConfigureAwait(false);
+
+        // An unknown, spent and expired token are the same answer: the link is not usable, and
+        // which of the three it was is the requester's business, not ours.
+        if (record is null || !record.IsUsable(now))
+        {
+            return Result.Failure("This password reset link is no longer valid. Request a new one.", ResultErrorCodes.NotFound);
+        }
+
+        var user = await users.GetByIdAsync(record.UserId, cancellationToken).ConfigureAwait(false);
+        if (user is null || !user.IsActive)
+        {
+            return Result.Failure("This password reset link is no longer valid. Request a new one.", ResultErrorCodes.NotFound);
+        }
+
+        user.ChangePassword(passwordHasher.Hash(request.Password), now);
+        record.Use(now);
+
+        // Whoever asked for the reset may not be whoever was using the account, so every session
+        // that existed before the reset ends with it.
+        var active = await refreshTokens.Query()
+            .Where(t => t.UserId == user.Id && t.RevokedAt == null)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var token in active)
+        {
+            token.Revoke(now, "password-reset");
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await auditService.RecordAsync(AuditAction.PasswordResetCompleted, nameof(User), user.Id, user.Email, null, cancellationToken).ConfigureAwait(false);
 
         return Result.Success();
     }

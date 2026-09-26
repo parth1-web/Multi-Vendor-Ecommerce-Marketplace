@@ -139,6 +139,35 @@ public sealed class AuthController(
         });
     }
 
+    /// <summary>
+    /// Starts a password reset. Always answers 204, so this endpoint cannot be used to find out
+    /// which addresses have accounts here.
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await auth.ForgotPasswordAsync(request, requestContext.IpAddress, cancellationToken);
+        return result.ToActionResult(() => new NoContentResult());
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await auth.ResetPasswordAsync(request, cancellationToken);
+        return result.ToActionResult(() =>
+        {
+            // Every session the account had ends with the reset, including this browser's, so the
+            // cookie is cleared here as well as in the service.
+            Response.Cookies.Delete(RefreshCookieName);
+            return new NoContentResult();
+        });
+    }
+
     private string? ReadRefreshToken() => Request.Cookies[RefreshCookieName];
 
     private void SetRefreshCookie(TokenResponse token)
