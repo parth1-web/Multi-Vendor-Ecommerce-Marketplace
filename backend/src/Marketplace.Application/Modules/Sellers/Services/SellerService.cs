@@ -380,10 +380,10 @@ public sealed class SellerService(
             decimal.Round(totalRevenue, 2),
             decimal.Round(pendingEarnings, 2),
             decimal.Round(paidEarnings, 2),
+            decimal.Round(commissionPaid, 2),
             store?.Name,
             store?.SlugValue,
             store?.RatingAverage ?? 0m,
-            store?.RatingCount ?? 0,
-            decimal.Round(commissionPaid, 2));
+            store?.RatingCount ?? 0);
     }
 }
