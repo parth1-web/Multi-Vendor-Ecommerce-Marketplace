@@ -120,7 +120,8 @@ public sealed class DatabaseSeeder(
             ("womens", "Women's Clothing", "womens-clothing", "fashion", "Dresses, tops, denim and more."),
             ("accessories", "Accessories", "accessories", "fashion", "Bags, wallets, belts and jewellery."),
             ("home", "Home & Living", "home-living", null, "Kitchen, decor and everyday essentials."),
-            ("kitchen", "Kitchen", "kitchen", "home-living", "Cookware, appliances and storage.")
+            ("kitchen", "Kitchen", "kitchen", "home", "Cookware, appliances and storage.")
+
         };
 
         var result = new Dictionary<string, Category>(StringComparer.Ordinal);
@@ -151,7 +152,16 @@ public sealed class DatabaseSeeder(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        // The demo catalogue is a fixed set, so a second run has nothing to add. Without this the
+        // unique slug index refuses the insert and the whole seed reports as skipped, which reads
+        // like a failure on every restart after the first.
+        if (await context.Products.AnyAsync(p => p.SlugValue == "aerolux-wireless-headphones", cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
         var catalogue = new (string Name, string Slug, string Short, string Description, decimal Price, decimal? CompareAt, string Brand, string CategoryKey, string SellerSku, string[] Specs, string SellerSlot)[]
+
         {
             ("AeroLux Wireless Headphones", "aerolux-wireless-headphones", "Over-ear ANC headphones with 40-hour battery.",
                 "AeroLux combines adaptive noise cancelling, 40 hours of playback and a memory-foam headband tuned for long-haul travel. Multipoint pairing keeps a laptop and phone connected at once.",
@@ -210,14 +220,31 @@ public sealed class DatabaseSeeder(
 
             ("Linen Duvet Cover Set", "linen-duvet-cover-set", "Stonewashed linen duvet cover and two pillowcases.",
                 "A stonewashed linen duvet cover with two matching pillowcases. Breathable, temperature regulating and softer with every wash.",
-                199.00m, 249.00m, "Northloom", "home-living", "NL-DUV-203",
+                199.00m, 249.00m, "Northloom", "home", "NL-DUV-203",
+
                 ["Composition: 100% linen", "Includes: duvet cover + 2 pillowcases", "Closure: button"], "fashion")
         };
+
+        // A tag name is unique across the whole catalogue, so the second product by the same
+        // brand would collide with the first. The rows are resolved once and shared, which is
+        // what the join expects: one tag, many products.
+        var tags = await ResolveTagsAsync(catalogue.Select(item => item.Brand ?? "General"), now, cancellationToken)
+            .ConfigureAwait(false);
 
         foreach (var item in catalogue)
         {
             var seller = item.SellerSlot == "tech" ? techSeller : fashionSeller;
-            var category = categories[item.CategoryKey];
+
+            // The catalogue names a category by its key in the table above. A key that does not
+            // exist is a mistake in this file, and saying so plainly beats a KeyNotFoundException
+            // that reads as though the database were empty.
+            if (!categories.TryGetValue(item.CategoryKey, out var category))
+            {
+                throw new InvalidOperationException(
+                    $"Seed product '{item.Slug}' refers to category key '{item.CategoryKey}', which is not one of: {string.Join(", ", categories.Keys)}.");
+            }
+
+
 
             var product = Product.Create(
                 seller.Id,
@@ -247,7 +274,7 @@ public sealed class DatabaseSeeder(
                 product.AddSpecification(parts[0], parts.Length > 1 ? parts[1] : spec, 0, now);
             }
 
-            product.AddTag(item.Brand ?? "General", now);
+            product.AttachTags([tags[item.Brand ?? "General"]], now);
             product.Approve(now);
 
             context.Products.Add(product);
@@ -255,6 +282,42 @@ public sealed class DatabaseSeeder(
 
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// One row per tag name, matched without regard to case because that is how the unique
+    /// index treats them.
+    /// </summary>
+    private async Task<Dictionary<string, Tag>> ResolveTagsAsync(
+        IEnumerable<string> names, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var wanted = names.Select(n => n.Trim()).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        var existing = await context.Tags.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var resolved = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tag in existing)
+        {
+            resolved[tag.Name] = tag;
+        }
+
+        var created = new List<Tag>();
+
+        foreach (var name in wanted.Where(name => !resolved.ContainsKey(name)))
+        {
+            var tag = Tag.Create(name, now);
+            created.Add(tag);
+            resolved[name] = tag;
+        }
+
+        if (created.Count > 0)
+        {
+            context.Tags.AddRange(created);
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return resolved;
+    }
+
 
     private async Task EnsureCouponsAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
