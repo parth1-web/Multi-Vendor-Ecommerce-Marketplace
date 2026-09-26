@@ -135,9 +135,28 @@ public sealed class RefreshTokenProtector : IRefreshTokenProtector
             return false;
         }
 
+        // A malformed stored digest must be treated as a mismatch, never as an exception.
+        if (storedHash.Length != 64 || !IsHex(storedHash))
+        {
+            return false;
+        }
+
         var computed = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
         var expected = Convert.FromHexString(storedHash);
-        return computed.Length == expected.Length && CryptographicOperations.FixedTimeEquals(computed, expected);
+        return CryptographicOperations.FixedTimeEquals(computed, expected);
+    }
+
+    private static bool IsHex(string value)
+    {
+        foreach (var c in value)
+        {
+            if (!Uri.IsHexDigit(c))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

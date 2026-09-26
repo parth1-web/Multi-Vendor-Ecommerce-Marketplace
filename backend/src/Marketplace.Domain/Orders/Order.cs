@@ -255,33 +255,36 @@ public class Order : Entity
         UpdatedAt = now;
     }
 
-    /// <summary>Propagates a sub-order status change to the marketplace order.</summary>
+    /// <summary>
+    /// Propagates a sub-order status change to the marketplace order, walking the order
+    /// forward one legal step at a time so the parent never skips a state.
+    ///
+    /// The parent deliberately stops at <see cref="OrderStatus.Delivered"/>: only the
+    /// "every sub-order has completed" rule may move it to Completed, otherwise one fast
+    /// seller would complete the whole marketplace order.
+    /// </summary>
     public void SyncFromSellerOrder(SellerOrderStatus sellerStatus, DateTimeOffset now)
     {
-        var mapped = (OrderStatus)sellerStatus;
+        var mapped = (OrderStatus)Math.Min((int)sellerStatus, (int)OrderStatus.Delivered);
 
-        if (mapped == Status)
+        while (Status != mapped)
         {
-            return;
+            var candidates = OrderStatusTransition.NextStates(Status)
+                .Where(s => (int)s <= (int)mapped)
+                .OrderBy(s => (int)mapped - (int)s)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                break;
+            }
+
+            RecordStatusChange(Status, candidates[0], "Synchronised from seller fulfilment", null, now);
         }
 
-        if (OrderStatusTransition.IsAllowed(Status, mapped))
+        if (Status == mapped)
         {
-            Status = mapped;
             UpdatedAt = now;
-
-            if (mapped == OrderStatus.Delivered)
-            {
-                DeliveredAt ??= now;
-            }
-            else if (mapped == OrderStatus.Shipped)
-            {
-                ShippedAt ??= now;
-            }
-            else if (mapped == OrderStatus.Cancelled)
-            {
-                CancelledAt ??= now;
-            }
         }
 
         // The marketplace order completes only once every sub-order has completed.
