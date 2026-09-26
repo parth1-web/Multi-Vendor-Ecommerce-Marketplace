@@ -161,6 +161,15 @@ public sealed class ProductSpecificationConfiguration : IEntityTypeConfiguration
     }
 }
 
+public sealed class ProductTagConfiguration : IEntityTypeConfiguration<ProductTag>
+{
+    public void Configure(EntityTypeBuilder<ProductTag> builder)
+    {
+        builder.ToTable("product_tags");
+        builder.HasKey(pt => new { pt.ProductId, pt.TagId });
+    }
+}
+
 public sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
 {
     public void Configure(EntityTypeBuilder<Tag> builder)

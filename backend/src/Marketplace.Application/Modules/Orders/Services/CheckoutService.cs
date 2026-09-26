@@ -156,9 +156,20 @@ public sealed class CheckoutService(
 
         var now = clock.UtcNow;
         var provider = ParseProvider(request.PaymentMethod);
+        var snapshot = new OrderAddressSnapshot(
+            address.Label,
+            address.RecipientName,
+            address.PhoneNumber,
+            address.Line1,
+            address.Line2,
+            address.City,
+            address.State,
+            address.PostalCode,
+            address.Country);
+
         var order = Domain.Orders.Order.Place(
             currentUser.UserId,
-            address,
+            snapshot,
             null,
             string.IsNullOrWhiteSpace(request.IdempotencyKey) ? null : request.IdempotencyKey,
             totals.Subtotal,

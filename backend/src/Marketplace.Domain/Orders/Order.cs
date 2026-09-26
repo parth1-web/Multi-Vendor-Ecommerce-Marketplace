@@ -26,7 +26,7 @@ public class Order : Entity
         Guid id,
         string orderNumber,
         Guid customerId,
-        UserAddress shippingAddress,
+        OrderAddressSnapshot shippingAddress,
         Guid? couponId,
         string? couponCode,
         decimal subtotal,        decimal discountAmount,
@@ -88,7 +88,7 @@ public class Order : Entity
 
     public string? CouponCode { get; private set; }
 
-    public UserAddress ShippingAddressSnapshot { get; private set; } = null!;
+    public OrderAddressSnapshot ShippingAddressSnapshot { get; private set; } = new();
 
     public string? CustomerNote { get; private set; }
 
@@ -124,7 +124,7 @@ public class Order : Entity
 
     public static Order Place(
         Guid customerId,
-        UserAddress shippingAddress,
+        OrderAddressSnapshot shippingAddress,
         Guid? couponId,
         string? couponCode,
         decimal subtotal,

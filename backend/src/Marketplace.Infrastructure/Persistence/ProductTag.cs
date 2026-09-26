@@ -26,5 +26,14 @@ internal static class ModelBuilderExtensions
     {
         modelBuilder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);
         modelBuilder.Entity<Category>().HasQueryFilter(c => !c.IsDeleted);
+
+        // Owned/dependent rows inherit the parent's soft-delete filter so a deleted product
+        // can never surface through a child navigation include.
+        modelBuilder.Entity<ProductImage>().HasQueryFilter(i => !i.Product!.IsDeleted);
+        modelBuilder.Entity<ProductVariant>().HasQueryFilter(v => !v.Product!.IsDeleted);
+        modelBuilder.Entity<ProductSpecification>().HasQueryFilter(s => !s.Product!.IsDeleted);
+        modelBuilder.Entity<ProductTag>().HasQueryFilter(pt => !pt.Product!.IsDeleted);
+        modelBuilder.Entity<CouponProduct>().HasQueryFilter(cp => !cp.Product!.IsDeleted);
+        modelBuilder.Entity<ProductVariantOption>().HasQueryFilter(o => !o.Variant!.Product!.IsDeleted);
     }
 }

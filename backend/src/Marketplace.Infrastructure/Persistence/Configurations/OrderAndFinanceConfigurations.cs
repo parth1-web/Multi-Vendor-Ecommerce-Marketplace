@@ -107,9 +107,6 @@ public sealed class SellerOrderConfiguration : IEntityTypeConfiguration<SellerOr
         builder.HasIndex(so => new { so.SellerId, so.Status, so.CreatedAt }).HasDatabaseName("ix_seller_orders_seller");
         builder.HasIndex(so => so.OrderId).HasDatabaseName("ix_seller_orders_order");
 
-        builder.Ignore(so => so.Items);
-        builder.Ignore(so => so.History);
-
         builder.HasMany(so => so.Items)
             .WithOne(i => i.SellerOrder!)
             .HasForeignKey(i => i.SellerOrderId)
