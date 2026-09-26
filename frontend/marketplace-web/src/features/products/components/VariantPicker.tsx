@@ -44,6 +44,7 @@ export function VariantPicker({ productId, variants }: { productId: string; vari
                 }}
                 disabled={variant.availableQuantity <= 0}
                 aria-pressed={variant.id === selectedId}
+                title={optionSummary(variant)}
                 className="btn btn-sm"
                 style={{
                   borderColor: variant.id === selectedId ? "var(--brand-600)" : "var(--border)",
@@ -105,4 +106,13 @@ export function VariantPicker({ productId, variants }: { productId: string; vari
       ) : null}
     </div>
   );
+}
+
+/** "Colour: Black, Size: M" — the options a variant stands for, in one readable line. */
+function optionSummary(variant: ProductVariant): string | undefined {
+  if (variant.options.length === 0) {
+    return undefined;
+  }
+
+  return variant.options.map((option) => `${option.name}: ${option.value}`).join(", ");
 }

@@ -16,7 +16,9 @@ import { StatusBadge } from "@/components/shared/Feedback";
 import { BuyBox } from "@/features/products/components/BuyBox";
 import { ApiError, serverGet } from "@/lib/serverApi";
 import { formatDate } from "@/lib/format";
-import type { ProductDetail } from "@/types/product";
+import type { ProductDetail, RatingBreakdown } from "@/types/product";
+
+export const dynamic = "force-dynamic";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -27,6 +29,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   try {
     const product = await load(slug);
     const description = product.shortDescription || product.description.slice(0, 155);
+    const image = primaryImage(product);
 
     return {
       title: product.name,
@@ -34,7 +37,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
       openGraph: {
         title: product.name,
         description,
-        images: product.primaryImageUrl ? [{ url: product.primaryImageUrl, alt: product.name }] : undefined,
+        images: image ? [{ url: image, alt: product.name }] : undefined,
       },
     };
   } catch {
@@ -172,6 +175,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
               Reviews
             </h2>
 
+            <RatingSummary breakdown={product.ratingBreakdown} />
+
             {product.reviews.length === 0 ? (
               <p style={{ color: "var(--text-muted)" }}>No reviews for this product yet.</p>
             ) : (
@@ -184,6 +189,18 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
                     </div>
                     {review.title ? <p style={{ margin: "var(--space-1) 0 0", fontWeight: 600 }}>{review.title}</p> : null}
                     <p style={{ margin: "var(--space-1) 0 0", color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>{review.body}</p>
+
+                    {review.isVerifiedPurchase ? (
+                      <p style={{ margin: "var(--space-1) 0 0" }}>
+                        <StatusBadge tone="success">Verified purchase</StatusBadge>
+                      </p>
+                    ) : null}
+
+                    {review.reply ? (
+                      <p style={{ margin: "var(--space-2) 0 0", paddingLeft: "var(--space-3)", borderLeft: "2px solid var(--border)", color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+                        <strong>{review.reply.authorName}</strong> {review.reply.body}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -191,6 +208,97 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
           </section>
         </div>
       </div>
+
+      {product.relatedProducts.length > 0 ? (
+        <section aria-labelledby="related" className="mt-5">
+          <h2 className="mp-section-title" id="related">
+            You might also like
+          </h2>
+
+          <div className="row g-3">
+            {product.relatedProducts.map((related) => (
+              <div key={related.id} className="col-6 col-md-4 col-xl-3">
+                <article className="mp-card" style={{ padding: "var(--space-3)", height: "100%" }}>
+                  <Link href={`/products/${related.slug}`} style={{ color: "var(--text)" }}>
+                    {related.primaryImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={related.primaryImageUrl}
+                        alt={related.name}
+                        width={200}
+                        height={200}
+                        loading="lazy"
+                        style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: "var(--radius-sm)", backgroundColor: "var(--bg-subtle)" }}
+                      />
+                    ) : (
+                      <div className="mp-skeleton" style={{ aspectRatio: "1 / 1", borderRadius: "var(--radius-sm)" }} />
+                    )}
+
+                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--fs-sm)", fontWeight: 500 }}>{related.name}</p>
+                    <p style={{ margin: "var(--space-1) 0 0", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>{related.storeName}</p>
+                    <PriceDisplay price={related.basePrice} compareAtPrice={related.compareAtPrice} discountPercentage={related.discountPercentage} />
+                  </Link>
+                </article>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The rating distribution, as bars rather than a number.
+ *
+ * An average on its own hides the shape behind it: a product with a 4.2 average can be four
+ * fives and a pile of ones, and those two products deserve different decisions.
+ */
+function RatingSummary({ breakdown }: { breakdown: RatingBreakdown }) {
+  if (breakdown.total === 0) {
+    return null;
+  }
+
+  const rows = [
+    { stars: 5, count: breakdown.fiveStar },
+    { stars: 4, count: breakdown.fourStar },
+    { stars: 3, count: breakdown.threeStar },
+    { stars: 2, count: breakdown.twoStar },
+    { stars: 1, count: breakdown.oneStar },
+  ];
+
+  return (
+    <div className="d-flex align-items-center mb-3" style={{ gap: "var(--space-4)" }}>
+      <div style={{ textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: "var(--fs-h1)", fontWeight: 700, lineHeight: 1 }}>{breakdown.average.toFixed(1)}</p>
+        <RatingStars rating={breakdown.average} showCount={false} />
+        <p style={{ margin: "0.25rem 0 0", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>{breakdown.total} reviews</p>
+      </div>
+
+      <ul className="list-unstyled flex-grow-1 mb-0">
+        {rows.map((row) => (
+          <li key={row.stars} className="d-flex align-items-center" style={{ gap: "var(--space-2)" }}>
+            <span className="mp-metric-label" style={{ minWidth: "2.5rem" }}>
+              {row.stars}★
+            </span>
+            <span
+              className="flex-grow-1"
+              role="presentation"
+              style={{ height: "0.5rem", borderRadius: "999px", backgroundColor: "var(--bg-subtle)", overflow: "hidden" }}
+            >
+              <span
+                style={{
+                  display: "block",
+                  height: "100%",
+                  width: `${Math.round((row.count / breakdown.total) * 100)}%`,
+                  backgroundColor: "var(--violet)",
+                }}
+              />
+            </span>
+            <span style={{ minWidth: "2rem", textAlign: "right", color: "var(--text-muted)", fontSize: "var(--fs-xs)" }}>{row.count}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -230,6 +338,11 @@ function Gallery({ product }: { product: ProductDetail }) {
       ) : null}
     </div>
   );
+}
+
+/** The image a share card shows: the one marked primary, or failing that, the first. */
+function primaryImage(product: ProductDetail): string | null {
+  return product.images.find((image) => image.isPrimary)?.url ?? product.images[0]?.url ?? null;
 }
 
 /** A variant can carry its own price; the product price is the fallback. */
