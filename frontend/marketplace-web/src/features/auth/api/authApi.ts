@@ -1,7 +1,7 @@
 /** Authentication endpoints. The only module that touches these paths. */
 
 import { apiClient } from "@/api/axiosClient";
-import type { ChangePasswordRequest, LoginRequest, RegisterRequest, TokenResponse, UserResponse } from "@/types/auth";
+import type { ChangePasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse, UserResponse } from "@/types/auth";
 
 export const authApi = {
   async login(request: LoginRequest): Promise<TokenResponse> {
@@ -17,6 +17,19 @@ export const authApi = {
   async logout(): Promise<void> {
     // The refresh token is an HttpOnly cookie, so this is a cookie-only call.
     await apiClient.post("/api/auth/logout", {});
+  },
+
+  /**
+   * Asks for a reset link. The API answers the same way for every address, so this never throws
+   * because an account does or does not exist.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    await apiClient.post("/api/auth/forgot-password", { email });
+  },
+
+  /** Completes a reset. Rejects when the link is unknown, spent or expired. */
+  async resetPassword(request: ResetPasswordRequest): Promise<void> {
+    await apiClient.post("/api/auth/reset-password", request);
   },
 
   async me(): Promise<UserResponse> {
