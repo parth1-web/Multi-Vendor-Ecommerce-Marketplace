@@ -63,14 +63,32 @@ public sealed class PageRequest
     public int Skip => (Page - 1) * PageSize;
 }
 
+/// <summary>
+/// Well-known failure codes. The application layer stays free of HTTP, but a few failures are
+/// only meaningful with a specific status (a replayed refresh token is a conflict, not a
+/// generic rejection), so the code travels with the result and the API decides the status.
+/// </summary>
+public static class ResultErrorCodes
+{
+    /// <summary>The request conflicts with the current state, e.g. token reuse.</summary>
+    public const string Conflict = "conflict";
+
+    /// <summary>The caller is not authenticated.</summary>
+    public const string Unauthorized = "unauthorized";
+
+    /// <summary>The caller is authenticated but not allowed.</summary>
+    public const string Forbidden = "forbidden";
+}
+
 /// <summary>Result of an operation that either succeeds with a value or fails with a reason.</summary>
 public class Result
 {
-    protected Result(bool isSuccess, string? error, IReadOnlyDictionary<string, string[]>? errors)
+    protected Result(bool isSuccess, string? error, IReadOnlyDictionary<string, string[]>? errors, string? errorCode = null)
     {
         IsSuccess = isSuccess;
         Error = error;
         Errors = errors ?? new Dictionary<string, string[]>();
+        ErrorCode = errorCode;
     }
 
     public bool IsSuccess { get; }
@@ -79,11 +97,16 @@ public class Result
 
     public string? Error { get; }
 
+    /// <summary>Optional machine-readable reason, mapped to a status code by the API layer.</summary>
+    public string? ErrorCode { get; }
+
     public IReadOnlyDictionary<string, string[]> Errors { get; }
 
     public static Result Success() => new(true, null, null);
 
     public static Result Failure(string error) => new(false, error, null);
+
+    public static Result Failure(string error, string errorCode) => new(false, error, null, errorCode);
 
     public static Result Failure(string error, IReadOnlyDictionary<string, string[]> errors) => new(false, error, errors);
 }
@@ -91,8 +114,8 @@ public class Result
 /// <summary>Result carrying a value on success.</summary>
 public sealed class Result<T> : Result
 {
-    private Result(bool isSuccess, T? value, string? error, IReadOnlyDictionary<string, string[]>? errors)
-        : base(isSuccess, error, errors)
+    private Result(bool isSuccess, T? value, string? error, IReadOnlyDictionary<string, string[]>? errors, string? errorCode = null)
+        : base(isSuccess, error, errors, errorCode)
     {
         Value = value;
     }
@@ -102,6 +125,8 @@ public sealed class Result<T> : Result
     public static Result<T> Success(T value) => new(true, value, null, null);
 
     public new static Result<T> Failure(string error) => new(false, default, error, null);
+
+    public new static Result<T> Failure(string error, string errorCode) => new(false, default, error, null, errorCode);
 
     /// <summary>
     /// Failure that still carries a value — used when the failure payload matters, for

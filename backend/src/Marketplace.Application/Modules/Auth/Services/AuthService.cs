@@ -174,7 +174,9 @@ public sealed class AuthService(
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await auditService.RecordAsync(AuditAction.LoginFailed, nameof(RefreshToken), token.Id, token.UserId.ToString(),
                 new { Reason = "reuse-detected" }, cancellationToken).ConfigureAwait(false);
-            return Result<TokenResponse>.Failure("The refresh token is no longer valid. Please sign in again.");
+            return Result<TokenResponse>.Failure(
+                "The refresh token is no longer valid. Please sign in again.",
+                ResultErrorCodes.Conflict);
         }
 
         if (token.IsExpired(now))

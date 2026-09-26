@@ -177,23 +177,10 @@ public static class ResultExtensions
 
         if (result.Errors.Count > 0)
         {
-            return new BadRequestObjectResult(new ValidationProblemDetails(result.Errors.ToDictionary(e => e.Key, e => e.Value))
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Validation failed"
-            });
+            return ValidationProblem(result);
         }
 
-        return new ObjectResult(new ProblemDetails
-        {
-            Status = StatusCodes.Status422UnprocessableEntity,
-            Title = "Request failed",
-            Detail = result.Error,
-            Type = "https://errors.marketplace.dev/unprocessable"
-        })
-        {
-            StatusCode = StatusCodes.Status422UnprocessableEntity
-        };
+        return FailureProblem(result);
     }
 
     /// <summary>Controller-friendly variant returning <see cref="IActionResult"/>.</summary>
@@ -206,22 +193,51 @@ public static class ResultExtensions
 
         if (result.Errors.Count > 0)
         {
-            return new BadRequestObjectResult(new ValidationProblemDetails(result.Errors.ToDictionary(e => e.Key, e => e.Value))
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Validation failed"
-            });
+            return ValidationProblem(result);
         }
+
+        return FailureProblem(result);
+    }
+
+    private static IActionResult ValidationProblem(Result result) =>
+        new BadRequestObjectResult(new ValidationProblemDetails(result.Errors.ToDictionary(e => e.Key, e => e.Value))
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Validation failed"
+        });
+
+    /// <summary>Builds the problem-details response for a failure, honouring its error code.</summary>
+    private static IActionResult FailureProblem(Result result)
+    {
+        var status = StatusForErrorCode(result.ErrorCode);
+        var title = TitleForStatus(status);
 
         return new ObjectResult(new ProblemDetails
         {
-            Status = StatusCodes.Status422UnprocessableEntity,
-            Title = "Request failed",
+            Status = status,
+            Title = title,
             Detail = result.Error,
-            Type = "https://errors.marketplace.dev/unprocessable"
+            Type = $"https://errors.marketplace.dev/{title.ToLowerInvariant()}"
         })
         {
-            StatusCode = StatusCodes.Status422UnprocessableEntity
+            StatusCode = status
         };
     }
+
+    /// <summary>Maps a result error code to the status the API should answer with.</summary>
+    private static int StatusForErrorCode(string? errorCode) => errorCode switch
+    {
+        ResultErrorCodes.Conflict => StatusCodes.Status409Conflict,
+        ResultErrorCodes.Unauthorized => StatusCodes.Status401Unauthorized,
+        ResultErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
+        _ => StatusCodes.Status422UnprocessableEntity
+    };
+
+    private static string TitleForStatus(int status) => status switch
+    {
+        StatusCodes.Status409Conflict => "Conflict",
+        StatusCodes.Status401Unauthorized => "Unauthorized",
+        StatusCodes.Status403Forbidden => "Forbidden",
+        _ => "Request failed"
+    };
 }
