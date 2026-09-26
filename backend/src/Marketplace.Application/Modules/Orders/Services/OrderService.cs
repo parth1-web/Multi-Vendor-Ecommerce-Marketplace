@@ -135,7 +135,8 @@ public sealed class OrderService(
         }
 
         var page = new PageRequest(query.Page, query.PageSize);
-        var source = sellerOrders.Query().AsNoTracking().Where(so => so.SellerId == sellerId);
+        // The parent order is projected into the response, so it has to be loaded with it.
+        var source = sellerOrders.Query().AsNoTracking().Include(so => so.Order).Where(so => so.SellerId == sellerId);
 
         if (query.Status is { } status)
         {
@@ -167,7 +168,7 @@ public sealed class OrderService(
         };
 
         var result = await source.ToPagedResultAsync(page, so => new SellerOrderSummaryResponse(
-            so.Id, so.SellerOrderNumber, so.SellerId, string.Empty, so.Status,
+            so.Id, so.SellerOrderNumber, so.SellerId, so.OrderId, so.Order!.OrderNumber, string.Empty, so.Status,
             so.Subtotal, so.DiscountAmount, so.ShippingAmount, so.TotalAmount,
             so.CommissionRate, so.CommissionAmount, so.SellerEarnings,
             so.CarrierName, so.TrackingNumber, so.EstimatedDeliveryAt, so.Items.Count), cancellationToken)
@@ -188,6 +189,7 @@ public sealed class OrderService(
             .AsNoTracking()
             .Include(so => so.Items)
             .Include(so => so.History)
+            .Include(so => so.Order)
             .FirstOrDefaultAsync(so => so.Id == sellerOrderId && so.SellerId == sellerId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -197,7 +199,8 @@ public sealed class OrderService(
         }
 
         var dto = new SellerOrderSummaryResponse(
-            sellerOrder.Id, sellerOrder.SellerOrderNumber, sellerOrder.SellerId, string.Empty, sellerOrder.Status,
+            sellerOrder.Id, sellerOrder.SellerOrderNumber, sellerOrder.SellerId,
+            sellerOrder.OrderId, sellerOrder.Order!.OrderNumber, string.Empty, sellerOrder.Status,
             sellerOrder.Subtotal, sellerOrder.DiscountAmount, sellerOrder.ShippingAmount, sellerOrder.TotalAmount,
             sellerOrder.CommissionRate, sellerOrder.CommissionAmount, sellerOrder.SellerEarnings,
             sellerOrder.CarrierName, sellerOrder.TrackingNumber, sellerOrder.EstimatedDeliveryAt, sellerOrder.Items.Count);
@@ -387,7 +390,8 @@ public sealed class OrderService(
             !i.IsRefundRequested && order.Status == OrderStatus.Delivered)).ToList();
 
         var sellerOrderSummaries = order.SellerOrders.Select(so => new SellerOrderSummaryResponse(
-            so.Id, so.SellerOrderNumber, so.SellerId, storeNames.GetValueOrDefault(so.SellerId, "Seller"), so.Status,
+            so.Id, so.SellerOrderNumber, so.SellerId, so.OrderId, order.OrderNumber,
+            storeNames.GetValueOrDefault(so.SellerId, "Seller"), so.Status,
             so.Subtotal, so.DiscountAmount, so.ShippingAmount, so.TotalAmount,
             so.CommissionRate, so.CommissionAmount, so.SellerEarnings,
             so.CarrierName, so.TrackingNumber, so.EstimatedDeliveryAt, so.Items.Count)).ToList();

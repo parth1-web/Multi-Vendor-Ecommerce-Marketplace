@@ -152,6 +152,8 @@ public sealed record SellerOrderSummaryResponse(
     Guid Id,
     string SellerOrderNumber,
     Guid SellerId,
+    Guid OrderId,
+    string OrderNumber,
     string StoreName,
     SellerOrderStatus Status,
     decimal Subtotal,
