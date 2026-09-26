@@ -63,14 +63,18 @@ public sealed class OrderService(
             .AsNoTracking()
             .Include(o => o.Items)
             .Include(o => o.SellerOrders)
-            .Include(o => o.SellerOrders.Select(so => so.Items))
+            // Two levels of collection navigation need ThenInclude; a projected Select inside
+            // Include is not a property access and EF rejects it when the query is compiled.
+            .ThenInclude(so => so.Items)
             .Include(o => o.History)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.CustomerId == currentUser.UserId, cancellationToken)
             .ConfigureAwait(false);
 
         if (order is null)
         {
-            return Result<OrderResponse>.Failure("Order not found.");
+            // Someone else's order is reported exactly like a missing one, so the endpoint
+            // never confirms that an order id exists.
+            return Result<OrderResponse>.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         return Result<OrderResponse>.Success(await BuildAsync(order, cancellationToken).ConfigureAwait(false));
@@ -85,7 +89,7 @@ public sealed class OrderService(
 
         if (order is null)
         {
-            return Result.Failure("Order not found.");
+            return Result.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         if (!OrderStatusTransition.IsCancellableByCustomer(order.Status))
@@ -217,7 +221,7 @@ public sealed class OrderService(
 
         if (sellerOrder is null)
         {
-            return Result.Failure("Order not found.");
+            return Result.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         var now = clock.UtcNow;
@@ -281,7 +285,9 @@ public sealed class OrderService(
 
         if (order is null)
         {
-            return Result<OrderResponse>.Failure("Order not found.");
+            // Someone else's order is reported exactly like a missing one, so the endpoint
+            // never confirms that an order id exists.
+            return Result<OrderResponse>.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         return Result<OrderResponse>.Success(await BuildAsync(order, cancellationToken).ConfigureAwait(false));
@@ -296,7 +302,7 @@ public sealed class OrderService(
 
         if (order is null)
         {
-            return Result.Failure("Order not found.");
+            return Result.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
         var now = clock.UtcNow;

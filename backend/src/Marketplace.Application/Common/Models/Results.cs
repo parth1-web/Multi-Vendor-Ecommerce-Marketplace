@@ -73,6 +73,9 @@ public static class ResultErrorCodes
     /// <summary>The request conflicts with the current state, e.g. token reuse.</summary>
     public const string Conflict = "conflict";
 
+    /// <summary>The resource does not exist, or the caller may not know that it does.</summary>
+    public const string NotFound = "not-found";
+
     /// <summary>The caller is not authenticated.</summary>
     public const string Unauthorized = "unauthorized";
 

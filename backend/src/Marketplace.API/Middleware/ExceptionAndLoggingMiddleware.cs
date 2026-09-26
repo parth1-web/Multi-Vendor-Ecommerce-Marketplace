@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Marketplace.Application.Common.Models;
 using Marketplace.Domain.Common;
 using Microsoft.AspNetCore.Diagnostics;
@@ -38,6 +39,19 @@ public sealed class GlobalExceptionHandler(
         {
             logger.LogError(exception, "Unhandled exception for {Method} {Path} (correlation {CorrelationId})",
                 httpContext.Request.Method, httpContext.Request.Path, correlationId);
+
+            // A concurrency failure names no entity in its message, so log the ones that
+            // conflicted. Without this a lost update is impossible to diagnose in production.
+            if (exception is DbUpdateConcurrencyException concurrency)
+            {
+                logger.LogError(
+                    "Concurrency conflict on {Entities} for {Method} {Path} (correlation {CorrelationId})",
+                    string.Join(", ", concurrency.Entries.Select(entry =>
+                        $"{entry.Metadata.ClrType.Name} ({entry.State})")),
+                    httpContext.Request.Method,
+                    httpContext.Request.Path,
+                    correlationId);
+            }
         }
         else
         {
@@ -227,6 +241,7 @@ public static class ResultExtensions
     /// <summary>Maps a result error code to the status the API should answer with.</summary>
     private static int StatusForErrorCode(string? errorCode) => errorCode switch
     {
+        ResultErrorCodes.NotFound => StatusCodes.Status404NotFound,
         ResultErrorCodes.Conflict => StatusCodes.Status409Conflict,
         ResultErrorCodes.Unauthorized => StatusCodes.Status401Unauthorized,
         ResultErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
@@ -235,6 +250,7 @@ public static class ResultExtensions
 
     private static string TitleForStatus(int status) => status switch
     {
+        StatusCodes.Status404NotFound => "Not found",
         StatusCodes.Status409Conflict => "Conflict",
         StatusCodes.Status401Unauthorized => "Unauthorized",
         StatusCodes.Status403Forbidden => "Forbidden",
