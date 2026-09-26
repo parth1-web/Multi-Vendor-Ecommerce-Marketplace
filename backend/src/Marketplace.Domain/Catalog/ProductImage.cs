@@ -22,7 +22,7 @@ public class ProductImage : Entity
 
     public Guid ProductId { get; private set; }
 
-    /// <summary>Owning product. Navigation only — set by EF Core.</summary>
+    /// <summary>Owning product. Navigation only - set by EF Core.</summary>
     public Product? Product { get; internal set; }
 
     public string Url { get; private set; }

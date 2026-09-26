@@ -52,12 +52,12 @@ public class OrderItem : Entity
 
     public Guid OrderId { get; private set; }
 
-    /// <summary>Owning marketplace order. Navigation only — set by EF Core.</summary>
+    /// <summary>Owning marketplace order. Navigation only - set by EF Core.</summary>
     public Order? Order { get; internal set; }
 
     public Guid SellerOrderId { get; private set; }
 
-    /// <summary>Owning seller sub-order. Navigation only — set by EF Core.</summary>
+    /// <summary>Owning seller sub-order. Navigation only - set by EF Core.</summary>
     public SellerOrder? SellerOrder { get; internal set; }
 
     public Guid ProductId { get; private set; }

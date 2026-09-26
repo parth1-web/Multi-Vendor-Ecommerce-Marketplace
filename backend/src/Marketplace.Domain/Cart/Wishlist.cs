@@ -77,7 +77,7 @@ public class WishlistItem : Entity
 
     public Guid WishlistId { get; private set; }
 
-    /// <summary>Owning wishlist. Navigation only — set by EF Core.</summary>
+    /// <summary>Owning wishlist. Navigation only - set by EF Core.</summary>
     public Wishlist? Wishlist { get; internal set; }
 
     public Guid ProductId { get; private set; }
