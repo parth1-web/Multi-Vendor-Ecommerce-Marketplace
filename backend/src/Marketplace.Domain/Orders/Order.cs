@@ -19,6 +19,7 @@ public class Order : Entity
     {
         OrderNumber = string.Empty;
         Currency = "USD";
+        PaymentMethod = string.Empty;
     }
 
     private Order(
@@ -27,9 +28,8 @@ public class Order : Entity
         Guid customerId,
         UserAddress shippingAddress,
         Guid? couponId,
-        string couponCode,
-        decimal subtotal,
-        decimal discountAmount,
+        string? couponCode,
+        decimal subtotal,        decimal discountAmount,
         decimal shippingAmount,
         decimal taxAmount,
         string currency,
@@ -223,7 +223,7 @@ public class Order : Entity
 
         foreach (var sellerOrder in _sellerOrders)
         {
-            sellerOrder.Cancel(reason, cancelledByUserId, now);
+            sellerOrder.Cancel(reason ?? "Order cancelled", cancelledByUserId, now);
         }
     }
 
