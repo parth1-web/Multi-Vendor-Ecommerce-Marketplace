@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using System.Reflection;
 using System.Text;
+using Marketplace.API.Configuration;
+using Marketplace.API.Security;
 using Marketplace.API.Hubs;
 using Marketplace.API.Middleware;
-using Marketplace.API.Security;
 using Marketplace.Application;
 using Marketplace.Application.Common.Interfaces;
 using Marketplace.Application.Modules.Auth.Abstractions;
@@ -50,6 +51,9 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddScoped<IRealtimeNotifier, SignalRRealtimeNotifier>();
+    var validationClock = new ApplicationValidationClock();
+    builder.Services.AddSingleton(validationClock);
+
     builder.Services.AddScoped<DatabaseSeeder>();
 
     builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -57,7 +61,7 @@ try
         options.SuppressModelStateInvalidFilter = false;
     });
 
-    builder.Services.AddControllers()
+    builder.Services.AddControllers(options => options.Filters.Add<FluentValidationFilter>())
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
@@ -71,20 +75,40 @@ try
     ValidateJwtConfiguration(jwtOptions, builder.Environment.IsProduction());
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
+        .AddJwtBearer();
+
+    // The bearer parameters are configured from the resolved options rather than from a
+    // value captured here. Options are bound when they are first resolved, which is the only
+    // point at which every configuration source (including ones added by a test host) is
+    // guaranteed to be present; an eagerly read value can silently disagree with the key the
+    // token service signs with.
+    builder.Services.AddOptions<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(
+            JwtBearerDefaults.AuthenticationScheme)
+        .Configure<Microsoft.Extensions.Options.IOptions<JwtOptions>>((options, configured) =>
         {
+            var jwt = configured.Value;
+
             options.RequireHttpsMetadata = builder.Environment.IsProduction();
             options.SaveToken = false;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidIssuer = jwtOptions.Issuer,
+                ValidIssuer = jwt.Issuer,
                 ValidateAudience = true,
-                ValidAudience = jwtOptions.Audience,
+                ValidAudience = jwt.Audience,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
+                // The same key id the token is signed with, so the validator can match it.
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)) { KeyId = TokenService.SigningKeyId },
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.FromSeconds(jwtOptions.ClockSkewSeconds),
+                ClockSkew = TimeSpan.FromSeconds(jwt.ClockSkewSeconds),
+                // Token lifetimes are stamped with the application clock, so they are judged by it
+                // too. Using the system clock here would reject tokens the API just issued
+                // whenever the application clock is frozen, shifted or under test.
+                LifetimeValidator = (notBefore, expires, _, parameters) =>
+                {
+                    var now = validationClock.UtcNow.UtcDateTime;
+                    return now.Add(parameters.ClockSkew) >= notBefore && now.Subtract(parameters.ClockSkew) <= expires;
+                },
                 NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier,
                 RoleClaimType = TokenService.RoleClaim
             };
@@ -98,6 +122,7 @@ try
                 }
             };
         });
+
 
     builder.Services.AddScoped<IAuthorizationHandler, SellerStatusAuthorizationHandler>();
     builder.Services.AddAuthorization(options => AuthorizationPolicies.Configure(options));
@@ -127,38 +152,27 @@ try
     });
 
     // ---- rate limiting --------------------------------------------------------
+    // Limits are bound through options so they are read when the policy is first resolved.
+    // A value captured here would miss any configuration source registered later, and the
+    // limiter would then enforce numbers nobody configured.
+    builder.Services.AddOptions<RateLimitOptions>()
+        .Bind(builder.Configuration.GetSection(RateLimitOptions.SectionName));
+
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-        options.AddFixedWindowLimiter("global", limiter =>
-        {
-            limiter.PermitLimit = 3000;
-            limiter.Window = TimeSpan.FromMinutes(1);
-            limiter.QueueLimit = 0;
-            limiter.AutoReplenishment = true;
-        });
+        options.AddPolicy<string>(RateLimitPolicies.Global, context => RateLimitPartitionFactory.FixedWindow(
+            context, static _ => new RateLimitOptions().GlobalPermitLimit));
 
-        options.AddFixedWindowLimiter("auth", limiter =>
-        {
-            limiter.PermitLimit = 20;
-            limiter.Window = TimeSpan.FromMinutes(1);
-            limiter.QueueLimit = 0;
-        });
+        options.AddPolicy<string>(RateLimitPolicies.Auth, context => RateLimitPartitionFactory.FixedWindow(
+            context, limits => limits.AuthPermitLimit));
 
-        options.AddFixedWindowLimiter("checkout", limiter =>
-        {
-            limiter.PermitLimit = 40;
-            limiter.Window = TimeSpan.FromMinutes(1);
-            limiter.QueueLimit = 0;
-        });
+        options.AddPolicy<string>(RateLimitPolicies.Checkout, context => RateLimitPartitionFactory.FixedWindow(
+            context, limits => limits.CheckoutPermitLimit));
 
-        options.AddFixedWindowLimiter("webhook", limiter =>
-        {
-            limiter.PermitLimit = 600;
-            limiter.Window = TimeSpan.FromMinutes(1);
-            limiter.QueueLimit = 0;
-        });
+        options.AddPolicy<string>(RateLimitPolicies.Webhook, context => RateLimitPartitionFactory.FixedWindow(
+            context, limits => limits.WebhookPermitLimit));
     });
 
     // ---- SignalR --------------------------------------------------------------
@@ -212,6 +226,9 @@ try
     });
 
     var app = builder.Build();
+
+    // Token validation reads the same application clock that stamps the tokens.
+    validationClock.Attach(app.Services);
 
     // ---------------------------------------------------------------------------
     // Pipeline
@@ -280,7 +297,9 @@ try
 
     static async Task SeedAsync(WebApplication app)
     {
-        if (app.Environment.IsProduction())
+        // Integration tests build their own deterministic world, so the demo seed must not
+        // run there. Production keeps the previous behaviour of relying on migrations only.
+        if (app.Environment.IsProduction() || app.Environment.IsEnvironment("Testing"))
         {
             return;
         }
