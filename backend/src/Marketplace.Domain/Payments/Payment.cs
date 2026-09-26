@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Marketplace.Domain.Common;
 using Marketplace.Domain.Enums;
 
@@ -190,6 +191,14 @@ public class Payment : Entity
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Builds the merchant-facing payment reference, e.g. <c>PAY-20260226101530-7F3A9C21B4D0</c>.
+    /// </summary>
+    /// <remarks>
+    /// The reference carries a unique index, so its random part has to be random. A
+    /// sequential id leads with its own timestamp, which means two payments raised in the same
+    /// tick would produce the same reference and the second one would be rejected outright.
+    /// </remarks>
     public static string GenerateReference(DateTimeOffset now) =>
-        $"PAY-{now:yyyyMMddHHmmss}-{Convert.ToHexString(SequentialGuid.New(now).ToByteArray())[..6]}";
+        $"PAY-{now:yyyyMMddHHmmss}-{Convert.ToHexString(RandomNumberGenerator.GetBytes(6))}";
 }
