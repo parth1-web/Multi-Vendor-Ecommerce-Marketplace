@@ -1,5 +1,5 @@
 import { serverGet } from "@/lib/serverApi";
-import type { ProductPage } from "@/types/product";
+import type { ProductSummary } from "@/types/product";
 
 /**
  * The homepage, rendered on the server.
@@ -42,14 +42,16 @@ export default async function HomePage() {
 interface Rail {
   title: string;
   subtitle: string;
-  products: ProductPage["items"];
+  products: ProductSummary[];
 }
 
 async function rail(path: string, title: string, subtitle: string): Promise<Rail> {
   try {
-    const page = await serverGet<ProductPage>(`/api/products/${path}?take=8`);
+    // The rails are a plain list rather than a paged envelope: there is no second page to
+    // walk, so pretending otherwise would hide every product on the homepage.
+    const products = await serverGet<ProductSummary[]>(`/api/products/${path}?take=8`);
 
-    return { title, subtitle, products: page.items };
+    return { title, subtitle, products };
   } catch {
     // A rail that cannot load is omitted rather than allowed to fail the whole page.
     return { title, subtitle, products: [] };
