@@ -18,16 +18,15 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PhoneNumber).HasColumnType("varchar(32)");
         builder.Property(u => u.AvatarUrl).HasColumnType("varchar(512)");
         builder.Property(u => u.Role).HasConversion<string>().HasMaxLength(32).IsRequired();
-        builder.Property(u => u.SellerId);
 
         builder.HasIndex(u => u.Email).IsUnique().HasDatabaseName("ux_users_email");
         builder.HasIndex(u => u.Role).HasDatabaseName("ix_users_role");
 
         builder.Ignore(u => u.FullName);
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(u => u.SellerId)
-            .OnDelete(DeleteBehavior.Restrict);
+
+        // There is deliberately no User.SellerId column. The link between an account and
+        // its seller record is Seller.UserId, which keeps the two tables free of a
+        // circular foreign key and removes any insert-ordering requirement.
     }
 }
 

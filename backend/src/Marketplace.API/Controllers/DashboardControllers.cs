@@ -163,16 +163,14 @@ public sealed class AdminDashboardController(
             source = source.Where(u => u.Role == parsedRole);
         }
 
-        var result = await source
-            .OrderByDescending(u => u.CreatedAt)
-            .ToListAsync(cancellationToken)
-            .ContinueWith(t => new Marketplace.Application.Common.Models.PagedResult<AdminUserResponse>(
-                t.Result.Skip(paging.Skip).Take(paging.PageSize)
-                    .Select(u => new AdminUserResponse(u.Id, u.Email, u.FullName, u.Role, u.IsActive, u.IsEmailConfirmed, u.CreatedAt, u.LastLoginAt, u.SellerId))
-                    .ToList(), paging.Page, paging.PageSize, t.Result.Count), cancellationToken, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default)
-            .ConfigureAwait(false);
+        var all = await source.OrderByDescending(u => u.CreatedAt).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var total = all.Count;
 
-        return Ok(result);
+        var pageItems = all.Skip(paging.Skip).Take(paging.PageSize)
+            .Select(u => new AdminUserResponse(u.Id, u.Email, u.FullName, u.Role, u.IsActive, u.IsEmailConfirmed, u.CreatedAt, u.LastLoginAt, null))
+            .ToList();
+
+        return Ok(new Marketplace.Application.Common.Models.PagedResult<AdminUserResponse>(pageItems, paging.Page, paging.PageSize, total));
     }
 
     [HttpPut("users/{id:guid}/role")]

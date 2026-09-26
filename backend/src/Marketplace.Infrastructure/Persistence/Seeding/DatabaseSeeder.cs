@@ -97,7 +97,6 @@ public sealed class DatabaseSeeder(
 
             context.Sellers.Add(seller);
             context.SellerStores.Add(store);
-            user.AttachSeller(seller.Id, now);
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
             return seller;

@@ -79,7 +79,6 @@ public sealed class AuthService(
                 now);
 
             sellerId = seller.Id;
-            user.AttachSeller(seller.Id, now);
             await sellers.AddAsync(seller, cancellationToken).ConfigureAwait(false);
 
             var store = SellerStore.Create(
@@ -349,13 +348,15 @@ public sealed class AuthService(
         string? storeName = null;
         string? storeSlug = null;
 
-        if (user.SellerId is not null)
+        var seller = await sellers.Query().AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == user.Id, cancellationToken).ConfigureAwait(false);
+
+        if (seller is not null)
         {
-            var seller = await sellers.GetByIdAsync(user.SellerId.Value, cancellationToken).ConfigureAwait(false);
-            sellerStatus = seller?.Status.ToString();
+            sellerStatus = seller.Status.ToString();
 
             var store = await stores.Query()
-                .FirstOrDefaultAsync(s => s.SellerId == user.SellerId.Value, cancellationToken)
+                .FirstOrDefaultAsync(s => s.SellerId == seller.Id, cancellationToken)
                 .ConfigureAwait(false);
             storeName = store?.Name;
             storeSlug = store?.SlugValue;
@@ -374,7 +375,7 @@ public sealed class AuthService(
             user.IsActive,
             user.CreatedAt,
             user.LastLoginAt,
-            user.SellerId,
+            seller?.Id,
             sellerStatus,
             storeName,
             storeSlug);

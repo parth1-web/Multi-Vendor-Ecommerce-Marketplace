@@ -49,8 +49,6 @@ public class User : Entity
 
     public DateTimeOffset? UpdatedAt { get; private set; }
 
-    public Guid? SellerId { get; internal set; }
-
     /// <summary>Rows deleted by the user; kept soft for audit purposes.</summary>
     public bool IsDeleted { get; private set; }
 
@@ -146,14 +144,6 @@ public class User : Entity
         IsDeleted = true;
         IsActive = false;
         DeletedAt = now;
-        UpdatedAt = now;
-    }
-
-    /// <summary>Links the account to a seller record once an application has been created.</summary>
-    public void AttachSeller(Guid sellerId, DateTimeOffset now)
-    {
-        Guard.NotEmpty(sellerId, nameof(sellerId));
-        SellerId = sellerId;
         UpdatedAt = now;
     }
 }
