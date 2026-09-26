@@ -67,6 +67,9 @@ public sealed class MarketplaceTestData(IServiceProvider rootServices, FixedCloc
 
     public Guid SellerBProductVariantId { get; private set; }
 
+    /// <summary>A product filed under the child category, for the subcategory listing filter.</summary>
+    public Guid ChildCategoryProductId { get; private set; }
+
     /// <summary>The single-unit product, used for the oversell scenario.</summary>
     public Guid SingleUnitProductId { get; private set; }
 
@@ -132,6 +135,10 @@ public sealed class MarketplaceTestData(IServiceProvider rootServices, FixedCloc
         SingleUnitProductId = productC.Id;
         SingleUnitVariantId = variantC.Id;
 
+        // Seller B's product filed under the child category, so a parent category listing has
+        // something beneath it to include.
+        ChildCategoryProductId = CreateProduct(SellerBId, "Earbuds Lite", "earbuds-lite", 59m, null, 12, now, out _, ChildCategoryId).Id;
+
         var coupon = Coupon.Create(null, CouponScope.Global, "TEST10", "10% off", CouponDiscountType.Percentage, 10m, 50m, 25m, 100, 5,
             now.AddDays(-1), now.AddDays(30), now);
         Context.Coupons.Add(coupon);
@@ -169,6 +176,8 @@ public sealed class MarketplaceTestData(IServiceProvider rootServices, FixedCloc
         var productC = await Context.Products.FirstAsync(p => p.SlugValue == "last-unit");
         SingleUnitProductId = productC.Id;
         SingleUnitVariantId = (await Context.ProductVariants.FirstAsync(v => v.ProductId == productC.Id)).Id;
+
+        ChildCategoryProductId = (await Context.Products.FirstAsync(p => p.SlugValue == "earbuds-lite")).Id;
     }
 
     private async Task<User> CreateUserAsync(string email, string password, string first, string last, UserRole role, IPasswordHasher hasher, DateTimeOffset now)
@@ -209,9 +218,9 @@ public sealed class MarketplaceTestData(IServiceProvider rootServices, FixedCloc
         return (seller.Id, store.SlugValue);
     }
 
-    private Product CreateProduct(Guid sellerId, string name, string slug, decimal price, decimal? compareAt, int stock, DateTimeOffset now, out ProductVariant variant)
+    private Product CreateProduct(Guid sellerId, string name, string slug, decimal price, decimal? compareAt, int stock, DateTimeOffset now, out ProductVariant variant, Guid? categoryId = null)
     {
-        var product = Product.Create(sellerId, CategoryId, name, Slug.Create(slug), $"{name} short", $"{name} long", price, compareAt, "TestBrand", null, now);
+        var product = Product.Create(sellerId, categoryId ?? CategoryId, name, Slug.Create(slug), $"{name} short", $"{name} long", price, compareAt, "TestBrand", null, now);
         product.AddImage($"https://cdn.test/{slug}.jpg", name, true, now);
 
         variant = product.AddVariant($"SKU-{slug.ToUpperInvariant()}", "Default", null, 0, now);
