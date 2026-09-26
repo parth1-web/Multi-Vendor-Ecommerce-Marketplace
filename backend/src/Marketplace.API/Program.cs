@@ -90,6 +90,12 @@ try
 
             options.RequireHttpsMetadata = builder.Environment.IsProduction();
             options.SaveToken = false;
+
+            // Claims are consumed exactly as the token service writes them ("sub", "role",
+            // "sid"). Inbound mapping would rename them to the long WS-Federation URIs, and
+            // every role-restricted endpoint would then deny an authorised caller.
+            options.MapInboundClaims = false;
+
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
@@ -109,7 +115,7 @@ try
                     var now = validationClock.UtcNow.UtcDateTime;
                     return now.Add(parameters.ClockSkew) >= notBefore && now.Subtract(parameters.ClockSkew) <= expires;
                 },
-                NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier,
+                NameClaimType = "sub",
                 RoleClaimType = TokenService.RoleClaim
             };
 

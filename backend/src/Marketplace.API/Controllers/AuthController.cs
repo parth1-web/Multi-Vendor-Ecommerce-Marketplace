@@ -1,4 +1,5 @@
 using Marketplace.API.Middleware;
+using Marketplace.API.Security;
 using Marketplace.Application.Common.Interfaces;
 using Marketplace.Application.Modules.Auth.Abstractions;
 using Marketplace.Application.Modules.Auth.DTOs;
@@ -18,6 +19,7 @@ namespace Marketplace.API.Controllers;
 [EnableRateLimiting("auth")]
 public sealed class AuthController(
     IAuthService auth,
+    ICurrentUser currentUser,
     IRequestContext requestContext) : ControllerBase
 {
     private const string RefreshCookieName = "mp_refresh";
@@ -93,8 +95,8 @@ public sealed class AuthController(
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        var user = HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(user, out var userId))
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
         {
             return Unauthorized();
         }
@@ -108,8 +110,8 @@ public sealed class AuthController(
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request, CancellationToken cancellationToken)
     {
-        var user = HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(user, out var userId))
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
         {
             return Unauthorized();
         }
@@ -123,8 +125,8 @@ public sealed class AuthController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
     {
-        var user = HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(user, out var userId))
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
         {
             return Unauthorized();
         }

@@ -142,7 +142,7 @@ public sealed class StoresController(ISellerService sellers) : ControllerBase
 /// <summary>Seller and store management.</summary>
 [ApiController]
 [Route("api/sellers")]
-public sealed class SellersController(ISellerService sellers) : ControllerBase
+public sealed class SellersController(ISellerService sellers, Marketplace.Application.Common.Interfaces.ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet("me")]
     [Authorize(Policy = Security.AuthorizationPolicies.SellerOnly)]
@@ -180,7 +180,7 @@ public sealed class SellersController(ISellerService sellers) : ControllerBase
     [ProducesResponseType(typeof(SellerResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] UpdateSellerStatusRequest request, CancellationToken cancellationToken)
     {
-        var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value is { } raw && Guid.TryParse(raw, out var id2) ? id2 : Guid.Empty;
+        var adminId = currentUser.UserId;
         return (await sellers.ChangeStatusAsync(id, request, adminId, cancellationToken)).ToActionResult();
     }
 
