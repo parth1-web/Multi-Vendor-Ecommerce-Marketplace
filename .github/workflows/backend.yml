@@ -1,0 +1,138 @@
+name: Backend
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build:
+    name: Restore, build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/**/*.csproj
+
+      - name: Restore
+        run: dotnet restore Marketplace.sln
+
+      - name: Build
+        run: dotnet build Marketplace.sln --configuration Release --no-restore -warnaserror
+
+      - name: Unit tests
+        run: >
+          dotnet test tests/Marketplace.UnitTests/Marketplace.UnitTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=unit.trx"
+          --results-directory ${{ github.workspace }}/test-results/unit
+
+      - name: Integration tests
+        run: >
+          dotnet test tests/Marketplace.IntegrationTests/Marketplace.IntegrationTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=integration.trx"
+          --results-directory ${{ github.workspace }}/test-results/integration
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: test-results/
+          retention-days: 7
+
+  vulnerability-scan:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore Marketplace.sln
+
+      - name: List vulnerable packages
+        run: dotnet list Marketplace.sln package --vulnerable --include-transitive
+
+      - name: Fail on high or critical advisories
+        shell: bash
+        run: |
+          output=$(dotnet list Marketplace.sln package --vulnerable --include-transitive --format json)
+          echo "$output" | tee vulnerable.json
+          if echo "$output" | grep -Eiq '"severity"[[:space:]]*:[[:space:]]*"(high|critical)"'; then
+            echo "::error::High or critical vulnerabilities detected"
+            exit 1
+          fi
+          echo "No high or critical vulnerabilities found."
+
+  domain-purity:
+    name: Domain layer purity check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Ensure Domain has no package references
+        shell: bash
+        run: |
+          if grep -q '<PackageReference' src/Marketplace.Domain/Marketplace.Domain.csproj; then
+            echo "::error::Marketplace.Domain must not reference any NuGet package"
+            grep '<PackageReference' src/Marketplace.Domain/Marketplace.Domain.csproj
+            exit 1
+          fi
+          echo "Domain layer is framework-only."
