@@ -2,6 +2,7 @@ using System.Net;
 using FluentAssertions;
 using Marketplace.Application.Common.Models;
 using Marketplace.Application.Modules.Catalog.DTOs;
+using Marketplace.Application.Modules.Sellers.DTOs;
 using Marketplace.Infrastructure.Persistence;
 using Marketplace.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -138,6 +139,7 @@ public sealed class CatalogBrowsingTests : IClassFixture<MarketplaceApiFactory>,
 
     [Fact]
     public async Task A_product_detail_reads_the_same_scope_as_the_listing()
+
     {
         var detail = await _shopper.GetAsync<ProductDetailResponse>($"/api/products/slug/{_data.SellerAProductSlug}");
 
