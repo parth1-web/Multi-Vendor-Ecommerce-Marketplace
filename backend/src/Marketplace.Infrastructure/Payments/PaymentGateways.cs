@@ -16,8 +16,10 @@ public sealed class PaymentGatewayResolver : IPaymentGatewayResolver
 
     public PaymentGatewayResolver(IEnumerable<IPaymentGateway> gateways, IOptions<PaymentOptions> options)
     {
+        ArgumentNullException.ThrowIfNull(gateways);
+
         var defaultProvider = options.Value.DefaultProvider;
-        _gateways = gateways.ToDictionary(g => Parse(g.Name), g => g);
+        _gateways = gateways.GroupBy(g => Parse(g.Name)).ToDictionary(g => g.Key, g => g.First());
 
         if (!_gateways.ContainsKey(defaultProvider))
         {
