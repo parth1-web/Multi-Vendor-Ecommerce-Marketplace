@@ -20,6 +20,7 @@ import type { PagedResult } from "@/types/api";
 import type { ProductStatus, ProductSummary } from "@/types/product";
 import type { ProductRejectionReason } from "@/types/productAuthoring";
 import type { Order, OrderPage, OrderStatus } from "@/types/order";
+import type { Coupon, CouponPage, CouponStatus, CreateCouponRequest, UpdateCouponRequest } from "@/types/coupon";
 import type { UserRole } from "@/types/auth";
 
 const withRange = (range: DateRange) => `range=${range}`;
@@ -138,6 +139,34 @@ export const adminApi = {
 
   updateOrderStatus: (id: string, status: OrderStatus, note?: string | null) =>
     apiClient.put(`/api/admin/orders/${id}/status`, { status, note: note ?? null }).then(() => undefined),
+
+  /**
+   * The discount codes on the marketplace.
+   *
+   * A code with no way to make one is a code that only exists in the seed, so this is where a
+   * promotion is actually created. The rules — when it applies, how much it takes off, how many
+   * times — are all the server's; this screen collects them and shows what came back.
+   */
+  coupons: (params: { page: number; pageSize?: number; status?: CouponStatus; search?: string }) => {
+    const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
+
+    if (params.status) {
+      search.set("status", params.status);
+    }
+
+    if (params.search) {
+      search.set("search", params.search);
+    }
+
+    return apiClient.get<CouponPage>(`/api/coupons?${search.toString()}`).then(data => data.data);
+  },
+
+  createCoupon: (request: CreateCouponRequest) => apiClient.post<Coupon>("/api/coupons", request).then(data => data.data),
+
+  updateCoupon: (id: string, request: UpdateCouponRequest) => apiClient.put<Coupon>(`/api/coupons/${id}`, request).then(data => data.data),
+
+  /** Stops a code applying. The row stays, because its usage is part of the record. */
+  stopCoupon: (id: string) => apiClient.delete(`/api/coupons/${id}`).then(() => undefined),
 };
 
 export type { AdminUser };

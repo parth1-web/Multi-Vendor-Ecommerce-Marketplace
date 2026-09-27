@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { BarChart3, FileText, Package, ShieldCheck, Store, Users, UserSquare } from "lucide-react";
+import { BarChart3, FileText, Package, ShieldCheck, Store, Tag, Users, UserSquare } from "lucide-react";
 
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -19,6 +19,7 @@ const LINKS = [
   { href: "/admin", label: "Overview", icon: BarChart3 },
   { href: "/admin/moderation", label: "Moderation", icon: ShieldCheck },
   { href: "/admin/orders", label: "Orders", icon: Package },
+  { href: "/admin/coupons", label: "Discounts", icon: Tag },
   { href: "/admin/sellers", label: "Sellers", icon: Store },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/reports", label: "Reports", icon: FileText },

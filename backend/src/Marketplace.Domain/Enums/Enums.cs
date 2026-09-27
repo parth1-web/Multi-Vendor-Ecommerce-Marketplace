@@ -250,7 +250,15 @@ public enum AuditAction
     ReviewModerated = 39,
     CouponCreated = 40,
     CouponUpdated = 41,
+
+    /// <summary>
+    /// Retired. Stopping a coupon does not remove it, so this said something untrue; rows already
+    /// written keep the name they were written with, and new ones use
+    /// <see cref="CouponDeactivated"/>.
+    /// </summary>
     CouponDeleted = 42,
+
+    CouponDeactivated = 47,
     SettingsUpdated = 43,
     ReportExported = 44,
     PasswordResetRequested = 45,

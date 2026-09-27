@@ -158,6 +158,15 @@ public sealed class CouponService(
         return Result<CouponResponse>.Success(Map(coupon, null));
     }
 
+    /// <summary>
+    /// Stops a coupon: it stops applying, and the row stays.
+    /// </summary>
+    /// <remarks>
+    /// Not a removal, and deliberately so. A code that has been used is part of the record of
+    /// what was discounted and why, and a code that has not is a code somebody may have written
+    /// down and will try again next week. Either way the honest operation is "stopped" rather than
+    /// "gone", so the audit entry says that too. Editing a stopped coupon sets it running again.
+    /// </remarks>
     public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var coupon = await coupons.Query().FirstOrDefaultAsync(c => c.Id == id, cancellationToken).ConfigureAwait(false);
@@ -173,7 +182,7 @@ public sealed class CouponService(
 
         coupon.SetStatus(CouponStatus.Paused, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await auditService.RecordAsync(AuditAction.CouponDeleted, nameof(Coupon), coupon.Id, coupon.Code, null, cancellationToken).ConfigureAwait(false);
+        await auditService.RecordAsync(AuditAction.CouponDeactivated, nameof(Coupon), coupon.Id, coupon.Code, null, cancellationToken).ConfigureAwait(false);
 
         return Result.Success();
     }
