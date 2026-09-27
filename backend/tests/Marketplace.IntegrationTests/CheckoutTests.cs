@@ -191,6 +191,39 @@ public sealed class CheckoutTests : IClassFixture<MarketplaceApiFactory>, IAsync
     }
 
     [Fact]
+    public async Task An_order_status_the_state_machine_forbids_is_a_conflict_and_not_a_crash()
+    {
+        // The state machine throws when a seller skips a step, which is a refusal rather than a
+        // fault. The global handler maps it to a 409 with a code, but the handler was never
+        // registered, so it reached the client as a 500: an opaque "something went wrong" for
+        // something the caller did wrong and can fix by choosing a different status.
+        var (customer, addressId) = await NewCustomerAsync();
+        await customer.PostAsync("/api/cart/items", new AddCartItemRequest(
+            _data.SellerAProductId, _data.SellerAProductVariantId, 1));
+        var placed = await ApiClient.ReadAsync<CheckoutResponse>(
+            await customer.PostAsync("/api/checkout", Checkout(addressId, Guid.NewGuid().ToString("N"))));
+
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var theirs = await seller.GetAsync<PagedResult<SellerOrderSummaryResponse>>("/api/seller/orders?page=1&pageSize=50");
+        var sellerOrder = theirs!.Items.Single(o => o.OrderId == placed!.OrderId);
+
+        foreach (var status in new[] { "Confirmed", "Processing", "Packed" })
+        {
+            var step = await seller.PutAsync($"/api/seller/orders/{sellerOrder.Id}/status", new { status, note = "on its way" });
+            step.StatusCode.Should().Be(HttpStatusCode.NoContent, $"{status} is a legal step: {await ApiClient.ReadTextAsync(step)}");
+        }
+
+        // Packed does not go straight to Delivered, and saying so is the whole point.
+        var skipped = await seller.PutAsync($"/api/seller/orders/{sellerOrder.Id}/status", new { status = "Delivered", note = "skipping ahead" });
+
+        skipped.StatusCode.Should().Be(HttpStatusCode.Conflict, await ApiClient.ReadTextAsync(skipped));
+        skipped.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
+
+        var after = await seller.GetAsync<SellerOrderSummaryResponse>($"/api/seller/orders/{sellerOrder.Id}");
+        after!.Status.Should().Be(SellerOrderStatus.Packed, "a refused change leaves the order where it was");
+    }
+
+    [Fact]
     public async Task An_order_says_which_stores_it_went_to()
     {
         // Both the admin's order book and a seller's own list project the store name as an empty

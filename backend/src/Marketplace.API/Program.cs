@@ -75,6 +75,12 @@ try
 
     builder.Services.AddProblemDetails();
 
+    // Without this, UseExceptionHandler has nothing to ask and every domain exception that is not
+    // already a Result reaches the client as an opaque 500. A seller asking for an order status
+    // the state machine forbids is a bad request, not a server fault, and the codes this maps are
+    // the ones the rest of the application documents: 409 for a conflict, 422 for a rule.
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
     // ---- authentication -------------------------------------------------------
     var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
     ValidateJwtConfiguration(jwtOptions, builder.Environment.IsProduction());
