@@ -14,7 +14,13 @@ import type {
   SellerSummary,
   TopProduct,
 } from "@/types/seller";
-import type { CreateProductRequest, SellerProductDetail, UpdateProductRequest } from "@/types/productAuthoring";
+import type {
+  CreateImageInput,
+  CreateProductRequest,
+  CreateVariantInput,
+  SellerProductDetail,
+  UpdateProductRequest,
+} from "@/types/productAuthoring";
 
 export const sellerApi = {
   summary: () => apiClient.get<SellerSummary>("/api/seller/analytics/summary").then(data => data.data),
@@ -55,6 +61,24 @@ export const sellerApi = {
    * Scoped to the signed-in seller by the API, so there is no "which seller" to pass.
    */
   product: (id: string) => apiClient.get<SellerProductDetail>(`/api/seller/products/${id}`).then(data => data.data),
+
+  /**
+   * The listing's pictures, variants and specifications, each one separately.
+   *
+   * They are separate operations with separate rules on the server, so they are separate calls
+   * here too, and none of them is part of saving a listing's details.
+   */
+  addProductImage: (id: string, body: CreateImageInput) =>
+    apiClient.post(`/api/seller/products/${id}/images`, body).then(data => data.data),
+
+  deleteProductImage: (id: string, imageId: string) =>
+    apiClient.delete(`/api/seller/products/${id}/images/${imageId}`).then(() => undefined),
+
+  addProductVariant: (id: string, body: CreateVariantInput) =>
+    apiClient.post(`/api/seller/products/${id}/variants`, body).then(data => data.data),
+
+  deleteProductVariant: (id: string, variantId: string) =>
+    apiClient.delete(`/api/seller/products/${id}/variants/${variantId}`).then(() => undefined),
 
   /**
    * Puts a draft in front of a moderator. A listing is not live until somebody approves it,

@@ -19,7 +19,6 @@ import { sellerApi } from "@/features/seller/api/sellerApi";
 import { errorMessage } from "@/lib/errors";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
-import { apiClient } from "@/api/axiosClient";
 import type { SellerProductDetail } from "@/types/productAuthoring";
 import type { ProductStatus } from "@/types/product";
 
@@ -34,19 +33,19 @@ export function SellerProductDetail() {
   const [variantStock, setVariantStock] = useState("0");
 
   const product = useQuery({
-    queryKey: queryKeys.products.detail(id ?? ""),
-    queryFn: () => apiClient.get<SellerProductDetail>(`/api/seller/products/${id}`).then(data => data.data),
+    queryKey: queryKeys.seller.product(id ?? ""),
+    queryFn: () => sellerApi.product(id!),
 
     enabled: Boolean(id),
   });
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.products.detail(id ?? "") });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.seller.product(id ?? "") });
     await queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
   };
 
   const addImage = useMutation({
-    mutationFn: () => apiClient.post(`/api/seller/products/${id}/images`, { url: imageUrl.trim(), altText: null, isPrimary: false }),
+    mutationFn: () => sellerApi.addProductImage(id!, { url: imageUrl.trim(), altText: null, isPrimary: false }),
     onSuccess: async () => {
       setImageUrl("");
       await invalidate();
@@ -55,14 +54,14 @@ export function SellerProductDetail() {
   });
 
   const removeImage = useMutation({
-    mutationFn: (imageId: string) => apiClient.delete(`/api/seller/products/${id}/images/${imageId}`),
+    mutationFn: (imageId: string) => sellerApi.deleteProductImage(id!, imageId),
     onSuccess: invalidate,
     onError: error => setActionError(errorMessage(error)),
   });
 
   const addVariant = useMutation({
     mutationFn: () =>
-      apiClient.post(`/api/seller/products/${id}/variants`, {
+      sellerApi.addProductVariant(id!, {
         sku: variantSku.trim(),
         name: variantName.trim() || "Default",
         price: null,
@@ -70,6 +69,7 @@ export function SellerProductDetail() {
         lowStockThreshold: 5,
         options: [],
       }),
+
     onSuccess: async () => {
       setVariantSku("");
       setVariantName("");
@@ -80,7 +80,7 @@ export function SellerProductDetail() {
   });
 
   const removeVariant = useMutation({
-    mutationFn: (variantId: string) => apiClient.delete(`/api/seller/products/${id}/variants/${variantId}`),
+    mutationFn: (variantId: string) => sellerApi.deleteProductVariant(id!, variantId),
     onSuccess: invalidate,
     onError: error => setActionError(errorMessage(error)),
   });

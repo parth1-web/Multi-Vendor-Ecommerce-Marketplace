@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
@@ -27,8 +27,8 @@ import { categoryApi } from "@/features/products/api/productApi";
 import { sellerApi } from "@/features/seller/api/sellerApi";
 import { errorMessage, fieldErrors } from "@/lib/errors";
 import { queryKeys } from "@/lib/queryKeys";
-import type { Category } from "@/types/product";
-import type { CreateProductRequest } from "@/types/productAuthoring";
+import type { Category, ProductImage, ProductSpecification, ProductVariant } from "@/types/product";
+import type { CreateProductRequest, SellerProductDetail } from "@/types/productAuthoring";
 
 const basicsSchema = z.object({
   name: z.string().trim().min(3, "Give the product a name shoppers will recognise.").max(200),
@@ -74,28 +74,7 @@ interface SpecDraft {
 }
 
 export function ProductEditor({ productId }: { productId?: string }) {
-  const router = useRouter();
-  const isEdit = Boolean(productId);
-
-  const [variants, setVariants] = useState<VariantDraft[]>([newVariant()]);
-  const [images, setImages] = useState<ImageDraft[]>([{ key: nextKey(), url: "", altText: "", isPrimary: true }]);
-  const [specifications, setSpecifications] = useState<SpecDraft[]>([{ key: nextKey(), specKey: "", value: "" }]);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
   const categories = useQuery({ queryKey: queryKeys.categories.tree(), queryFn: () => categoryApi.tree() });
-
-  const {
-    register,
-    handleSubmit,
-    getValues,
-    reset,
-    setError,
-    formState: { errors },
-  } = useForm<BasicsValues>({
-    resolver: zodResolver(basicsSchema),
-    defaultValues: { name: "", shortDescription: "", description: "", brand: "", model: "", basePrice: 0, categoryId: "" },
-  });
 
   const existing = useQuery({
     queryKey: queryKeys.seller.product(productId!),
@@ -103,53 +82,60 @@ export function ProductEditor({ productId }: { productId?: string }) {
     enabled: Boolean(productId),
   });
 
-  // An edit form that starts blank is a form that overwrites. Everything the seller did not
-  // retype would be saved as empty, and they would only find out when the listing came back
-  // wrong. The values arrive once, when the listing does, and are never written back afterwards.
-  useEffect(() => {
-    if (!existing.data) {
-      return;
-    }
+  if (categories.isPending || (Boolean(productId) && existing.isPending)) {
+    return <div className="mp-skeleton" style={{ height: "24rem", borderRadius: "var(--radius)" }} />;
+  }
 
-    const product = existing.data;
-    reset({
-      name: product.name,
-      shortDescription: product.shortDescription,
-      description: product.description,
-      brand: product.brand ?? "",
-      model: product.model ?? "",
-      basePrice: product.basePrice,
-      compareAtPrice: product.compareAtPrice ?? undefined,
-      categoryId: product.categoryId,
-    });
+  if (categories.isError) {
+    return <ErrorState message="We could not load the categories, so the form cannot be filled in yet." />;
+  }
 
-    setImages(
-      product.images.length > 0
-        ? product.images.map((image, index) => ({ key: nextKey(), url: image.url, altText: image.altText ?? "", isPrimary: image.isPrimary || index === 0 }))
-        : [{ key: nextKey(), url: "", altText: "", isPrimary: true }],
-    );
+  if (productId && existing.isError) {
+    return <ErrorState message="We could not open that listing, so there is nothing to edit." />;
+  }
 
-    setVariants(
-      product.variants.length > 0
-        ? product.variants.map(variant => ({
-            key: nextKey(),
-            sku: variant.sku,
-            name: variant.name,
-            price: variant.price === null ? "" : String(variant.price),
-            initialStock: String(variant.availableQuantity),
-            lowStockThreshold: variant.lowStockThreshold === null ? "" : String(variant.lowStockThreshold),
-          }))
-        : [newVariant()],
-    );
+  // Keyed on the listing, so the form is built once with the values it is editing. An edit form
+  // that starts blank is a form that overwrites: everything the seller did not retype would be
+  // saved as empty, and they would find out when the listing came back wrong. The alternative,
+  // filling the form in from an effect once the data arrives, renders the empty form first and
+  // then rewrites it underneath the seller's hands.
+  return <ListingForm key={productId ?? "new"} productId={productId} existing={existing.data ?? null} />;
+}
 
-    setSpecifications(
-      product.specifications.length > 0
-        ? product.specifications.map(spec => ({ key: nextKey(), specKey: spec.key, value: spec.value }))
-        : [{ key: nextKey(), specKey: "", value: "" }],
-    );
-  }, [existing.data, reset]);
+function ListingForm({ productId, existing }: { productId?: string; existing: SellerProductDetail | null }) {
+  const router = useRouter();
+  const isEdit = Boolean(productId);
 
+  const categories = useQuery({ queryKey: queryKeys.categories.tree(), queryFn: () => categoryApi.tree() });
   const categoryOptions = useMemo(() => flattenCategories(categories.data ?? []), [categories.data]);
+
+  const [variants, setVariants] = useState<VariantDraft[]>(() => draftsFromVariants(existing?.variants));
+  const [images, setImages] = useState<ImageDraft[]>(() => draftsFromImages(existing?.images));
+  const [specifications, setSpecifications] = useState<SpecDraft[]>(() => draftsFromSpecifications(existing?.specifications));
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    setError,
+    formState: { errors },
+  } = useForm<BasicsValues>({
+    resolver: zodResolver(basicsSchema),
+    defaultValues: existing
+      ? {
+          name: existing.name,
+          shortDescription: existing.shortDescription,
+          description: existing.description,
+          brand: existing.brand ?? "",
+          model: existing.model ?? "",
+          basePrice: existing.basePrice,
+          compareAtPrice: existing.compareAtPrice ?? undefined,
+          categoryId: existing.categoryId,
+        }
+      : { name: "", shortDescription: "", description: "", brand: "", model: "", basePrice: 0, categoryId: "" },
+  });
 
   async function onSubmit(values: BasicsValues) {
     setFormError(null);
@@ -225,14 +211,6 @@ export function ProductEditor({ productId }: { productId?: string }) {
       setFormError(errorMessage(error));
       setSubmitting(false);
     }
-  }
-
-  if (categories.isPending) {
-    return <div className="mp-skeleton" style={{ height: "24rem", borderRadius: "var(--radius)" }} />;
-  }
-
-  if (categories.isError) {
-    return <ErrorState message="We could not load the categories, so the form cannot be filled in yet." />;
   }
 
   return (
@@ -561,6 +539,49 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
 function newVariant(): VariantDraft {
   return { key: nextKey(), sku: "", name: "Default", price: "", initialStock: "0", lowStockThreshold: "5" };
+}
+
+/**
+ * The listing's own rows, in the form's shape.
+ *
+ * Used to seed the editor when it is opened on an existing listing, so the seller is looking at
+ * what they have rather than at empty inputs. Each falls back to a single blank row, because a
+ * listing with nothing in it is still something to edit.
+ */
+function draftsFromVariants(variants: ProductVariant[] | undefined): VariantDraft[] {
+  if (!variants || variants.length === 0) {
+    return [newVariant()];
+  }
+
+  return variants.map(variant => ({
+    key: nextKey(),
+    sku: variant.sku,
+    name: variant.name,
+    price: variant.price === null ? "" : String(variant.price),
+    initialStock: String(variant.availableQuantity),
+    lowStockThreshold: variant.lowStockThreshold === null ? "" : String(variant.lowStockThreshold),
+  }));
+}
+
+function draftsFromImages(images: ProductImage[] | undefined): ImageDraft[] {
+  if (!images || images.length === 0) {
+    return [{ key: nextKey(), url: "", altText: "", isPrimary: true }];
+  }
+
+  return images.map((image, index) => ({
+    key: nextKey(),
+    url: image.url,
+    altText: image.altText ?? "",
+    isPrimary: image.isPrimary || index === 0,
+  }));
+}
+
+function draftsFromSpecifications(specifications: ProductSpecification[] | undefined): SpecDraft[] {
+  if (!specifications || specifications.length === 0) {
+    return [{ key: nextKey(), specKey: "", value: "" }];
+  }
+
+  return specifications.map(spec => ({ key: nextKey(), specKey: spec.key, value: spec.value }));
 }
 
 let keyCounter = 0;
