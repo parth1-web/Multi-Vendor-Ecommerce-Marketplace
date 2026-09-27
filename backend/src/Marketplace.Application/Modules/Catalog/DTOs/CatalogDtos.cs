@@ -2,7 +2,39 @@ using Marketplace.Application.Modules.Reviews.DTOs;
 using Marketplace.Domain.Enums;
 namespace Marketplace.Application.Modules.Catalog.DTOs;
 
-/// <summary>Compact product shape used in listings, carts, orders and dashboards.</summary>
+/// <summary>
+/// A seller's own view of a product, which is not the public one.
+///
+/// A seller has to be able to tell a draft from a live listing and to see why a moderator sent
+/// it back. None of that belongs in the shape the catalogue publishes, and omitting it leaves the
+/// seller's own list indistinguishable from a shopper's.
+/// </summary>
+public sealed record SellerProductListItemResponse(
+    Guid Id,
+    string Name,
+    string Slug,
+    string ShortDescription,
+    decimal BasePrice,
+    decimal? CompareAtPrice,
+    int DiscountPercentage,
+    string? PrimaryImageUrl,
+    Guid CategoryId,
+    string CategoryName,
+    ProductStatus Status,
+    ProductRejectionReason RejectionReason,
+    string? RejectionNote,
+    bool IsFeatured,
+    bool IsInStock,
+    int AvailableQuantity,
+    int SoldCount,
+    decimal RatingAverage,
+    int RatingCount,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? PublishedAt,
+    DateTimeOffset? UpdatedAt);
+
+/// <summary>The compact product shape used in listings, carts, orders and dashboards.</summary>
+
 public sealed record ProductSummaryResponse(
     Guid Id,
     string Name,

@@ -24,25 +24,26 @@ namespace Marketplace.API.Controllers;
 public sealed class SellerProductsController(IProductService products, Marketplace.Application.Common.Interfaces.ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<ProductSummaryResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> List([FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? search, [FromQuery] string? status, CancellationToken cancellationToken) =>
-        Ok(await products.ListAsync(new ProductQuery(
-            Page: page,
-            PageSize: pageSize,
-            Search: search,
-            CategoryId: null,
-            CategorySlug: null,
-            // The scope comes from the token, never from the query string, and it is what
-            // makes drafts and rejected products visible to their own seller.
-            SellerId: currentUser.SellerId,
-            SellerSlug: null,
-            MinPrice: null,
-            MaxPrice: null,
-            MinRating: null,
-            InStock: null,
-            OnSale: null,
-            Status: Enum.TryParse<ProductStatus>(status, true, out var parsed) ? parsed : null,
-            IncludeUnpublished: true), cancellationToken));
+    [ProducesResponseType(typeof(PagedResult<SellerProductListItemResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> List([FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? search, [FromQuery] string? status, CancellationToken cancellationToken)
+    {
+        // The scope comes from the token, never from the query string: a seller who could pass
+        // a seller id would be able to read another seller's drafts.
+        if (currentUser.SellerId is not { } sellerId)
+        {
+            return Forbid();
+        }
+
+        // The seller's own list, not the catalogue's: a draft and a live listing look identical
+        // in the public shape, and telling them apart is the whole job of this screen.
+        return Ok(await products.ListForSellerAsync(
+            sellerId,
+            page,
+            pageSize,
+            search,
+            Enum.TryParse<ProductStatus>(status, true, out var parsed) ? parsed : null,
+            cancellationToken));
+    }
 
     [HttpPost]
     [ProducesResponseType(typeof(ProductSummaryResponse), StatusCodes.Status201Created)]

@@ -526,6 +526,80 @@ public sealed class ProductService(
         return seller?.UserId ?? Guid.Empty;
     }
 
+    public async Task<PagedResult<SellerProductListItemResponse>> ListForSellerAsync(
+        Guid sellerId,
+        int? page,
+        int? pageSize,
+        string? search,
+        ProductStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new PageRequest(page, pageSize);
+
+        var source = products.Query()
+            .AsNoTracking()
+            .Where(p => p.SellerId == sellerId && !p.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = $"%{search.Trim()}%";
+            source = source.Where(p => EF.Functions.Like(p.Name, term) || p.Variants.Any(v => EF.Functions.Like(v.Sku, term)));
+        }
+
+        // Only a status the caller named narrows the list. Anything else means the whole
+        // catalogue, because a seller asking to see their products means all of them.
+        if (status is { } requested)
+        {
+            source = source.Where(p => p.Status == requested);
+        }
+
+        var ordered = source
+            .OrderByDescending(p => p.UpdatedAt)
+            .ThenByDescending(p => p.CreatedAt);
+
+        var result = await ordered
+            .ToPagedResultAsync(request, p => ProjectForSeller(p, p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url, string.Empty, 0), cancellationToken)
+            .ConfigureAwait(false);
+
+        // Availability is a per-variant question, so it is answered for the page rather than
+        // guessed per row inside the projection.
+        var pageIds = result.Items.Select(item => item.Id).ToList();
+        var pageCategoryIds = result.Items.Select(item => item.CategoryId).Distinct().ToList();
+
+        var availability = await inventories.Query().AsNoTracking()
+            .Where(i => pageIds.Contains(i.ProductId))
+            .GroupBy(i => i.ProductId)
+            .Select(g => new { ProductId = g.Key, Sellable = g.Sum(i => i.AvailableQuantity - i.ReservedQuantity) })
+            .ToDictionaryAsync(row => row.ProductId, row => row.Sellable, cancellationToken)
+            .ConfigureAwait(false);
+
+        var categoryNames = await categories.Query().AsNoTracking()
+            .Where(c => pageCategoryIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = result.Items
+            .Select(item =>
+            {
+                var sellable = availability.GetValueOrDefault(item.Id, 0);
+                return item with
+                {
+                    CategoryName = categoryNames.GetValueOrDefault(item.CategoryId, string.Empty),
+                    AvailableQuantity = sellable,
+                    IsInStock = sellable > 0
+                };
+            })
+            .ToList();
+
+        return new PagedResult<SellerProductListItemResponse>(items, result.Page, result.PageSize, result.TotalCount);
+    }
+
+    private static SellerProductListItemResponse ProjectForSeller(Product p, string? imageUrl, string categoryName, int available) =>
+        new(p.Id, p.Name, p.SlugValue, p.ShortDescription, p.BasePrice, p.CompareAtPrice, p.DiscountPercentage,
+            imageUrl, p.CategoryId, categoryName, p.Status, p.RejectionReason, p.RejectionNote,
+            p.IsFeatured, available > 0, available, p.SoldCount, p.RatingAverage, p.RatingCount,
+            p.CreatedAt, p.PublishedAt, p.UpdatedAt);
+
     /// <summary>
     /// The parts of a listing query that cannot be expressed as a predicate over products
     /// alone, because they are names that have to become ids first: a category slug (and, by

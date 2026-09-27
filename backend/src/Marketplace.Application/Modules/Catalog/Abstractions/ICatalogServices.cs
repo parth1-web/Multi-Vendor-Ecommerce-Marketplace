@@ -41,6 +41,17 @@ public interface IProductService
 {
     Task<PagedResult<ProductSummaryResponse>> ListAsync(ProductQuery query, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// A seller's own catalogue, including drafts and whatever a moderator sent back.
+    /// </summary>
+    Task<PagedResult<SellerProductListItemResponse>> ListForSellerAsync(
+        Guid sellerId,
+        int? page,
+        int? pageSize,
+        string? search,
+        ProductStatus? status,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ProductSummaryResponse>> GetFeaturedAsync(int take, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ProductSummaryResponse>> GetBestSellersAsync(int take, CancellationToken cancellationToken = default);
