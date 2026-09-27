@@ -10,6 +10,7 @@
 import Link from "next/link";
 
 import { EmptyState, ErrorState } from "@/components/shared/Feedback";
+import { useSavedProductIds } from "@/features/account/api/useWishlist";
 import { useProducts } from "@/features/products/api/useProducts";
 import { listingHref } from "@/features/products/api/readProductQuery";
 import { ProductCard } from "@/features/products/components/ProductCard";
@@ -30,6 +31,7 @@ interface ProductBrowserProps {
 
 export function ProductBrowser({ query, basePath = "/products" }: ProductBrowserProps) {
   const { data, isPending, isError, error, isPlaceholderData } = useProducts(query);
+  const savedIds = useSavedProductIds();
 
   return (
     <div className="row g-4">
@@ -69,7 +71,7 @@ export function ProductBrowser({ query, basePath = "/products" }: ProductBrowser
               <div className="row g-3">
                 {data.items.map((product) => (
                   <div key={product.id} className="col-6 col-md-4 col-xl-3">
-                    <ProductCard product={product} />
+                    <ProductCard product={product} saved={savedIds.has(product.id)} />
                   </div>
                 ))}
               </div>

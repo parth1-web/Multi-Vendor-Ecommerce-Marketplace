@@ -9,12 +9,13 @@
 
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { EmptyState, ErrorState } from "@/components/shared/Feedback";
 import { PriceDisplay } from "@/components/shared/PriceDisplay";
 import { RatingStars } from "@/components/shared/RatingStars";
 import { RequireAuth } from "@/features/account/components/RequireAuth";
+import { useWishlist } from "@/features/account/api/useWishlist";
 import { wishlistApi } from "@/features/account/api/accountApi";
 import { formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
@@ -23,7 +24,9 @@ import type { WishlistItem } from "@/types/account";
 function WishlistView() {
   const queryClient = useQueryClient();
 
-  const wishlist = useQuery({ queryKey: queryKeys.wishlist.detail(), queryFn: () => wishlistApi.list() });
+  // The same query the hearts read, so a heart turned on a product card has already filled this
+  // page in. Two keys for one list is two answers to the same question.
+  const wishlist = useWishlist();
 
   const remove = useMutation({
     mutationFn: (productId: string) => wishlistApi.remove(productId),

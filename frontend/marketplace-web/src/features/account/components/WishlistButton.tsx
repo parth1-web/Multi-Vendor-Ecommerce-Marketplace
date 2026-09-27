@@ -48,9 +48,9 @@ export function WishlistButton({
     onError: error => setFailed(errorMessage(error, "We could not update your saved items.")),
   });
 
-
-  // Signed out, the heart is still shown: tapping it explains why nothing happened rather than
-  // leaving a control that appears broken.
+  // Signed out, the heart is still shown: tapping it says why nothing happened, rather than
+  // leaving a control that looks broken. The reason is shown as well as the link, because a
+  // button that silently does nothing is worse than one that explains itself.
   const signInUrl = `/login?returnUrl=${encodeURIComponent(typeof window === "undefined" ? "/" : window.location.pathname)}`;
 
   return (
@@ -58,7 +58,7 @@ export function WishlistButton({
       <button
         type="button"
         className="btn btn-sm"
-        onClick={() => (isAuthenticated ? toggle.mutate() : undefined)}
+        onClick={() => (isAuthenticated ? toggle.mutate() : setFailed("Saving items needs an account."))}
         aria-pressed={saved}
         aria-label={saved ? `Remove from saved items` : label}
         title={isAuthenticated ? (saved ? "Remove from saved items" : label) : "Sign in to save items"}
@@ -69,6 +69,7 @@ export function WishlistButton({
       >
         <Heart size={16} aria-hidden fill={saved ? "currentColor" : "none"} />
       </button>
+
 
       {failed ? (
         <p role="alert" style={{ margin: "0.25rem 0 0", fontSize: "var(--fs-xs)", color: "var(--danger)" }}>
@@ -81,5 +82,3 @@ export function WishlistButton({
     </div>
   );
 }
-
-import React from "react";

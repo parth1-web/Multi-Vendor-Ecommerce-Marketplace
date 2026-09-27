@@ -27,9 +27,19 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
 
   return (
     <AnonymousOnly>
-      <LoginForm returnUrl={safeReturnUrl(returnUrl)} />
+      <LoginForm returnUrl={safeReturnUrl(returnUrl)} reason={reasonFrom(params.reason)} />
     </AnonymousOnly>
   );
+}
+
+/** Why somebody is being asked to sign in, in words rather than a code the page has to decode. */
+function reasonFrom(candidate: string | string[] | undefined): string | null {
+  const reasons: Record<string, string> = {
+    "password-changed": "Your password has been changed, so this device has been signed out too. Sign in with the new one.",
+    expired: "Your session has ended. Sign in again to carry on.",
+  };
+
+  return typeof candidate === "string" ? (reasons[candidate] ?? null) : null;
 }
 
 /** Accepts only a path on this site; anything else is dropped rather than followed. */

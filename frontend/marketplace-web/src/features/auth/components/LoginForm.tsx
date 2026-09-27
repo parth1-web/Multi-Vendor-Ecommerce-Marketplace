@@ -21,7 +21,7 @@ import { loginSchema, type LoginValues } from "@/features/auth/schemas";
 import { errorMessage, fieldErrors, isSignInFailure } from "@/lib/errors";
 import { useAuth } from "@/providers/AuthProvider";
 
-export function LoginForm({ returnUrl }: { returnUrl: string }) {
+export function LoginForm({ returnUrl, reason }: { returnUrl: string; reason?: string | null }) {
   const router = useRouter();
   const { signIn } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export function LoginForm({ returnUrl }: { returnUrl: string }) {
   return (
     <AuthPanel
       title="Sign in"
-      subtitle="Pick up where you left off, or start a basket you can come back to."
+      subtitle={reason ?? "Pick up where you left off, or start a basket you can come back to."}
       footer={
         <>
           No account yet? <Link href="/register">Create one</Link>

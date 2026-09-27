@@ -7,6 +7,7 @@
 
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,10 +55,11 @@ type PasswordValues = z.infer<typeof passwordSchema>;
 function AccountPanel() {
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [profileError, setProfileError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordDone, setPasswordDone] = useState(false);
+
 
   const profile = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
@@ -86,11 +88,11 @@ function AccountPanel() {
   const changePassword = useMutation({
     mutationFn: (values: PasswordValues) => authApi.changePassword(values),
     onSuccess: () => {
-      setPasswordDone(true);
       setPasswordError(null);
       password.reset();
     },
   });
+
 
   async function onProfileSubmit(values: ProfileValues) {
     setProfileError(null);
@@ -111,10 +113,17 @@ function AccountPanel() {
 
   async function onPasswordSubmit(values: PasswordValues) {
     setPasswordError(null);
-    setPasswordDone(false);
 
     try {
+
       await changePassword.mutateAsync(values);
+
+      // The server has revoked every session, including this one's, so the access token still
+      // in memory is the only thing left of it. Ending it here is what makes the sentence under
+      // the heading true: a password change that leaves you signed in on the device you changed
+      // it from has not really signed you out anywhere you were not already looking.
+      await signOut();
+      router.replace("/login?reason=password-changed");
     } catch (error) {
       for (const [field, message] of Object.entries(fieldErrors(error))) {
         const key = field.toLowerCase();
@@ -220,11 +229,6 @@ function AccountPanel() {
               </p>
             ) : null}
 
-            {passwordDone ? (
-              <p className="mp-alert mp-alert-success" role="status">
-                Your password has been changed. Sign in again with it.
-              </p>
-            ) : null}
 
             <TextField
               label="Current password"

@@ -63,8 +63,9 @@ export const queryKeys = {
 
   wishlist: {
     all: ["wishlist"] as const,
-    detail: () => [...queryKeys.wishlist.all, "detail"] as const,
+    list: () => [...queryKeys.wishlist.all, "list"] as const,
   },
+
 
   addresses: {
     all: ["addresses"] as const,
