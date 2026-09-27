@@ -19,6 +19,7 @@ import type { DateRange } from "@/types/seller";
 import type { PagedResult } from "@/types/api";
 import type { ProductStatus, ProductSummary } from "@/types/product";
 import type { ProductRejectionReason } from "@/types/productAuthoring";
+import type { Order, OrderPage, OrderStatus } from "@/types/order";
 import type { UserRole } from "@/types/auth";
 
 const withRange = (range: DateRange) => `range=${range}`;
@@ -111,6 +112,32 @@ export const adminApi = {
 
   /** A direct link to the CSV, so the browser downloads it rather than the page navigating to it. */
   salesCsvUrl: (range: DateRange) => `${apiClient.defaults.baseURL}/api/admin/reports/export/sales.csv?${withRange(range)}`,
+
+  /**
+   * Every order on the marketplace, across all sellers.
+   *
+   * This is the whole marketplace's order book rather than one seller's half of it: an order here
+   * is what a shopper bought from several stores at once, so a support question about a missing
+   * item starts here rather than in any single storefront.
+   */
+  orders: (params: { page: number; pageSize?: number; status?: OrderStatus; search?: string }) => {
+    const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
+
+    if (params.status) {
+      search.set("status", params.status);
+    }
+
+    if (params.search) {
+      search.set("search", params.search);
+    }
+
+    return apiClient.get<OrderPage>(`/api/admin/orders?${search.toString()}`).then(data => data.data);
+  },
+
+  order: (id: string) => apiClient.get<Order>(`/api/admin/orders/${id}`).then(data => data.data),
+
+  updateOrderStatus: (id: string, status: OrderStatus, note?: string | null) =>
+    apiClient.put(`/api/admin/orders/${id}/status`, { status, note: note ?? null }).then(() => undefined),
 };
 
 export type { AdminUser };

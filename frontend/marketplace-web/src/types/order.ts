@@ -206,3 +206,24 @@ export interface OrderListItem {
 }
 
 export type OrderPage = PagedResult<OrderListItem>;
+
+/** One of the payments a customer has made, as the payments page and the pay screen read it. */
+export type PaymentStatus = "Pending" | "Processing" | "Succeeded" | "Failed" | "Refunded" | "PartiallyRefunded";
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  provider: string;
+  status: PaymentStatus;
+  amount: number;
+  currency: string;
+  transactionReference: string;
+  gatewayPaymentId: string | null;
+  redirectUrl: string | null;
+  qrCodeData: string | null;
+  failureReason: string | null;
+  requiresAction: boolean;
+  initiatedAt: string;
+  completedAt: string | null;
+}
