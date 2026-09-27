@@ -385,6 +385,8 @@ public sealed class ProductService(
             product.ChangeSlug(Slug.Create(slugValue), clock.UtcNow);
         }
 
+        var previousCategoryId = product.CategoryId;
+
         product.UpdateDetails(request.Name, request.ShortDescription, request.Description, request.CategoryId, request.Brand, request.Model, clock.UtcNow);
         product.UpdatePricing(request.BasePrice, request.CompareAtPrice, clock.UtcNow);
 
@@ -397,6 +399,15 @@ public sealed class ProductService(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // Moving a published product between categories takes one off one count and puts it on
+        // the other, so both sides are recounted rather than only the destination.
+        if (previousCategoryId != request.CategoryId)
+        {
+            await SyncCategoryProductCountAsync(previousCategoryId, cancellationToken).ConfigureAwait(false);
+            await SyncCategoryProductCountAsync(request.CategoryId, cancellationToken).ConfigureAwait(false);
+        }
+
         await auditService.RecordAsync(AuditAction.ProductUpdated, nameof(Product), product.Id, product.Name,
             new { product.Name, product.BasePrice }, cancellationToken).ConfigureAwait(false);
         await InvalidateAsync(product, cancellationToken).ConfigureAwait(false);
@@ -422,6 +433,7 @@ public sealed class ProductService(
         product.SoftDelete(clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await SyncStoreProductCountAsync(product.SellerId, cancellationToken).ConfigureAwait(false);
+        await SyncCategoryProductCountAsync(product.CategoryId, cancellationToken).ConfigureAwait(false);
         await auditService.RecordAsync(AuditAction.ProductDeleted, nameof(Product), product.Id, product.Name, null, cancellationToken).ConfigureAwait(false);
         await InvalidateAsync(product, cancellationToken).ConfigureAwait(false);
 
@@ -540,6 +552,7 @@ public sealed class ProductService(
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await SyncStoreProductCountAsync(product.SellerId, cancellationToken).ConfigureAwait(false);
+        await SyncCategoryProductCountAsync(product.CategoryId, cancellationToken).ConfigureAwait(false);
         await auditService.RecordAsync(
             request.Approve ? AuditAction.ProductApproved : AuditAction.ProductRejected,
             nameof(Product), product.Id, product.Name,
@@ -1023,6 +1036,39 @@ public sealed class ProductService(
         if (store.ProductCount != published)
         {
             store.UpdateProductCount(published, clock.UtcNow);
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Recounts a category's live products onto the category row.
+    /// </summary>
+    /// <remarks>
+    /// The category page and the category tree both read this column, and until now nothing wrote
+    /// it, so every category in the application advertised zero products while showing a dozen.
+    /// The count is the published one, matching what a shopper is being offered; the stricter
+    /// "can this be deleted" question is answered by a live query in the category service.
+    /// </remarks>
+    private async Task SyncCategoryProductCountAsync(Guid categoryId, CancellationToken cancellationToken)
+    {
+        if (categoryId == Guid.Empty)
+        {
+            return;
+        }
+
+        var category = await categories.Query().FirstOrDefaultAsync(c => c.Id == categoryId, cancellationToken).ConfigureAwait(false);
+        if (category is null)
+        {
+            return;
+        }
+
+        var published = await products.Query().AsNoTracking()
+            .CountAsync(p => p.CategoryId == categoryId && p.Status == ProductStatus.Published && !p.IsDeleted, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (category.ProductCount != published)
+        {
+            category.RecalculateProductCount(published, clock.UtcNow);
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
     }

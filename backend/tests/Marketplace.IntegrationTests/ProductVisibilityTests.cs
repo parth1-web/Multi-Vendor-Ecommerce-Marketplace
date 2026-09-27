@@ -1,12 +1,17 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
+
 using FluentAssertions;
 using Marketplace.Application.Common.Models;
 using Marketplace.Application.Modules.Catalog.DTOs;
 using Marketplace.Domain.Enums;
 using Marketplace.IntegrationTests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+
 
 namespace Marketplace.IntegrationTests;
 
@@ -162,7 +167,56 @@ public sealed class ProductVisibilityTests : IClassFixture<MarketplaceApiFactory
         publishedOnly!.Items.Should().NotContain(p => p.Id == listing.Id, "a published filter still means published");
     }
 
+    [Fact]
+    public async Task A_category_counts_a_listing_only_while_it_is_on_sale()
+    {
+        // The category tree, the category page and the admin category list all read this count off
+        // the row rather than counting on the way out. Nothing used to write it, so every category
+        // in the application read "0 products" while showing a dozen.
+        var (owner, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var listing = await CreateListingAsync(owner);
+        var submitted = await owner.PostAsync($"/api/seller/products/{listing.Id}/submit", EmptyJson());
+        submitted.StatusCode.Should().Be(HttpStatusCode.NoContent, await ApiClient.ReadTextAsync(submitted));
+
+        // This class shares one database, so the count is whatever the earlier cases left behind
+        // and only the change is interesting.
+        var baseline = await CategoryCountAsync(_data.CategoryId);
+        baseline.Should().Be(await PublishedInCategoryAsync(_data.CategoryId), "the row is kept in step as products are approved");
+
+        var (admin, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
+        var approved = await admin.PutAsync(
+            $"/api/admin/products/{listing.Id}/approval",
+            new ProductApprovalRequest(true, ProductRejectionReason.None, "Fine"));
+        approved.StatusCode.Should().Be(HttpStatusCode.NoContent, await ApiClient.ReadTextAsync(approved));
+
+        (await CategoryCountAsync(_data.CategoryId)).Should().Be(baseline + 1, "approval is what puts a product into the count");
+
+        var removed = await owner.DeleteAsync($"/api/seller/products/{listing.Id}");
+        removed.StatusCode.Should().Be(HttpStatusCode.NoContent, await ApiClient.ReadTextAsync(removed));
+
+        (await CategoryCountAsync(_data.CategoryId)).Should().Be(baseline, "and removing it takes the count back down");
+    }
+
+    private async Task<int> CategoryCountAsync(Guid categoryId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<Marketplace.Infrastructure.Persistence.MarketplaceDbContext>();
+        return await context.Categories.AsNoTracking()
+            .Where(c => c.Id == categoryId)
+            .Select(c => c.ProductCount)
+            .SingleAsync();
+    }
+
+    private async Task<int> PublishedInCategoryAsync(Guid categoryId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<Marketplace.Infrastructure.Persistence.MarketplaceDbContext>();
+        return await context.Products.AsNoTracking()
+            .CountAsync(p => p.CategoryId == categoryId && p.Status == ProductStatus.Published);
+    }
+
     private async Task<ProductSummaryResponse> CreateListingAsync(ApiClient? seller = null)
+
     {
         // A customer cannot create a product, so the listing is made by a seller: the case under
         // test is visibility, not the create path.
