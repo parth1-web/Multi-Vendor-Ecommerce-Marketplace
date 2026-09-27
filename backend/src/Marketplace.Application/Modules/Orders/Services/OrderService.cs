@@ -174,8 +174,8 @@ public sealed class OrderService(
             so.CarrierName, so.TrackingNumber, so.EstimatedDeliveryAt, so.Items.Count), cancellationToken)
             .ConfigureAwait(false);
 
-        await HydrateSellerNamesAsync(result.Items.ToList(), cancellationToken).ConfigureAwait(false);
-        return result;
+        var named = await WithStoreNamesAsync(result.Items, cancellationToken).ConfigureAwait(false);
+        return new PagedResult<SellerOrderSummaryResponse>(named, result.Page, result.PageSize, result.TotalCount);
     }
 
     public async Task<Result<SellerOrderSummaryResponse>> GetSellerOrderAsync(Guid sellerOrderId, CancellationToken cancellationToken = default)
@@ -205,9 +205,8 @@ public sealed class OrderService(
             sellerOrder.CommissionRate, sellerOrder.CommissionAmount, sellerOrder.SellerEarnings,
             sellerOrder.CarrierName, sellerOrder.TrackingNumber, sellerOrder.EstimatedDeliveryAt, sellerOrder.Items.Count);
 
-        var list = new List<SellerOrderSummaryResponse> { dto };
-        await HydrateSellerNamesAsync(list, cancellationToken).ConfigureAwait(false);
-        return Result<SellerOrderSummaryResponse>.Success(list[0]);
+        var named = await WithStoreNamesAsync([dto], cancellationToken).ConfigureAwait(false);
+        return Result<SellerOrderSummaryResponse>.Success(named[0]);
     }
 
     public async Task<Result> UpdateSellerOrderStatusAsync(Guid sellerOrderId, UpdateOrderStatusRequest request, CancellationToken cancellationToken = default)
@@ -270,10 +269,14 @@ public sealed class OrderService(
         var page = new PageRequest(query.Page, query.PageSize);
         var source = ApplyOrderFilters(orders.Query().AsNoTracking(), query);
 
-        return await source.ToPagedResultAsync(page, o => new OrderListItemResponse(
+        var result = await source.ToPagedResultAsync(page, o => new OrderListItemResponse(
             o.Id, o.OrderNumber, o.Status, o.PlacedAt, o.TotalAmount, o.Currency, o.IsPaid,
             o.Items.FirstOrDefault()?.ProductName, o.Items.FirstOrDefault()?.ProductImage,
             o.Items.Count, o.SellerOrders.Count, string.Empty), cancellationToken).ConfigureAwait(false);
+
+        // Which stores an order went to is the first thing anybody supporting it wants to know,
+        // and it is in the response, so it is filled in rather than left as an empty string.
+        return await WithStoreNamesAsync(result, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<Result<OrderResponse>> GetByIdForAdminAsync(Guid orderId, CancellationToken cancellationToken = default)
@@ -459,14 +462,66 @@ public sealed class OrderService(
             NotificationAudience.Customer, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task HydrateSellerNamesAsync(List<SellerOrderSummaryResponse> items, CancellationToken cancellationToken)
+    /// <summary>
+    /// Fills in the store names on a page of orders, one query for the whole page.
+    /// </summary>
+    /// <remarks>
+    /// Returns a new page rather than editing the one it was given. These are records, so a copy of
+    /// the list is a copy of the elements, and writing a corrected record into the copy leaves the
+    /// page the caller is holding exactly as it was.
+    /// </remarks>
+    private async Task<PagedResult<OrderListItemResponse>> WithStoreNamesAsync(
+        PagedResult<OrderListItemResponse> page, CancellationToken cancellationToken)
     {
-        if (items.Count == 0)
+        if (page.Items.Count == 0)
         {
-            return;
+            return page;
         }
 
-        var sellerIds = items.Select(i => i.SellerId).Distinct().ToList();
+        var orderIds = page.Items.Select(i => i.Id).ToList();
+        var sellersByOrder = await sellerOrders.Query().AsNoTracking()
+            .Where(so => orderIds.Contains(so.OrderId))
+            .Select(so => new { so.OrderId, so.SellerId })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var sellerIds = sellersByOrder.Select(s => s.SellerId).Distinct().ToList();
+        var storeList = await stores.Query().AsNoTracking()
+            .Where(s => sellerIds.Contains(s.SellerId))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var names = storeList.ToDictionary(s => s.SellerId, s => s.Name);
+        var byOrder = sellersByOrder
+            .GroupBy(s => s.OrderId)
+            .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(s => names.GetValueOrDefault(s.SellerId, "Seller")).Distinct()));
+
+        var items = page.Items
+            .Select(item => item with { SellerNames = byOrder.GetValueOrDefault(item.Id) })
+            .ToList();
+
+        return new PagedResult<OrderListItemResponse>(items, page.Page, page.PageSize, page.TotalCount);
+    }
+
+    /// <summary>
+    /// Returns a copy of these seller orders with the store name filled in.
+    /// </summary>
+    /// <remarks>
+    /// A new list rather than an edit, for the same reason as the order list: these are records,
+    /// so writing into a copy of the list leaves the caller's page untouched. One query for the
+    /// whole page, not one per row.
+    /// </remarks>
+    private async Task<List<SellerOrderSummaryResponse>> WithStoreNamesAsync(
+        IEnumerable<SellerOrderSummaryResponse> items, CancellationToken cancellationToken)
+    {
+        var list = items as List<SellerOrderSummaryResponse> ?? items.ToList();
+
+        if (list.Count == 0)
+        {
+            return list;
+        }
+
+        var sellerIds = list.Select(i => i.SellerId).Distinct().ToList();
         var storeList = await stores.Query().AsNoTracking()
             .Where(s => sellerIds.Contains(s.SellerId))
             .ToListAsync(cancellationToken)
@@ -474,11 +529,10 @@ public sealed class OrderService(
 
         var names = storeList.ToDictionary(s => s.SellerId, s => s.Name);
 
-        for (var i = 0; i < items.Count; i++)
-        {
-            items[i] = items[i] with { StoreName = names.GetValueOrDefault(items[i].SellerId, "Seller") };
-        }
+        return list.Select(i => i with { StoreName = names.GetValueOrDefault(i.SellerId, "Seller") }).ToList();
     }
+
+
 
     private static string Label(OrderStatus status) => status switch
     {

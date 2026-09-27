@@ -191,6 +191,32 @@ public sealed class CheckoutTests : IClassFixture<MarketplaceApiFactory>, IAsync
     }
 
     [Fact]
+    public async Task An_order_says_which_stores_it_went_to()
+    {
+        // Both the admin's order book and a seller's own list project the store name as an empty
+        // string and fill it in afterwards, because a projection cannot join a second table. The
+        // filling in has to survive the trip back: these are records, so writing the correction
+        // into a copy of the list leaves the page the caller returns exactly as it was.
+        var (customer, addressId) = await NewCustomerAsync();
+        await customer.PostAsync("/api/cart/items", new AddCartItemRequest(
+            _data.SellerAProductId, _data.SellerAProductVariantId, 1));
+        var placed = await ApiClient.ReadAsync<CheckoutResponse>(
+            await customer.PostAsync("/api/checkout", Checkout(addressId, Guid.NewGuid().ToString("N"))));
+
+        var (admin, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
+        var all = await admin.GetAsync<PagedResult<OrderListItemResponse>>("/api/admin/orders?page=1&pageSize=50");
+
+        all.Should().NotBeNull();
+        var order = all!.Items.SingleOrDefault(o => o.Id == placed!.OrderId);
+        order.Should().NotBeNull("the order just placed is in the admin's book");
+        order!.SellerNames.Should().NotBeNullOrWhiteSpace("a support question about an order starts with who it went to");
+
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var theirs = await seller.GetAsync<PagedResult<SellerOrderSummaryResponse>>("/api/seller/orders?page=1&pageSize=50");
+        theirs!.Items.Should().Contain(o => o.OrderId == placed!.OrderId && !string.IsNullOrWhiteSpace(o.StoreName));
+    }
+
+    [Fact]
     public async Task A_second_order_from_the_same_address_is_a_second_order()
     {
         // The other half of the retry case, and the one that catches a key built out of what was
