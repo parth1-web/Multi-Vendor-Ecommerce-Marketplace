@@ -73,7 +73,7 @@ export const queryKeys = {
 
   notifications: {
     all: ["notifications"] as const,
-    list: () => [...queryKeys.notifications.all, "list"] as const,
+    list: (params: { page: number; unreadOnly: boolean }) => [...queryKeys.notifications.all, "list", params] as const,
     unreadCount: () => [...queryKeys.notifications.all, "unread-count"] as const,
   },
 
