@@ -79,11 +79,22 @@ public sealed class MockPaymentGateway : IPaymentGateway
 
     public bool RequiresCustomerAction => true;
 
+    /// <summary>
+    /// Sends the customer to a page of our own rather than to a domain that does not exist.
+    /// </summary>
+    /// <remarks>
+    /// A gateway that needs something from the customer has to be able to send them somewhere to
+    /// do it, and this one is emulating a redirect provider, so it behaves like one: the payment
+    /// is initiated here and settled when it is confirmed, exactly as it is for a real provider
+    /// and as the webhook and verification paths expect. The difference is where that somewhere
+    /// is. It used to point at a host that does not resolve, which left every order in a demo
+    /// unpaid and sent the browser off to a page it could not come back from.
+    /// </remarks>
     public Task<PaymentInitiationResult> CreatePaymentAsync(PaymentInitiationRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(new PaymentInitiationResult(
             IsSuccess: true,
             GatewayPaymentId: $"mock-{request.OrderNumber}",
-            RedirectUrl: $"https://mock-gateway.local/pay/{request.OrderId:N}",
+            RedirectUrl: $"{request.SuccessUrl}",
             QrCodeData: null,
             FailureReason: null,
             RawResponse: $"{{\"status\":\"initiated\",\"order\":\"{request.OrderNumber}\"}}"));

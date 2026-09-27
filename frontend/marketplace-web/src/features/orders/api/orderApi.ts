@@ -8,6 +8,7 @@ import type {
   CreateAddressRequest,
   Order,
   OrderPage,
+  Payment,
   Quote,
   QuoteRequest,
   UpdateAddressRequest,
@@ -49,6 +50,26 @@ export const checkoutApi = {
 
   async checkout(request: CheckoutRequest): Promise<CheckoutResponse> {
     const { data } = await apiClient.post<CheckoutResponse>("/api/checkout", request);
+    return data;
+  },
+};
+
+export const paymentApi = {
+  /** The payments this customer has made, newest first. Scoped by the token, not by a parameter. */
+  async mine(): Promise<Payment[]> {
+    const { data } = await apiClient.get<Payment[]>("/api/payments/mine");
+    return data;
+  },
+
+  /**
+   * Asks the server to confirm a payment with the gateway.
+   *
+   * The customer never says a payment succeeded; they say they have been to the payment page, and
+   * the server goes and finds out. This is what the pay screen calls, and it is idempotent, so
+   * pressing the button twice settles one payment.
+   */
+  async verify(id: string): Promise<Payment> {
+    const { data } = await apiClient.post<Payment>(`/api/payments/${id}/verify`, {});
     return data;
   },
 };

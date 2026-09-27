@@ -325,8 +325,11 @@ public sealed class CheckoutService(
             _options.Currency,
             currentUser.Email ?? string.Empty,
             $"{currentUser.UserId}",
-            $"{_options.FrontendBaseUrl}/checkout?order={order.OrderNumber}",
-            $"{_options.FrontendBaseUrl}/checkout?failed={order.OrderNumber}",
+            // Where a gateway that needs the customer to do something sends them. The pay screen
+            // is ours, and a sandbox gateway uses it the way a real one would use its own hosted
+            // page: the order is paid when the customer comes back from there, not before.
+            $"{_options.FrontendBaseUrl}/checkout/pay?order={order.OrderNumber}",
+            $"{_options.FrontendBaseUrl}/checkout/pay?order={order.OrderNumber}&failed=1",
             $"{_options.FrontendBaseUrl}/cart",
             null), cancellationToken).ConfigureAwait(false);
 
