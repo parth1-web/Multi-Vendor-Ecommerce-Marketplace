@@ -75,6 +75,16 @@ export interface OrderStatusCount {
   total: number;
 }
 
+export type SellerOrderStatus =
+  | "Pending"
+  | "Confirmed"
+  | "Processing"
+  | "Packed"
+  | "Shipped"
+  | "Delivered"
+  | "Cancelled"
+  | "Returned";
+
 export interface SellerOrder {
   id: string;
   sellerOrderNumber: string;
@@ -82,7 +92,7 @@ export interface SellerOrder {
   orderId: string;
   orderNumber: string;
   storeName: string;
-  status: string;
+  status: SellerOrderStatus;
   subtotal: number;
   discountAmount: number;
   shippingAmount: number;
@@ -94,12 +104,48 @@ export interface SellerOrder {
   trackingNumber: string | null;
   estimatedDeliveryAt: string | null;
   itemCount: number;
-  placedAt?: string;
-  buyerName?: string;
-  items?: { productName: string; quantity: number; lineTotal: number; variantName: string }[];
+}
+
+/**
+ * One of a seller's orders, in full.
+ *
+ * Separate from the row above because a list of orders does not need twenty sets of line items and
+ * a delivery address, and a page that says "3 items" is not a page a seller can pack from.
+ */
+export interface SellerOrderDetail {
+  summary: SellerOrder;
+  customerName: string;
+  items: {
+    id: string;
+    productId: string;
+    productVariantId: string;
+    productName: string;
+    productImageUrl: string | null;
+    variantName: string;
+    sku: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }[];
+  timeline: { step: string; label: string; at: string | null; isComplete: boolean; isCurrent: boolean; note: string | null }[];
+  shippingAddress: {
+    label: string;
+    recipientName: string;
+    phoneNumber: string;
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string | null;
+    postalCode: string;
+    country: string;
+  };
+  /** A refund has been asked for, which the seller is told about but does not handle. */
+  refundRequested: boolean;
+  refundStatus: string | null;
 }
 
 export type SellerOrderPage = PagedResult<SellerOrder>;
+
 /**
  * A seller's own view of a product. It carries a status and a rejection note, which the public
  * catalogue deliberately does not: a seller has to be able to tell a draft from a live listing

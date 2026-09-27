@@ -219,8 +219,8 @@ public sealed class CheckoutTests : IClassFixture<MarketplaceApiFactory>, IAsync
         skipped.StatusCode.Should().Be(HttpStatusCode.Conflict, await ApiClient.ReadTextAsync(skipped));
         skipped.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
 
-        var after = await seller.GetAsync<SellerOrderSummaryResponse>($"/api/seller/orders/{sellerOrder.Id}");
-        after!.Status.Should().Be(SellerOrderStatus.Packed, "a refused change leaves the order where it was");
+        var after = await seller.GetAsync<SellerOrderDetailResponse>($"/api/seller/orders/{sellerOrder.Id}");
+        after!.Summary.Status.Should().Be(SellerOrderStatus.Packed, "a refused change leaves the order where it was");
     }
 
     [Fact]

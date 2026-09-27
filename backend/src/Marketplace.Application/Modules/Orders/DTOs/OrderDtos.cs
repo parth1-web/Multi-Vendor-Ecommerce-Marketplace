@@ -170,6 +170,27 @@ public sealed record SellerOrderSummaryResponse(
 
 public sealed record OrderTimelineStepResponse(string Step, string Label, DateTimeOffset? At, bool IsComplete, bool IsCurrent, string? Note);
 
+/// <summary>
+/// One of a seller's own orders, in full: the summary plus what is actually in the parcel.
+/// </summary>
+/// <remarks>
+/// A separate shape from the list row rather than a fuller row, because a list of twenty orders
+/// does not need twenty sets of line items and a delivery address, and a detail page cannot be
+/// built out of a row that says only "3 items".
+///
+/// The address is the shopper's, because the seller is the one who has to deliver to it. It is
+/// the address that was captured at checkout, not whatever the shopper's account says now: a
+/// parcel goes where the order says it goes.
+/// </remarks>
+public sealed record SellerOrderDetailResponse(
+    SellerOrderSummaryResponse Summary,
+    string CustomerName,
+    IReadOnlyList<OrderItemResponse> Items,
+    IReadOnlyList<OrderTimelineStepResponse> Timeline,
+    AddressSnapshotResponse ShippingAddress,
+    bool RefundRequested,
+    string? RefundStatus);
+
 public sealed record AddressSnapshotResponse(
     string Label,
     string RecipientName,

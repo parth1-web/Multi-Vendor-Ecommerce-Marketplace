@@ -9,7 +9,9 @@ import type {
   OrderStatusCount,
   PayoutPage,
   RevenuePoint,
+  SellerOrderDetail,
   SellerOrderPage,
+  SellerOrderStatus,
   SellerProductPage,
   SellerSummary,
   TopProduct,
@@ -100,13 +102,19 @@ export const sellerApi = {
     return apiClient.get<SellerOrderPage>(`/api/seller/orders?${search.toString()}`).then(data => data.data);
   },
 
-  order: (id: string) => apiClient.get(`/api/seller/orders/${id}`).then(data => data.data),
+  /**
+   * One of this seller's orders, in full: the items, where they are going, and the progress.
+   *
+   * Scoped to the signed-in seller by the API, and a seller asking for another store's order id
+   * gets the same "not found" as a wrong one rather than a refusal that would confirm it exists.
+   */
+  order: (id: string) => apiClient.get<SellerOrderDetail>(`/api/seller/orders/${id}`).then(data => data.data),
 
   /**
    * Moves a sub-order along. The seller owns fulfilment for their own part of an order, which
    * is the whole point of splitting it per seller in the first place.
    */
-  updateOrderStatus: (id: string, body: { status: string; note?: string | null; carrierName?: string | null; trackingNumber?: string | null }) =>
+  updateOrderStatus: (id: string, body: { status: SellerOrderStatus; note?: string | null; carrierName?: string | null; trackingNumber?: string | null }) =>
     apiClient.put(`/api/seller/orders/${id}/status`, body).then(data => data.data),
 
   inventory: (params: { page: number; lowStockOnly?: boolean }) => {

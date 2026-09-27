@@ -26,7 +26,7 @@ public interface IOrderService
 
     Task<PagedResult<SellerOrderSummaryResponse>> ListSellerOrdersAsync(OrderListQuery query, CancellationToken cancellationToken = default);
 
-    Task<Result<SellerOrderSummaryResponse>> GetSellerOrderAsync(Guid sellerOrderId, CancellationToken cancellationToken = default);
+    Task<Result<SellerOrderDetailResponse>> GetSellerOrderAsync(Guid sellerOrderId, CancellationToken cancellationToken = default);
 
     Task<Result> UpdateSellerOrderStatusAsync(Guid sellerOrderId, UpdateOrderStatusRequest request, CancellationToken cancellationToken = default);
 

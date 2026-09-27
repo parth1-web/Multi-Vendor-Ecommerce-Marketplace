@@ -9,7 +9,9 @@ using Marketplace.Domain.Enums;
 using Marketplace.Domain.Events;
 using Marketplace.Domain.Inventory;
 using Marketplace.Domain.Orders;
+using Marketplace.Domain.Identity;
 using Marketplace.Domain.Payments;
+using Marketplace.Domain.Refunds;
 using Marketplace.Domain.Sellers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -26,6 +28,8 @@ public sealed class OrderService(
     IRepository<OrderEntity> orders,
     IRepository<Domain.Orders.SellerOrder> sellerOrders,
     IRepository<Payment> payments,
+    IRepository<Refund> refunds,
+    IRepository<Domain.Identity.User> users,
     IRepository<InventoryReservation> reservations,
     IRepository<SellerStore> stores,
     IInventoryService inventory,
@@ -41,6 +45,13 @@ public sealed class OrderService(
     [
         OrderStatus.Pending, OrderStatus.Confirmed, OrderStatus.Processing,
         OrderStatus.Packed, OrderStatus.Shipped, OrderStatus.Delivered
+    ];
+
+    /// <summary>The same path, for a seller's half of an order, which moves on its own.</summary>
+    private static readonly SellerOrderStatus[] SellerOrderTimeline =
+    [
+        SellerOrderStatus.Pending, SellerOrderStatus.Confirmed, SellerOrderStatus.Processing,
+        SellerOrderStatus.Packed, SellerOrderStatus.Shipped, SellerOrderStatus.Delivered
     ];
 
     public async Task<PagedResult<OrderListItemResponse>> ListOwnAsync(OrderListQuery query, CancellationToken cancellationToken = default)
@@ -178,13 +189,17 @@ public sealed class OrderService(
         return new PagedResult<SellerOrderSummaryResponse>(named, result.Page, result.PageSize, result.TotalCount);
     }
 
-    public async Task<Result<SellerOrderSummaryResponse>> GetSellerOrderAsync(Guid sellerOrderId, CancellationToken cancellationToken = default)
+    public async Task<Result<SellerOrderDetailResponse>> GetSellerOrderAsync(Guid sellerOrderId, CancellationToken cancellationToken = default)
     {
         if (currentUser.SellerId is not { } sellerId)
         {
-            return Result<SellerOrderSummaryResponse>.Failure("Seller access is required.");
+            return Result<SellerOrderDetailResponse>.Failure("Seller access is required.");
         }
 
+        // The order comes with its items, its history and its address, because a seller opening
+        // an order is trying to find out what to put in a parcel and where to take it. None of
+        // that is on the list row, which is why this is a different shape rather than the same one
+        // with more filled in.
         var sellerOrder = await sellerOrders.Query()
             .AsNoTracking()
             .Include(so => so.Items)
@@ -195,18 +210,57 @@ public sealed class OrderService(
 
         if (sellerOrder is null)
         {
-            return Result<SellerOrderSummaryResponse>.Failure("Order not found.", ResultErrorCodes.NotFound);
+            // Reported as absent rather than forbidden, so a seller cannot map another seller's
+            // orders by watching which ids come back as "forbidden".
+            return Result<SellerOrderDetailResponse>.Failure("Order not found.", ResultErrorCodes.NotFound);
         }
 
-        var dto = new SellerOrderSummaryResponse(
+        var summary = new SellerOrderSummaryResponse(
             sellerOrder.Id, sellerOrder.SellerOrderNumber, sellerOrder.SellerId,
             sellerOrder.OrderId, sellerOrder.Order!.OrderNumber, string.Empty, sellerOrder.Status,
             sellerOrder.Subtotal, sellerOrder.DiscountAmount, sellerOrder.ShippingAmount, sellerOrder.TotalAmount,
             sellerOrder.CommissionRate, sellerOrder.CommissionAmount, sellerOrder.SellerEarnings,
             sellerOrder.CarrierName, sellerOrder.TrackingNumber, sellerOrder.EstimatedDeliveryAt, sellerOrder.Items.Count);
 
-        var named = await WithStoreNamesAsync([dto], cancellationToken).ConfigureAwait(false);
-        return Result<SellerOrderSummaryResponse>.Success(named[0]);
+        var named = await WithStoreNamesAsync([summary], cancellationToken).ConfigureAwait(false);
+
+        var customerName = await users.Query().AsNoTracking()
+            .Where(u => u.Id == sellerOrder.Order!.CustomerId)
+            .Select(u => u.FullName)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false) ?? "Customer";
+
+        // A refund against any line of this order, because a shopper asking for their money back
+        // does not have to work out which store they bought from.
+        var refund = await refunds.Query().AsNoTracking()
+            .Where(r => r.OrderId == sellerOrder.OrderId && r.Status == RefundStatus.Requested)
+            .Select(r => new { r.Status })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Result<SellerOrderDetailResponse>.Success(new SellerOrderDetailResponse(
+            named[0],
+            customerName,
+            sellerOrder.Items
+                .OrderBy(i => i.ProductName)
+                .Select(i => new OrderItemResponse(
+                    i.Id, i.ProductId, i.ProductVariantId, i.SellerId, named[0].StoreName, i.ProductName,
+                    i.ProductImage, i.VariantName, i.Sku, i.Quantity, i.UnitPrice, i.LineTotal,
+                    false, false, false))
+                .ToList(),
+            BuildTimeline(sellerOrder),
+            new AddressSnapshotResponse(
+                sellerOrder.Order!.ShippingAddressSnapshot.Label,
+                sellerOrder.Order.ShippingAddressSnapshot.RecipientName,
+                sellerOrder.Order.ShippingAddressSnapshot.PhoneNumber,
+                sellerOrder.Order.ShippingAddressSnapshot.Line1,
+                sellerOrder.Order.ShippingAddressSnapshot.Line2,
+                sellerOrder.Order.ShippingAddressSnapshot.City,
+                sellerOrder.Order.ShippingAddressSnapshot.State,
+                sellerOrder.Order.ShippingAddressSnapshot.PostalCode,
+                sellerOrder.Order.ShippingAddressSnapshot.Country),
+            refund is not null,
+            refund?.Status.ToString()));
     }
 
     public async Task<Result> UpdateSellerOrderStatusAsync(Guid sellerOrderId, UpdateOrderStatusRequest request, CancellationToken cancellationToken = default)
@@ -533,6 +587,64 @@ public sealed class OrderService(
     }
 
 
+
+    /// <summary>
+    /// A seller order's own progress, as steps rather than as a status.
+    /// </summary>
+    /// <remarks>
+    /// Built from the seller order's own history, not the marketplace order's, because a seller's
+    /// half of an order moves on its own: two stores on one order can be in different states at
+    /// the same moment, and a seller needs to see their own parcel rather than the other store's.
+    /// </remarks>
+    private static IReadOnlyList<OrderTimelineStepResponse> BuildTimeline(Domain.Orders.SellerOrder sellerOrder)
+    {
+        var steps = SellerOrderTimeline;
+        var currentIndex = Array.IndexOf(steps, sellerOrder.Status);
+
+        var timeline = steps.Select((step, index) =>
+        {
+            var reached = sellerOrder.History
+                .Where(h => h.ToStatus == step)
+                .OrderByDescending(h => h.CreatedAt)
+                .FirstOrDefault();
+
+            return new OrderTimelineStepResponse(
+                step.ToString(),
+                SellerLabel(step),
+                reached?.CreatedAt,
+                index <= currentIndex || reached is not null,
+                index == currentIndex,
+                reached?.Note);
+        }).ToList();
+
+        // A cancelled or returned order has left the path, so say where it stopped rather than
+        // leaving the last completed step looking like the current one.
+        if (sellerOrder.Status is SellerOrderStatus.Cancelled or SellerOrderStatus.Returned)
+        {
+            var stopped = sellerOrder.History
+                .Where(h => h.ToStatus == sellerOrder.Status)
+                .OrderByDescending(h => h.CreatedAt)
+                .FirstOrDefault();
+
+            timeline.Add(new OrderTimelineStepResponse(
+                sellerOrder.Status.ToString(), SellerLabel(sellerOrder.Status), stopped?.CreatedAt, true, true, stopped?.Note));
+        }
+
+        return timeline;
+    }
+
+    private static string SellerLabel(SellerOrderStatus status) => status switch
+    {
+        SellerOrderStatus.Pending => "Waiting to be accepted",
+        SellerOrderStatus.Confirmed => "Accepted",
+        SellerOrderStatus.Processing => "Being prepared",
+        SellerOrderStatus.Packed => "Packed",
+        SellerOrderStatus.Shipped => "On its way",
+        SellerOrderStatus.Delivered => "Delivered",
+        SellerOrderStatus.Cancelled => "Cancelled",
+        SellerOrderStatus.Returned => "Returned",
+        _ => status.ToString()
+    };
 
     private static string Label(OrderStatus status) => status switch
     {
