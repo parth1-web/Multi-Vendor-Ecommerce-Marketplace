@@ -50,17 +50,60 @@ public sealed class DatabaseSeeder(
 
         var categories = await EnsureCategoriesAsync(now, cancellationToken).ConfigureAwait(false);
 
-        var productCount = await context.Products.CountAsync(cancellationToken).ConfigureAwait(false);
-        if (productCount == 0)
-        {
-            await EnsureProductsAsync(techSeller, fashionSeller, categories, now, cancellationToken).ConfigureAwait(false);
-        }
+        // Per product rather than "if the table is empty". A catalogue that is skipped because
+        // the table is not empty is skipped because a developer added a product of their own, and
+        // a catalogue that is only partly there is never healed.
+        await EnsureProductsAsync(techSeller, fashionSeller, categories, now, cancellationToken).ConfigureAwait(false);
+
+        await SyncProductCountsAsync(now, cancellationToken).ConfigureAwait(false);
 
         await EnsureCouponsAsync(now, cancellationToken).ConfigureAwait(false);
         await EnsureAddressAsync(customer, now, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation("Seed data verified.");
     }
+
+    /// <summary>
+    /// Brings the denormalised product counts back in line with the products that are on sale.
+    /// </summary>
+    /// <remarks>
+    /// The catalogue service keeps these in step whenever a listing is approved, moved or removed.
+    /// The seeder writes products straight to the database rather than through that service, so
+    /// without this the demo storefronts sit at zero while showing five products each, and every
+    /// category reads "0 products". A count that is wrong in the demo data is a count nobody
+    /// trusts later, and it is also the guard that stops a non-empty category being deleted.
+    /// </remarks>
+    private async Task SyncProductCountsAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var stores = await context.SellerStores.ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        foreach (var store in stores)
+        {
+            var published = await context.Products.CountAsync(
+                p => p.SellerId == store.SellerId && p.Status == ProductStatus.Published,
+                cancellationToken).ConfigureAwait(false);
+
+            if (store.ProductCount != published)
+            {
+                store.UpdateProductCount(published, now);
+            }
+        }
+
+        foreach (var category in await context.Categories.ToListAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var published = await context.Products.CountAsync(
+                p => p.CategoryId == category.Id && p.Status == ProductStatus.Published,
+                cancellationToken).ConfigureAwait(false);
+
+            if (category.ProductCount != published)
+            {
+                category.RecalculateProductCount(published, now);
+            }
+        }
+
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
 
     private async Task<User> EnsureUserAsync(string email, string firstName, string lastName, UserRole role, string password, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -152,13 +195,13 @@ public sealed class DatabaseSeeder(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        // The demo catalogue is a fixed set, so a second run has nothing to add. Without this the
-        // unique slug index refuses the insert and the whole seed reports as skipped, which reads
-        // like a failure on every restart after the first.
-        if (await context.Products.AnyAsync(p => p.SlugValue == "aerolux-wireless-headphones", cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
+        // One row per slug, the same rule the categories use. Deleting one product from the demo
+        // catalogue and restarting gets that product back, and the other eleven are left alone
+        // instead of the whole insert failing on a unique index.
+        var alreadySeeded = await context.Products
+            .Select(p => p.SlugValue)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         var catalogue = new (string Name, string Slug, string Short, string Description, decimal Price, decimal? CompareAt, string Brand, string CategoryKey, string SellerSku, string[] Specs, string SellerSlot)[]
 
@@ -233,6 +276,11 @@ public sealed class DatabaseSeeder(
 
         foreach (var item in catalogue)
         {
+            if (alreadySeeded.Contains(item.Slug))
+            {
+                continue;
+            }
+
             var seller = item.SellerSlot == "tech" ? techSeller : fashionSeller;
 
             // The catalogue names a category by its key in the table above. A key that does not
@@ -287,12 +335,19 @@ public sealed class DatabaseSeeder(
     /// One row per tag name, matched without regard to case because that is how the unique
     /// index treats them.
     /// </summary>
+    /// <remarks>
+    /// The existing tags are loaded tracked, deliberately. Every product in the catalogue is
+    /// tagged with the same handful of instances, and the change tracker decides between
+    /// "update this row" and "insert this row" by whether it is tracking the instance. Handing
+    /// it an untracked one marks it Added, and the save then fails on the tag primary key the
+    /// first time a product is created against a tag that already exists.
+    /// </remarks>
     private async Task<Dictionary<string, Tag>> ResolveTagsAsync(
         IEnumerable<string> names, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var wanted = names.Select(n => n.Trim()).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-        var existing = await context.Tags.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var existing = await context.Tags.ToListAsync(cancellationToken).ConfigureAwait(false);
         var resolved = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var tag in existing)
