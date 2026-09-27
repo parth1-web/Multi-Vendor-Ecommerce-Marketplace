@@ -191,6 +191,30 @@ public sealed class CheckoutTests : IClassFixture<MarketplaceApiFactory>, IAsync
     }
 
     [Fact]
+    public async Task A_second_order_from_the_same_address_is_a_second_order()
+    {
+        // The other half of the retry case, and the one that catches a key built out of what was
+        // ordered. A customer who buys the same thing again, to the same address, paying the same
+        // way, is placing a new order and must get one. Only a repeated attempt at the same order
+        // may replay.
+        var (customer, addressId) = await NewCustomerAsync();
+        var ordersBefore = await OrderCountAsync();
+
+        await customer.PostAsync("/api/cart/items", new AddCartItemRequest(
+            _data.SellerAProductId, _data.SellerAProductVariantId, 1));
+        var first = await ApiClient.ReadAsync<CheckoutResponse>(
+            await customer.PostAsync("/api/checkout", Checkout(addressId, Guid.NewGuid().ToString("N"))));
+
+        await customer.PostAsync("/api/cart/items", new AddCartItemRequest(
+            _data.SellerAProductId, _data.SellerAProductVariantId, 1));
+        var second = await ApiClient.ReadAsync<CheckoutResponse>(
+            await customer.PostAsync("/api/checkout", Checkout(addressId, Guid.NewGuid().ToString("N"))));
+
+        second!.OrderId.Should().NotBe(first!.OrderId, "same address, same payment method, new basket, new order");
+        (await OrderCountAsync()).Should().Be(ordersBefore + 2);
+    }
+
+    [Fact]
     public async Task The_idempotency_key_is_stored_on_its_own_column_and_leaves_the_coupon_alone()
     {
         var (customer, addressId) = await NewCustomerAsync();

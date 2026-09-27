@@ -65,6 +65,13 @@ export function CheckoutWizard() {
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
+  // One key per attempt at this order, and the same key for every retry of it. The API keeps a
+  // key for good and returns the order it already made, which is what makes a retry safe and
+  // also what makes a derived key dangerous: derive it from the address, the coupon and the
+  // payment method and the customer's second order from the same address arrives as their
+  // first. Success navigates away, so arriving back here is a new attempt and a new key.
+  const [idempotencyKey] = useState(() => newIdempotencyKey());
+
   const addresses = useQuery({ queryKey: queryKeys.addresses.list(), queryFn: () => addressApi.list() });
 
   // The default address is the one a returning customer means, so it is derived rather than
@@ -89,21 +96,41 @@ export function CheckoutWizard() {
     setPlaceError(null);
 
     try {
-      // The key is derived from what was ordered rather than randomised, which is what makes a
-      // retry after a dropped response safe: the server reads a repeated key as the same order.
       const result = await checkoutApi.checkout({
         shippingAddressId: addressId,
         paymentMethod,
         couponCode,
         shippingMethod: null,
         customerNote: null,
-        idempotencyKey: idempotencyKeyFor(addressId, couponCode, paymentMethod),
+        idempotencyKey,
       });
 
       // The basket has become an order, so every read of it is now wrong.
       queryClient.setQueryData(queryKeys.cart.detail(), null);
       await queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+
+      // Some payment providers take the customer off to their own page to approve the payment,
+      // and they say so. Sending them to the order page instead would tell them the order is
+      // confirmed when the money has not moved, so the provider's page goes first and the
+      // order page carries where to come back to.
+      if (result.paymentRequiresAction && result.paymentRedirectUrl) {
+        const destination = safePaymentRedirect(result.paymentRedirectUrl);
+
+        if (destination) {
+          const withOrder = `${destination}${destination.includes("?") ? "&" : "?"}orderId=${result.orderId}`;
+
+          // Deliberately a full page load: this leaves the application for the provider's own
+          // page, which a client-side route would not do.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.assign(withOrder);
+          return;
+        }
+
+        setPlaceError("The payment provider sent us back to a page we will not open. Your order is saved; please pay from the order page.");
+        router.push(`/orders/${result.orderId}`);
+        return;
+      }
 
       router.push(`/orders/${result.orderId}?placed=1`);
     } catch (error) {
@@ -620,7 +647,29 @@ function formatAddress(address: Address): string {
     .join(", ");
 }
 
-/** Stable for the same attempt at the same order, which is what makes a retry safe. */
-function idempotencyKeyFor(addressId: string, couponCode: string | null, paymentMethod: string): string {
-  return `checkout-${addressId}-${couponCode ?? "none"}-${paymentMethod}`.toLowerCase();
+/** A key for one attempt at placing an order, and no two attempts ever share one. */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `checkout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/**
+ * A payment redirect we are willing to send a customer to, or null.
+ *
+ * The URL arrives in a response body, and following a URL from a response body is how an
+ * application turns into an open redirect: a scheme of javascript: or data: turns the checkout
+ * page into whatever the string says it is. Only an ordinary web address is accepted, and
+ * anything else falls back to the order page, which is a worse experience and a safer one.
+ */
+function safePaymentRedirect(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
 }
