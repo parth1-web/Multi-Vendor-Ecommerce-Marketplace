@@ -288,6 +288,21 @@
   overflow-x: auto;
 }
 
+/*
+ * A bare input inside a table. The labelled field is the right control for a form; a table of
+ * variants needs something that looks like the rest of the row, and it still gets a label for
+ * screen readers through an aria-label on the input.
+ */
+.mp-input {
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
 /* Focus is never removed, only restyled: a keyboard user must always see where they are. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-500);
