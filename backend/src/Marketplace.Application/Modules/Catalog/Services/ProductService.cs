@@ -127,7 +127,7 @@ public sealed class ProductService(
     {
         var key = CacheKeys.ProductBySlug(slug.ToLowerInvariant());
         var cached = await cache.GetAsync<ProductDetailResponse>(key, cancellationToken).ConfigureAwait(false);
-        if (cached is not null)
+        if (cached is not null && MaySeeUnpublished(cached))
         {
             return Result<ProductDetailResponse>.Success(cached);
         }
@@ -141,12 +141,9 @@ public sealed class ProductService(
             return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
 
-        // This route is anonymous, so it owes the same check as the one by id: a slug is as
-        // guessable as an id, and an unpublished listing is not public just because it has a
-        // prettier address.
-        var isOwner = currentUser.SellerId is { } caller && caller == product.SellerId;
-
-        if (product.Status != ProductStatus.Published && !isOwner && !currentUser.IsAdmin)
+        // A slug is as guessable as an id, and an unpublished listing is not public just because
+        // it has a prettier address, so this route asks the same question as the one by id.
+        if (product.Status != ProductStatus.Published && !MaySee(product.SellerId))
         {
             return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
@@ -154,37 +151,6 @@ public sealed class ProductService(
         var dto = await BuildDetailAsync(product, cancellationToken).ConfigureAwait(false);
         await cache.SetAsync(key, dto, DetailTtl, [CacheKeys.ProductTag(product.Id)], cancellationToken).ConfigureAwait(false);
 
-        return Result<ProductDetailResponse>.Success(dto);
-    }
-
-    public async Task<Result<ProductDetailResponse>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        var key = CacheKeys.Product(id);
-        var cached = await cache.GetAsync<ProductDetailResponse>(key, cancellationToken).ConfigureAwait(false);
-        if (cached is not null)
-        {
-            return Result<ProductDetailResponse>.Success(cached);
-        }
-
-        var product = await DetailQuery().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, cancellationToken).ConfigureAwait(false);
-
-        if (product is null)
-        {
-            return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
-        }
-
-        // A draft, a listing awaiting review and one that was sent back are all somebody's
-        // unpublished work. They are readable by the seller who owns them and by an admin, and by
-        // nobody else: a moderator's queue is not a public page.
-        var isOwner = currentUser.SellerId is { } caller && caller == product.SellerId;
-
-        if (product.Status != ProductStatus.Published && !isOwner && !currentUser.IsAdmin)
-        {
-            return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
-        }
-
-        var dto = await BuildDetailAsync(product, cancellationToken).ConfigureAwait(false);
-        await cache.SetAsync(key, dto, DetailTtl, [CacheKeys.ProductTag(product.Id)], cancellationToken).ConfigureAwait(false);
         return Result<ProductDetailResponse>.Success(dto);
     }
 
@@ -192,11 +158,13 @@ public sealed class ProductService(
     {
         var key = CacheKeys.Product(id);
         var cached = await cache.GetAsync<ProductDetailResponse>(key, cancellationToken).ConfigureAwait(false);
-        if (cached is not null)
+
+        // Strictly published, whoever is asking. An admin reading a draft through the public route
+        // is a moderator's queue, and this is not it.
+        if (cached is not null && cached.Status == ProductStatus.Published)
         {
             return Result<ProductDetailResponse>.Success(cached);
         }
-
         var product = await DetailQuery()
             .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted && p.Status == ProductStatus.Published, cancellationToken)
             .ConfigureAwait(false);
@@ -210,6 +178,21 @@ public sealed class ProductService(
         await cache.SetAsync(key, dto, DetailTtl, [CacheKeys.ProductTag(product.Id)], cancellationToken).ConfigureAwait(false);
         return Result<ProductDetailResponse>.Success(dto);
     }
+
+    /// <summary>
+    /// Whether this caller is entitled to see a product that is not on sale.
+    /// </summary>
+    /// <remarks>
+    /// Owner and admin only, in both the cached and the uncached path. This is the one rule that
+    /// decides whether unpublished work is readable, so it is asked in one place: a detail
+    /// response carries the seller and the status, which means a cache hit can answer it without
+    /// going back to the database for a row it already has.
+    /// </remarks>
+    private bool MaySeeUnpublished(ProductDetailResponse dto) =>
+        dto.Status == ProductStatus.Published || MaySee(dto.SellerId);
+
+    private bool MaySee(Guid sellerId) =>
+        currentUser.IsAdmin || currentUser.SellerId is { } caller && caller == sellerId;
 
     public async Task<Result<SellerProductDetailResponse>> GetForSellerAsync(Guid sellerId, Guid id, CancellationToken cancellationToken = default)
     {

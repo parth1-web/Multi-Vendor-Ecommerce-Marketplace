@@ -139,6 +139,51 @@ public sealed class ProductVisibilityTests : IClassFixture<MarketplaceApiFactory
     }
 
     [Fact]
+    public async Task An_owner_reading_a_listing_first_does_not_publish_it()
+    {
+        // The order matters, and it is the order a real session happens in: the seller opens their
+        // own listing, which caches it, and a stranger asks for the same listing a moment later.
+        // The detail cache is shared between the entitled reader and the public one, so a cache
+        // hit has to be checked against the same rule the database is checked against. Reading it
+        // as a stranger first, as the test above does, never populates that cache entry at all.
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var listing = await CreateListingAsync(seller);
+        await seller.Http.PostAsync($"/api/seller/products/{listing.Id}/submit", EmptyJson());
+
+        var own = await seller.Http.GetAsync($"/api/products/slug/{listing.Slug}");
+        own.StatusCode.Should().Be(HttpStatusCode.OK, "the owner may read their own listing");
+
+        var bySlug = await _anonymous.Http.GetAsync($"/api/products/slug/{listing.Slug}");
+        bySlug.StatusCode.Should().Be(HttpStatusCode.NotFound, "a cached copy is not a public copy");
+
+        (await _anonymous.Http.GetAsync($"/api/products/{listing.Id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var (admin, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
+        (await admin.Http.GetAsync($"/api/products/slug/{listing.Slug}")).StatusCode.Should().Be(HttpStatusCode.OK,
+            "a moderator is entitled, and the slug route is the one place that asks who is asking");
+    }
+
+    [Fact]
+    public async Task A_published_listing_stays_readable_after_its_owner_has_read_it()
+    {
+        // The other half of the same fix: a cache entry that is public does not stop being public
+        // because somebody entitled read it first.
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var listing = await CreateListingAsync(seller);
+        await seller.Http.PostAsync($"/api/seller/products/{listing.Id}/submit", EmptyJson());
+
+        var (admin, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
+        var approved = await admin.PutAsync(
+            $"/api/admin/products/{listing.Id}/approval",
+            new ProductApprovalRequest(true, ProductRejectionReason.None, "Fine"));
+        approved.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await seller.Http.GetAsync($"/api/products/slug/{listing.Slug}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _anonymous.Http.GetAsync($"/api/products/{listing.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _anonymous.Http.GetAsync($"/api/products/slug/{listing.Slug}")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task A_moderator_sees_the_queue_a_listing_is_waiting_in()
 
     {
