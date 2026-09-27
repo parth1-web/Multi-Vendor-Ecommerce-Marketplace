@@ -9,10 +9,11 @@ import Link from "next/link";
 import { Store } from "lucide-react";
 
 import { DiscountBadge, RatingStars } from "@/components/shared/RatingStars";
+import { WishlistButton } from "@/features/account/components/WishlistButton";
 import { PriceDisplay } from "@/components/shared/PriceDisplay";
 import type { ProductSummary } from "@/types/product";
 
-export function ProductCard({ product }: { product: ProductSummary }) {
+export function ProductCard({ product, saved = false }: { product: ProductSummary; saved?: boolean }) {
   return (
     <article className="mp-card h-100 d-flex flex-column" style={{ padding: "var(--space-3)", position: "relative" }}>
       <Link href={`/products/${product.slug}`} className="d-block" style={{ position: "relative" }}>
@@ -38,6 +39,11 @@ export function ProductCard({ product }: { product: ProductSummary }) {
 
         <DiscountBadge percentage={product.discountPercentage} />
       </Link>
+
+      <div style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-2)" }}>
+        <WishlistButton productId={product.id} saved={saved} className="mp-card-save" />
+      </div>
+
 
       <div className="d-flex flex-column flex-grow-1" style={{ gap: "var(--space-1)", padding: "var(--space-2) var(--space-1) 0" }}>
         <Link href={`/stores/${product.storeSlug}`} className="d-inline-flex align-items-center" style={{ gap: "0.25rem", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>
