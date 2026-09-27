@@ -114,10 +114,18 @@ export const queryKeys = {
     summary: () => [...queryKeys.admin.all, "summary"] as const,
     revenue: (range: string) => [...queryKeys.admin.all, "revenue", range] as const,
     growth: (range: string) => [...queryKeys.admin.all, "growth", range] as const,
+    refunds: (range: string) => [...queryKeys.admin.all, "refunds", range] as const,
+    /** The moderation queue, named apart from `products` so a decision invalidates only the queue. */
+    moderation: (params: unknown) => [...queryKeys.admin.all, "moderation", params] as const,
     users: (params: unknown) => [...queryKeys.admin.all, "users", params] as const,
     sellers: (params: unknown) => [...queryKeys.admin.all, "sellers", params] as const,
     auditLogs: (params: unknown) => [...queryKeys.admin.all, "audit-logs", params] as const,
+    salesReport: (range: string) => [...queryKeys.admin.all, "report-sales", range] as const,
+    sellerReport: () => [...queryKeys.admin.all, "report-sellers"] as const,
+    inventoryReport: () => [...queryKeys.admin.all, "report-inventory"] as const,
+    commissionReport: (range: string) => [...queryKeys.admin.all, "report-commissions", range] as const,
   },
+
 
   /** Customer-facing summary, kept apart from the seller one so an event can target either. */
   customer: {
