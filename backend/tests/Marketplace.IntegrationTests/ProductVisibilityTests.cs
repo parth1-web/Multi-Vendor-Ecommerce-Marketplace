@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using FluentAssertions;
+using Marketplace.Application.Common.Models;
 using Marketplace.Application.Modules.Catalog.DTOs;
 using Marketplace.Domain.Enums;
 using Marketplace.IntegrationTests.Infrastructure;
@@ -115,6 +116,50 @@ public sealed class ProductVisibilityTests : IClassFixture<MarketplaceApiFactory
         own.Status.Should().Be(ProductStatus.Rejected);
 
         (await _anonymous.Http.GetAsync($"/api/products/{listing.Id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task An_unpublished_listing_is_not_readable_by_its_slug_either()
+    {
+        var listing = await CreateListingAsync();
+
+        // A slug is as guessable as an id, and a prettier address is not a reason to publish
+        // somebody's unfinished work.
+        var bySlug = await _anonymous.Http.GetAsync($"/api/products/slug/{listing.Slug}");
+        bySlug.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        (await seller.Http.GetAsync($"/api/products/slug/{listing.Slug}")).StatusCode.Should().Be(HttpStatusCode.OK,
+            "the seller who owns it can still see it, which is what the edit screen relies on");
+    }
+
+    [Fact]
+    public async Task A_moderator_sees_the_queue_a_listing_is_waiting_in()
+
+    {
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var listing = await CreateListingAsync(seller);
+
+        var (admin, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
+        var queue = await admin.GetAsync<PagedResult<ProductSummaryResponse>>("/api/admin/products?status=PendingApproval");
+
+        queue.Should().NotBeNull();
+        queue!.Items.Should().Contain(p => p.Id == listing.Id,
+            "a queue that cannot see the listings waiting in it is not a queue: the status filter has to reach the query");
+    }
+
+    [Fact]
+    public async Task A_moderator_sees_every_state_of_the_catalogue()
+    {
+        var (admin, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
+        var listing = await CreateListingAsync();
+
+        var everything = await admin.GetAsync<PagedResult<ProductSummaryResponse>>("/api/admin/products?pageSize=100");
+        var publishedOnly = await admin.GetAsync<PagedResult<ProductSummaryResponse>>("/api/admin/products?status=Published");
+
+        everything.Should().NotBeNull();
+        everything!.Items.Should().Contain(p => p.Id == listing.Id, "an admin reads the whole catalogue, published or not");
+        publishedOnly!.Items.Should().NotContain(p => p.Id == listing.Id, "a published filter still means published");
     }
 
     private async Task<ProductSummaryResponse> CreateListingAsync(ApiClient? seller = null)

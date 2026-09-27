@@ -57,7 +57,7 @@ public sealed class ProductService(
             return new PagedResult<ProductSummaryResponse>([], page.Page, page.PageSize, 0);
         }
 
-        var source = ApplyScope(ApplyFilters(products.Query().AsNoTracking(), query), scope);
+        var source = ApplyScope(ApplyFilters(products.Query().AsNoTracking(), query, currentUser.IsAdmin), scope);
 
         source = query.Sort switch
         {
@@ -137,6 +137,16 @@ public sealed class ProductService(
             .ConfigureAwait(false);
 
         if (product is null)
+        {
+            return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
+        }
+
+        // This route is anonymous, so it owes the same check as the one by id: a slug is as
+        // guessable as an id, and an unpublished listing is not public just because it has a
+        // prettier address.
+        var isOwner = currentUser.SellerId is { } caller && caller == product.SellerId;
+
+        if (product.Status != ProductStatus.Published && !isOwner && !currentUser.IsAdmin)
         {
             return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
         }
@@ -850,12 +860,12 @@ public sealed class ProductService(
         return source;
     }
 
-    private static IQueryable<Product> ApplyFilters(IQueryable<Product> source, ProductQuery query)
+    private static IQueryable<Product> ApplyFilters(IQueryable<Product> source, ProductQuery query, bool callerIsAdmin)
     {
         // Only an admin, or a seller looking at their own catalogue, may see unpublished
         // products. The flag is honoured solely alongside a seller scope, which the API fills
         // from the token, so a public caller cannot use it to read other sellers' drafts.
-        var seesEveryState = currentUserIsAdmin() || (query.IncludeUnpublished && query.SellerId is not null);
+        var seesEveryState = callerIsAdmin || (query.IncludeUnpublished && query.SellerId is not null);
         if (!seesEveryState)
         {
             source = source.Where(p => p.Status == ProductStatus.Published);
@@ -916,22 +926,6 @@ public sealed class ProductService(
         }
 
         return source;
-    }
-
-    // Injected indirectly to keep ApplyFilters static; set once per request by the caller.
-    private static bool currentUserIsAdmin() => AdminScope.Value;
-
-    private static readonly AsyncLocal<bool> AdminScope = new();
-
-    internal IDisposable UseAdminScope(bool isAdmin)
-    {
-        AdminScope.Value = isAdmin;
-        return new AdminScopeReset();
-    }
-
-    private sealed class AdminScopeReset : IDisposable
-    {
-        public void Dispose() => AdminScope.Value = false;
     }
 
     private async Task<List<ProductSummaryResponse>> HydrateAsync(List<ProductSummaryResponse> items, CancellationToken cancellationToken)
