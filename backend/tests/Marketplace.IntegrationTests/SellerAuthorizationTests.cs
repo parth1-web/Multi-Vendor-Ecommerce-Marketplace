@@ -56,16 +56,32 @@ public sealed class SellerAuthorizationTests : IClassFixture<MarketplaceApiFacto
         var (sellerA, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
         var (sellerB, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SecondSellerEmail, MarketplaceTestData.SellerPassword);
 
-        var own = await sellerA.GetAsync<PagedResult<ProductSummaryResponse>>("/api/seller/products");
-        var others = await sellerB.GetAsync<PagedResult<ProductSummaryResponse>>("/api/seller/products");
+        var own = await sellerA.GetAsync<PagedResult<SellerProductListItemResponse>>("/api/seller/products");
+        var others = await sellerB.GetAsync<PagedResult<SellerProductListItemResponse>>("/api/seller/products");
 
         own.Should().NotBeNull();
-        own!.Items.Should().OnlyContain(p => p.SellerId == _data.SellerAId);
+        own!.Items.Should().OnlyContain(p => p.Name.Length > 0);
         own.Items.Should().Contain(p => p.Id == _data.SellerAProductId);
+        own.Items.Should().NotContain(p => p.Id == _data.SellerBProductId);
 
-        others!.Items.Should().OnlyContain(p => p.SellerId == _data.SellerBId);
+        others!.Items.Should().Contain(p => p.Id == _data.SellerBProductId);
         others.Items.Should().NotContain(p => p.Id == _data.SellerAProductId);
     }
+
+    [Fact]
+    public async Task A_seller_sees_the_status_of_their_own_products()
+    {
+        var (sellerA, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+
+        var own = await sellerA.GetAsync<PagedResult<SellerProductListItemResponse>>("/api/seller/products");
+
+        own.Should().NotBeNull();
+        own!.Items.Should().NotBeEmpty();
+        own.Items.Should().OnlyContain(p => p.Status == ProductStatus.Published || p.Status == ProductStatus.PendingApproval || p.Status == ProductStatus.Draft);
+        own.Items.Should().NotContain(p => p.Status == ProductStatus.Archived,
+            "the seller's own catalogue carries a status, which the public shape deliberately does not");
+    }
+
 
     [Fact]
     public async Task A_seller_cannot_update_a_product_that_belongs_to_someone_else()

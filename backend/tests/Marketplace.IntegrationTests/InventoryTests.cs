@@ -45,6 +45,12 @@ public sealed class InventoryTests : IClassFixture<MarketplaceApiFactory>, IAsyn
         mine!.Items.Should().Contain(i => i.ProductVariantId == _data.SellerAProductVariantId);
         mine.Items.Should().NotContain(i => i.ProductId == _data.SellerBProductId, "another seller's stock is not this seller's business");
 
+        // A stock list of blank names and the year 1 is what a seller sees on their own page,
+        // so the names and the date are asserted rather than assumed.
+        mine.Items.Should().OnlyContain(i => !string.IsNullOrWhiteSpace(i.ProductName), "a row a seller cannot identify is not a stock list");
+        mine.Items.Should().OnlyContain(i => !string.IsNullOrWhiteSpace(i.Sku));
+        mine.Items.Should().OnlyContain(i => i.UpdatedAt > DateTimeOffset.UnixEpoch, "stock that has never been moved is still dated today");
+
         theirs!.Items.Should().Contain(i => i.ProductVariantId == _data.SellerBProductVariantId);
         theirs.Items.Should().NotContain(i => i.ProductVariantId == _data.SellerAProductVariantId);
     }
