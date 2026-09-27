@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { ErrorState, StatusBadge } from "@/components/shared/Feedback";
 import { orderApi } from "@/features/orders/api/orderApi";
+import { OrderReviews } from "@/features/orders/components/OrderReviews";
 import { cx, formatCurrency, formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
@@ -266,6 +267,11 @@ function OrderDetailPage() {
               </span>
             </p>
           </section>
+
+          {/* A review is written against a line of this order, because that is what proves the
+              purchase. It is the only place one can be written from, and the server says which
+              lines are eligible. */}
+          <OrderReviews order={data} />
         </div>
       </div>
     </div>
