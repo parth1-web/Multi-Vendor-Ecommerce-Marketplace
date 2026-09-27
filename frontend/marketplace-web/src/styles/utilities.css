@@ -229,6 +229,27 @@
   box-shadow: 0 0 0 3px var(--violet-bg);
 }
 
+/* An unread notification is marked by weight and a rule, never by colour alone. */
+.mp-notification.is-unread {
+  background-color: var(--violet-bg);
+  border-radius: var(--radius-sm);
+  padding-inline: var(--space-3);
+}
+
+/* The heart sits on the image, so it needs its own ground to stay legible over any photo. */
+.mp-card-save button {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  line-height: 1;
+  padding: 0.35rem;
+}
+
+.mp-card-save p {
+  position: absolute;
+  width: 12rem;
+}
+
 /* Focus is never removed, only restyled: a keyboard user must always see where they are. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-500);
