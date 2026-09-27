@@ -30,7 +30,9 @@ public static class CacheKeys
 
     public static string ProductBySlug(string slug) => $"catalog:product:slug:{slug}";
 
-    public static string ProductTag(Guid id) => $"catalog:product:{id:N}";
+    // A tag key must not collide with the entry key it invalidates: both were "catalog:product:{id}",
+    // which made a tag sweep indistinguishable from reading or writing the detail itself.
+    public static string ProductTag(Guid id) => $"catalog:tag:product:{id:N}";
 
     public static string SellerProductTag(Guid sellerId) => $"catalog:seller:{sellerId:N}";
 
