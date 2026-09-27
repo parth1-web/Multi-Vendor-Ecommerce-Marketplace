@@ -66,10 +66,16 @@ public sealed class ProductsController(IProductService products) : ControllerBas
     public async Task<IActionResult> GetBySlug(string slug, CancellationToken cancellationToken) =>
         (await products.GetBySlugAsync(slug, cancellationToken)).ToActionResult();
 
+    /// <summary>
+    /// A product by id. The whole controller is anonymous, so an unpublished product must not be
+    /// readable here: a draft is a seller's unpublished work, and a moderator's queue is not
+    /// public. The owning seller reads it through <c>/api/seller/products/{id}</c> instead.
+    /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ProductDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
-        (await products.GetByIdAsync(id, cancellationToken)).ToActionResult();
+        (await products.GetPublishedByIdAsync(id, cancellationToken)).ToActionResult();
 
     private static ProductSortOption ParseSort(string? sort) => sort?.Trim().ToLowerInvariant() switch
     {

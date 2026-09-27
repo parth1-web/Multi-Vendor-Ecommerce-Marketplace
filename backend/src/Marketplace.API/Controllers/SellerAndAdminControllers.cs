@@ -45,6 +45,24 @@ public sealed class SellerProductsController(IProductService products, Marketpla
             cancellationToken));
     }
 
+    /// <summary>
+    /// One of the seller's own products, in full: images, variants, stock and moderation state.
+    /// The public detail deliberately hides all of that, and it is exactly what a seller needs in
+    /// order to fix a listing.
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(SellerProductDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken)
+    {
+        if (currentUser.SellerId is not { } sellerId)
+        {
+            return Forbid();
+        }
+
+        return (await products.GetForSellerAsync(sellerId, id, cancellationToken)).ToActionResult();
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(ProductSummaryResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> Create([FromBody] CreateProductRequest request, CancellationToken cancellationToken) =>

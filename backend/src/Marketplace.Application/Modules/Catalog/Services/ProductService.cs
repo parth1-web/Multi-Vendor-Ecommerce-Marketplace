@@ -155,7 +155,41 @@ public sealed class ProductService(
         {
             return Result<ProductDetailResponse>.Success(cached);
         }
+
         var product = await DetailQuery().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, cancellationToken).ConfigureAwait(false);
+
+        if (product is null)
+        {
+            return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
+        }
+
+        // A draft, a listing awaiting review and one that was sent back are all somebody's
+        // unpublished work. They are readable by the seller who owns them and by an admin, and by
+        // nobody else: a moderator's queue is not a public page.
+        var isOwner = currentUser.SellerId is { } caller && caller == product.SellerId;
+
+        if (product.Status != ProductStatus.Published && !isOwner && !currentUser.IsAdmin)
+        {
+            return Result<ProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
+        }
+
+        var dto = await BuildDetailAsync(product, cancellationToken).ConfigureAwait(false);
+        await cache.SetAsync(key, dto, DetailTtl, [CacheKeys.ProductTag(product.Id)], cancellationToken).ConfigureAwait(false);
+        return Result<ProductDetailResponse>.Success(dto);
+    }
+
+    public async Task<Result<ProductDetailResponse>> GetPublishedByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var key = CacheKeys.Product(id);
+        var cached = await cache.GetAsync<ProductDetailResponse>(key, cancellationToken).ConfigureAwait(false);
+        if (cached is not null)
+        {
+            return Result<ProductDetailResponse>.Success(cached);
+        }
+
+        var product = await DetailQuery()
+            .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted && p.Status == ProductStatus.Published, cancellationToken)
+            .ConfigureAwait(false);
 
         if (product is null)
         {
@@ -166,6 +200,70 @@ public sealed class ProductService(
         await cache.SetAsync(key, dto, DetailTtl, [CacheKeys.ProductTag(product.Id)], cancellationToken).ConfigureAwait(false);
         return Result<ProductDetailResponse>.Success(dto);
     }
+
+    public async Task<Result<SellerProductDetailResponse>> GetForSellerAsync(Guid sellerId, Guid id, CancellationToken cancellationToken = default)
+    {
+        var product = await DetailQuery().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, cancellationToken).ConfigureAwait(false);
+
+        if (product is null || product.SellerId != sellerId)
+        {
+            // Treated as absent rather than forbidden, so a seller cannot map another seller's
+            // catalogue by watching which ids come back as "forbidden".
+            return Result<SellerProductDetailResponse>.Failure("Product not found.", ResultErrorCodes.NotFound);
+        }
+
+        var category = await categories.GetByIdAsync(product.CategoryId, cancellationToken).ConfigureAwait(false);
+
+        var stockByVariant = await inventories.Query().AsNoTracking()
+            .Where(i => i.ProductId == product.Id)
+            .ToDictionaryAsync(i => i.ProductVariantId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Result<SellerProductDetailResponse>.Success(new SellerProductDetailResponse(
+            product.Id,
+            product.Name,
+            product.SlugValue,
+            product.ShortDescription,
+            product.Description,
+            product.BasePrice,
+            product.CompareAtPrice,
+            product.DiscountPercentage,
+            product.CategoryId,
+            category?.Name ?? string.Empty,
+            product.Brand,
+            product.Model,
+            product.Status,
+            product.RejectionReason,
+            product.RejectionNote,
+            product.IsFeatured,
+            stockByVariant.Values.Sum(i => i.SellableQuantity) > 0,
+            stockByVariant.Values.Sum(i => i.SellableQuantity),
+            product.SoldCount,
+            product.ViewCount,
+            product.RatingAverage,
+            product.RatingCount,
+            product.CreatedAt,
+            product.PublishedAt,
+            product.Images.OrderBy(i => i.SortOrder)
+                .Select(i => new ProductImageResponse(i.Id, i.Url, i.AltText, i.IsPrimary, i.SortOrder)).ToList(),
+            product.Variants
+                .OrderBy(v => v.SortOrder)
+                .Select(v => new ProductVariantResponse(
+                    v.Id,
+                    v.Sku,
+                    v.Name,
+                    v.Price,
+                    v.IsActive,
+                    stockByVariant.GetValueOrDefault(v.Id)?.AvailableQuantity ?? 0,
+                    (stockByVariant.GetValueOrDefault(v.Id)?.SellableQuantity ?? 0) > 0,
+                    stockByVariant.GetValueOrDefault(v.Id)?.LowStockThreshold ?? 0,
+                    v.Options.Select(o => new ProductVariantOptionResponse(o.Name, o.Value)).ToList()))
+                .ToList(),
+            product.Specifications.OrderBy(s => s.SortOrder)
+                .Select(s => new ProductSpecificationResponse(s.Key, s.Value, s.SortOrder)).ToList(),
+            product.Tags.Select(t => t.Name).ToList()));
+    }
+
 
     public async Task<Result<ProductSummaryResponse>> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken = default)
     {
@@ -245,17 +343,17 @@ public sealed class ProductService(
             new { product.Name, product.BasePrice }, cancellationToken).ConfigureAwait(false);
         await InvalidateAsync(product, cancellationToken).ConfigureAwait(false);
 
-        return await GetByIdAsync(product.Id, cancellationToken).ConfigureAwait(false)
-            is var result && result.IsSuccess
-            ? Result<ProductSummaryResponse>.Success(new ProductSummaryResponse(
-                product.Id, product.Name, product.SlugValue, product.ShortDescription, product.BasePrice,
-                product.CompareAtPrice, product.DiscountPercentage,
-                product.Images.FirstOrDefault(i => i.IsPrimary)?.Url,
-                product.Images.FirstOrDefault(i => i.IsPrimary)?.AltText,
-                product.SellerId, seller.BusinessName, string.Empty, string.Empty,
-                product.CategoryId, string.Empty, string.Empty,
-                product.RatingAverage, product.RatingCount, true, 0, product.IsFeatured, false, product.SoldCount, product.CreatedAt))
-            : Result<ProductSummaryResponse>.Failure("The product was created but could not be reloaded.");
+        // Projected from the entity that was just saved, not by re-reading it. The re-read went
+        // through the cached detail reader, which put an unpublished product's full detail into
+        // the same cache the public route serves from — so creating a listing published it.
+        return Result<ProductSummaryResponse>.Success(new ProductSummaryResponse(
+            product.Id, product.Name, product.SlugValue, product.ShortDescription, product.BasePrice,
+            product.CompareAtPrice, product.DiscountPercentage,
+            product.Images.FirstOrDefault(i => i.IsPrimary)?.Url,
+            product.Images.FirstOrDefault(i => i.IsPrimary)?.AltText,
+            product.SellerId, seller.BusinessName, string.Empty, string.Empty,
+            product.CategoryId, string.Empty, string.Empty,
+            product.RatingAverage, product.RatingCount, true, 0, product.IsFeatured, false, product.SoldCount, product.CreatedAt));
     }
 
     public async Task<Result<ProductSummaryResponse>> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken cancellationToken = default)

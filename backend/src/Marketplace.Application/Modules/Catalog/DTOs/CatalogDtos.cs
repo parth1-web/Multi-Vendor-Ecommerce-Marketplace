@@ -3,7 +3,44 @@ using Marketplace.Domain.Enums;
 namespace Marketplace.Application.Modules.Catalog.DTOs;
 
 /// <summary>
-/// A seller's own view of a product, which is not the public one.
+/// A seller's own view of a product, in full.
+///
+/// The public detail is a shopper's view: it hides the price of a variant that is not for sale
+/// and says nothing about moderation. Neither of those helps the person who has to fix the
+/// listing, so the seller gets this instead.
+/// </summary>
+public sealed record SellerProductDetailResponse(
+    Guid Id,
+    string Name,
+    string Slug,
+    string ShortDescription,
+    string Description,
+    decimal BasePrice,
+    decimal? CompareAtPrice,
+    int DiscountPercentage,
+    Guid CategoryId,
+    string CategoryName,
+    string? Brand,
+    string? Model,
+    ProductStatus Status,
+    ProductRejectionReason RejectionReason,
+    string? RejectionNote,
+    bool IsFeatured,
+    bool IsInStock,
+    int AvailableQuantity,
+    int SoldCount,
+    int ViewCount,
+    decimal RatingAverage,
+    int RatingCount,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? PublishedAt,
+    IReadOnlyList<ProductImageResponse> Images,
+    IReadOnlyList<ProductVariantResponse> Variants,
+    IReadOnlyList<ProductSpecificationResponse> Specifications,
+    IReadOnlyList<string> Tags);
+
+/// <summary>
+/// A seller's own view of a product in a list, which is not the public one.
 ///
 /// A seller has to be able to tell a draft from a live listing and to see why a moderator sent
 /// it back. None of that belongs in the shape the catalogue publishes, and omitting it leaves the
