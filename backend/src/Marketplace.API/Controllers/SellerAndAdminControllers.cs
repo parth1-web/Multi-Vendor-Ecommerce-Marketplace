@@ -225,7 +225,16 @@ public sealed class AdminOrdersController(IOrderService orders) : ControllerBase
 
 public sealed record AdminOrderStatusRequest(OrderStatus Status, string? Note);
 
-/// <summary>Reviews: public reads, verified-purchase writes.</summary>
+/// <summary>
+/// Public review reads: anyone may read the reviews of a product.
+/// </summary>
+/// <remarks>
+/// Writing one lives in its own controller, <see cref="ProductReviewWritesController"/>, and not
+/// on this one behind an <c>[Authorize]</c>, because <c>[AllowAnonymous]</c> on a controller
+/// overrides <c>[Authorize]</c> on any of its actions. Marking the action as it did was no
+/// protection at all: an anonymous caller reached the service and was refused by a business rule
+/// instead of by the gate.
+/// </remarks>
 [ApiController]
 [Route("api/products/{productId:guid}/reviews")]
 [AllowAnonymous]
@@ -235,9 +244,15 @@ public sealed class ProductReviewsController(IReviewService reviews) : Controlle
     [ProducesResponseType(typeof(PagedResult<ReviewResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(Guid productId, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] int? minRating, [FromQuery] string? sort, CancellationToken cancellationToken) =>
         Ok(await reviews.ListForProductAsync(productId, new ReviewListQuery(page, pageSize, minRating, true, sort ?? "newest"), cancellationToken));
+}
 
+/// <summary>Writing a review, which needs an account that bought the thing.</summary>
+[ApiController]
+[Route("api/products/{productId:guid}/reviews")]
+[Authorize]
+public sealed class ProductReviewWritesController(IReviewService reviews) : ControllerBase
+{
     [HttpPost]
-    [Authorize]
     [ProducesResponseType(typeof(ReviewResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> Create(Guid productId, [FromBody] CreateReviewRequest request, CancellationToken cancellationToken) =>
         (await reviews.CreateAsync(productId, request, cancellationToken)).ToActionResult(r => StatusCode(StatusCodes.Status201Created, r));

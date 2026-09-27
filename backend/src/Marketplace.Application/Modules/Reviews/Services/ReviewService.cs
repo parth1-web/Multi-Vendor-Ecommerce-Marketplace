@@ -28,6 +28,8 @@ public sealed class ReviewService(
     IRepository<Domain.Catalog.Product> products,
     IRepository<User> users,
     IRepository<SellerStore> stores,
+    IRepository<Seller> sellers,
+    ICacheService cache,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     IClock clock,
@@ -132,6 +134,14 @@ public sealed class ReviewService(
 
         await RecalculateProductRatingAsync(productId, now, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // A product's detail carries its rating and its reviews, and it is cached, so a new review
+        // is invisible on the product page until the entry happens to expire. The tag covers both
+        // the id and the slug entries, which were written under it.
+        await cache.RemoveByTagAsync(CacheKeys.ProductTag(productId), cancellationToken).ConfigureAwait(false);
+        await cache.RemoveAsync(CacheKeys.Product(productId), cancellationToken).ConfigureAwait(false);
+        await cache.RemoveAsync(CacheKeys.ProductBySlug(product.SlugValue), cancellationToken).ConfigureAwait(false);
+        await cache.RemoveByTagAsync(CacheKeys.CatalogTag, cancellationToken).ConfigureAwait(false);
 
         await auditService.RecordAsync(AuditAction.ReviewCreated, nameof(Review), review.Id, product.Name,
             new { productId, request.Rating }, cancellationToken).ConfigureAwait(false);
@@ -324,15 +334,26 @@ public sealed class ReviewService(
         }
     }
 
+    /// <summary>
+    /// The user id behind a seller, or null when there is no such seller.
+    /// </summary>
+    /// <remarks>
+    /// A notification is addressed to a user, and the notifications table's foreign key points at
+    /// the user id. This used to query the store, throw the answer away, and hand back the seller
+    /// id instead, so the insert failed on that foreign key and every attempt to write a review
+    /// came back as a server error. A seller and the user who owns one are different rows with
+    /// different ids, and only the second of them can be written into a notification.
+    /// </remarks>
     private async Task<Guid?> FindSellerUserAsync(Guid sellerId, CancellationToken cancellationToken)
     {
-        var seller = await stores.Query().AsNoTracking()
-            .Where(s => s.SellerId == sellerId)
-            .Select(s => s.SellerId)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
+        if (sellerId == Guid.Empty)
+        {
+            return null;
+        }
 
-        return sellerId == Guid.Empty ? null : sellerId;
+        var seller = await sellers.GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
+
+        return seller?.UserId is { } userId && userId != Guid.Empty ? userId : null;
     }
 
     private async Task<PagedResult<ReviewResponse>> HydrateAsync(PagedResult<ReviewResponse> result, CancellationToken cancellationToken)
