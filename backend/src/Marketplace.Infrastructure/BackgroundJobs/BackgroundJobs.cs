@@ -145,7 +145,12 @@ public sealed class BackgroundJobWorker(
 
         try
         {
-            using var scope = scopeFactory.CreateScope();
+            // The async scope, not the plain one. A job resolves a DbContext and a unit of work,
+            // and both are async-disposable only, so disposing the scope synchronously throws on
+            // the way out. The throw happens after the work has already run, which is the worst
+            // possible moment: the job reports as failed and nothing looks wrong until you notice
+            // the log filling up.
+            await using var scope = scopeFactory.CreateAsyncScope();
             var affected = await work(scope.ServiceProvider).ConfigureAwait(false);
             logger.LogInformation("Job {Job} completed with {Affected} affected row(s)", name, affected);
         }

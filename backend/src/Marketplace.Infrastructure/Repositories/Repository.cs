@@ -93,6 +93,19 @@ public sealed class UnitOfWork(MarketplaceDbContext context) : IUnitOfWork
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
+    /// <summary>
+    /// Disposes nothing, on purpose: the context belongs to the scope that created it.
+    /// </summary>
+    /// <remarks>
+    /// It exists anyway. A dependency injection scope disposed synchronously will dispose every
+    /// service it built, and a service that only implements <see cref="IAsyncDisposable"/> turns
+    /// that into an exception rather than a no-op, which in a background job surfaces as a failure
+    /// long after the work itself succeeded. A type that holds nothing can say so on both paths.
+    /// </remarks>
+    public void Dispose()
+    {
+    }
+
     private sealed class TransactionScopeAdapter(
         Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction) : ITransactionScope
     {
