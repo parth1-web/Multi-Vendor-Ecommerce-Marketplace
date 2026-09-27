@@ -81,8 +81,12 @@ public sealed class InventoryService(
                 (i.AvailableQuantity - i.ReservedQuantity) <= 0, i.UpdatedAt), cancellationToken)
             .ConfigureAwait(false);
 
-        await HydrateAsync(result.Items.ToList(), cancellationToken).ConfigureAwait(false);
-        return result;
+        // The hydrated items are the ones to return. The projection fills names in afterwards,
+        // and returning the un-hydrated page instead is how a stock list ends up showing a
+        // column of blank names and a default date.
+        var hydrated = await HydrateAsync(result.Items.ToList(), cancellationToken).ConfigureAwait(false);
+
+        return new PagedResult<InventoryItemResponse>(hydrated, result.Page, result.PageSize, result.TotalCount);
     }
 
     public async Task<IReadOnlyList<InventoryItemResponse>> GetLowStockAsync(CancellationToken cancellationToken = default)

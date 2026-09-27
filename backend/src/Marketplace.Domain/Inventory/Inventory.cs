@@ -22,6 +22,11 @@ public class Inventory : Entity
         AvailableQuantity = availableQuantity;
         LowStockThreshold = Math.Max(0, lowStockThreshold);
         CreatedAt = now;
+
+        // A row that has never been moved is still dated today. Leaving this at its default
+        // means a stock list shows the year 1 for anything nobody has adjusted yet, which reads
+        // as a broken record rather than as "never changed".
+        UpdatedAt = now;
     }
 
     public Guid ProductVariantId { get; private set; }
