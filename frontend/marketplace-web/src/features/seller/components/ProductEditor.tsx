@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
@@ -89,12 +89,65 @@ export function ProductEditor({ productId }: { productId?: string }) {
     register,
     handleSubmit,
     getValues,
+    reset,
     setError,
     formState: { errors },
   } = useForm<BasicsValues>({
     resolver: zodResolver(basicsSchema),
     defaultValues: { name: "", shortDescription: "", description: "", brand: "", model: "", basePrice: 0, categoryId: "" },
   });
+
+  const existing = useQuery({
+    queryKey: queryKeys.seller.product(productId!),
+    queryFn: () => sellerApi.product(productId!),
+    enabled: Boolean(productId),
+  });
+
+  // An edit form that starts blank is a form that overwrites. Everything the seller did not
+  // retype would be saved as empty, and they would only find out when the listing came back
+  // wrong. The values arrive once, when the listing does, and are never written back afterwards.
+  useEffect(() => {
+    if (!existing.data) {
+      return;
+    }
+
+    const product = existing.data;
+    reset({
+      name: product.name,
+      shortDescription: product.shortDescription,
+      description: product.description,
+      brand: product.brand ?? "",
+      model: product.model ?? "",
+      basePrice: product.basePrice,
+      compareAtPrice: product.compareAtPrice ?? undefined,
+      categoryId: product.categoryId,
+    });
+
+    setImages(
+      product.images.length > 0
+        ? product.images.map((image, index) => ({ key: nextKey(), url: image.url, altText: image.altText ?? "", isPrimary: image.isPrimary || index === 0 }))
+        : [{ key: nextKey(), url: "", altText: "", isPrimary: true }],
+    );
+
+    setVariants(
+      product.variants.length > 0
+        ? product.variants.map(variant => ({
+            key: nextKey(),
+            sku: variant.sku,
+            name: variant.name,
+            price: variant.price === null ? "" : String(variant.price),
+            initialStock: String(variant.availableQuantity),
+            lowStockThreshold: variant.lowStockThreshold === null ? "" : String(variant.lowStockThreshold),
+          }))
+        : [newVariant()],
+    );
+
+    setSpecifications(
+      product.specifications.length > 0
+        ? product.specifications.map(spec => ({ key: nextKey(), specKey: spec.key, value: spec.value }))
+        : [{ key: nextKey(), specKey: "", value: "" }],
+    );
+  }, [existing.data, reset]);
 
   const categoryOptions = useMemo(() => flattenCategories(categories.data ?? []), [categories.data]);
 
@@ -336,6 +389,17 @@ export function ProductEditor({ productId }: { productId?: string }) {
           One row for a size, a colour or a length. A product with only one option needs exactly one row, with a
           descriptive name.
         </p>
+
+        {isEdit ? (
+          <p className="mp-alert mp-alert-info" style={{ marginBottom: 0 }}>
+            These are shown so you can see what the listing has. Images, variants, stock and specifications are
+            separate operations on the product page, where each one can be checked on its own.{" "}
+            <Link href={`/seller/products/${productId}`} className="mp-link">
+              Open the listing
+            </Link>
+            .
+          </p>
+        ) : null}
 
         <div className="mp-table-wrap">
           <table className="mp-table">

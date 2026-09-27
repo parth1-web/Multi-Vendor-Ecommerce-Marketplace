@@ -18,6 +18,7 @@ import type {
 import type { DateRange } from "@/types/seller";
 import type { PagedResult } from "@/types/api";
 import type { ProductStatus, ProductSummary } from "@/types/product";
+import type { ProductRejectionReason } from "@/types/productAuthoring";
 import type { UserRole } from "@/types/auth";
 
 const withRange = (range: DateRange) => `range=${range}`;
@@ -45,8 +46,8 @@ export const adminApi = {
     return apiClient.get<PagedResult<ProductSummary>>(`/api/admin/products?${search.toString()}`).then(data => data.data);
   },
 
-  reviewProduct: (id: string, approve: boolean, note: string) =>
-    apiClient.put(`/api/admin/products/${id}/approval`, { approve, reason: "None", note: note || null }).then(() => undefined),
+  reviewProduct: (id: string, approve: boolean, reason: ProductRejectionReason, note: string) =>
+    apiClient.put(`/api/admin/products/${id}/approval`, { approve, reason, note: note || null }).then(() => undefined),
 
   setFeatured: (id: string, featured: boolean) =>
     apiClient.put(`/api/admin/products/${id}/featured?value=${featured}`, {}).then(() => undefined),

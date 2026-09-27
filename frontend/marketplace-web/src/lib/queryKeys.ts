@@ -99,6 +99,7 @@ export const queryKeys = {
   seller: {
     all: ["seller"] as const,
     products: (params: unknown) => [...queryKeys.seller.all, "products", params] as const,
+    product: (id: string) => [...queryKeys.seller.all, "products", "detail", id] as const,
     inventory: (page: number) => [...queryKeys.seller.all, "inventory", page] as const,
     orders: (params: unknown) => [...queryKeys.seller.all, "orders", params] as const,
     summary: () => [...queryKeys.seller.all, "summary"] as const,

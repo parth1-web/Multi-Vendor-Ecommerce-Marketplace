@@ -14,7 +14,7 @@ import type {
   SellerSummary,
   TopProduct,
 } from "@/types/seller";
-import type { CreateProductRequest, UpdateProductRequest } from "@/types/productAuthoring";
+import type { CreateProductRequest, SellerProductDetail, UpdateProductRequest } from "@/types/productAuthoring";
 
 export const sellerApi = {
   summary: () => apiClient.get<SellerSummary>("/api/seller/analytics/summary").then(data => data.data),
@@ -49,6 +49,12 @@ export const sellerApi = {
   updateProduct: (id: string, request: UpdateProductRequest) => apiClient.put(`/api/seller/products/${id}`, request).then(data => data.data),
 
   deleteProduct: (id: string) => apiClient.delete(`/api/seller/products/${id}`).then(() => undefined),
+
+  /**
+   * A seller's own listing, in full: the moderation fields the public detail deliberately omits.
+   * Scoped to the signed-in seller by the API, so there is no "which seller" to pass.
+   */
+  product: (id: string) => apiClient.get<SellerProductDetail>(`/api/seller/products/${id}`).then(data => data.data),
 
   /**
    * Puts a draft in front of a moderator. A listing is not live until somebody approves it,

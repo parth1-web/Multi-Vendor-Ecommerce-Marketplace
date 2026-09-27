@@ -19,12 +19,23 @@ import { errorMessage } from "@/lib/errors";
 import { cx, formatCurrency, formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
 import type { ProductSummary } from "@/types/product";
+import type { ProductRejectionReason } from "@/types/productAuthoring";
 
-const REJECTION_REASONS = [
-  "The description does not match the product",
-  "The photographs do not match the product",
-  "The price or the images appear to be copied from elsewhere",
-  "The product is not something this marketplace sells",
+/**
+ * What a reviewer can send a listing back for.
+ *
+ * One option per reason the API actually has, in the reviewer's words rather than the field's.
+ * The value is the API's name and not the sentence: the seller is shown the reason, an audit
+ * entry records it, and a reason that is only ever a string in this file is a reason the rest of
+ * the system cannot count.
+ */
+const REJECTION_REASONS: { value: ProductRejectionReason; label: string }[] = [
+  { value: "InaccurateDescription", label: "The description or the photographs do not match the product" },
+  { value: "ProhibitedItem", label: "This marketplace does not sell this kind of product" },
+  { value: "CopyrightConcern", label: "The images or the text look copied from somewhere else" },
+  { value: "PricingIssue", label: "The price is not credible, or is not this product's price" },
+  { value: "MissingDocumentation", label: "Something required is missing" },
+  { value: "Other", label: "Something else, explained in the note" },
 ];
 
 export function ModerationQueue() {
@@ -32,7 +43,7 @@ export function ModerationQueue() {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [reasons, setReasons] = useState<Record<string, ProductRejectionReason | "">>({});
   const [actionError, setActionError] = useState<string | null>(null);
 
   const queue = useQuery({
@@ -41,7 +52,8 @@ export function ModerationQueue() {
   });
 
   const decide = useMutation({
-    mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) => adminApi.reviewProduct(id, approve, note),
+    mutationFn: ({ id, approve, reason, note }: { id: string; approve: boolean; reason: ProductRejectionReason; note: string }) =>
+      adminApi.reviewProduct(id, approve, reason, note),
     onSuccess: async () => {
       setActionError(null);
       await queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
@@ -94,7 +106,17 @@ export function ModerationQueue() {
                 onNote={value => setNotes(current => ({ ...current, [product.id]: value }))}
                 onReason={value => setReasons(current => ({ ...current, [product.id]: value }))}
                 busy={decide.isPending}
-                onDecide={approve => decide.mutate({ id: product.id, approve, note: reasons[product.id] ?? notes[product.id] ?? "" })}
+                onDecide={approve =>
+                  decide.mutate({
+                    id: product.id,
+                    approve,
+                    // An approval has no reason; a rejection is not allowed without one. The note
+                    // is always the note, rather than whichever of the two fields happened to be
+                    // filled in.
+                    reason: approve ? "None" : ((reasons[product.id] || "Other") as ProductRejectionReason),
+                    note: notes[product.id] ?? "",
+                  })
+                }
                 onFeature={() => feature.mutate({ id: product.id, featured: !product.isFeatured })}
               />
             ))}
@@ -140,9 +162,9 @@ function ReviewableProduct({
   open: boolean;
   onToggle: () => void;
   note: string;
-  reason: string;
+  reason: ProductRejectionReason | "";
   onNote: (value: string) => void;
-  onReason: (value: string) => void;
+  onReason: (value: ProductRejectionReason) => void;
   busy: boolean;
   onDecide: (approve: boolean) => void;
   onFeature: () => void;
@@ -198,12 +220,12 @@ function ReviewableProduct({
                 id={`reason-${product.id}`}
                 className="mp-input"
                 value={reason}
-                onChange={event => onReason(event.target.value)}
+                onChange={event => onReason(event.target.value as ProductRejectionReason)}
               >
                 <option value="">Choose a reason…</option>
                 {REJECTION_REASONS.map(option => (
-                  <option key={option} value={option}>
-                    {option}
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
