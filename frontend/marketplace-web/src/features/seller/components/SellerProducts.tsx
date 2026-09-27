@@ -83,6 +83,7 @@ export function SellerProducts() {
                 <th scope="col">Sold</th>
                 <th scope="col">Status</th>
                 <th scope="col">Listed</th>
+                <th scope="col" />
               </tr>
             </thead>
             <tbody>
@@ -108,6 +109,11 @@ export function SellerProducts() {
                     <StatusBadge tone={productTone(product.status)}>{productLabel(product.status)}</StatusBadge>
                   </td>
                   <td style={{ color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>{formatDate(product.createdAt)}</td>
+                  <td>
+                    <Link href={`/seller/products/${product.id}/edit`} className="btn btn-sm btn-outline-secondary">
+                      Edit
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

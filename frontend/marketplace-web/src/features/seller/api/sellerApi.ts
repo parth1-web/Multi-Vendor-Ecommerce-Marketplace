@@ -14,6 +14,7 @@ import type {
   SellerSummary,
   TopProduct,
 } from "@/types/seller";
+import type { CreateProductRequest, UpdateProductRequest } from "@/types/productAuthoring";
 
 export const sellerApi = {
   summary: () => apiClient.get<SellerSummary>("/api/seller/analytics/summary").then(data => data.data),
@@ -42,6 +43,18 @@ export const sellerApi = {
 
     return apiClient.get<SellerProductPage>(`/api/seller/products?${search.toString()}`).then(data => data.data);
   },
+
+  createProduct: (request: CreateProductRequest) => apiClient.post("/api/seller/products", request).then(data => data.data),
+
+  updateProduct: (id: string, request: UpdateProductRequest) => apiClient.put(`/api/seller/products/${id}`, request).then(data => data.data),
+
+  deleteProduct: (id: string) => apiClient.delete(`/api/seller/products/${id}`).then(() => undefined),
+
+  /**
+   * Puts a draft in front of a moderator. A listing is not live until somebody approves it,
+   * which is the only reason a shopper can trust that what is for sale exists.
+   */
+  submitForApproval: (id: string) => apiClient.post(`/api/seller/products/${id}/submit`, {}).then(() => undefined),
 
   orders: (params: { page: number; pageSize?: number; status?: string; search?: string }) => {
     const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
