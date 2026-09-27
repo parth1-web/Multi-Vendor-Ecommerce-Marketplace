@@ -1087,7 +1087,11 @@ public sealed class ProductService(
 
         var totalSellable = stockByVariant.Values.Sum(i => i.SellableQuantity);
 
+        // The reply is loaded with the review, not looked up afterwards. Without the include it is
+        // simply null here, so a seller's answer to a review is written, stored, shown to the
+        // seller and never shown to the shopper it was written for.
         var productReviews = await reviews.Query().AsNoTracking()
+            .Include(r => r.Reply)
             .Where(r => r.ProductId == product.Id && r.IsVisible)
             .OrderByDescending(r => r.CreatedAt)
             .Take(10)

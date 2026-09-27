@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { Boxes, LayoutDashboard, Package, ShoppingCart, Wallet } from "lucide-react";
+import { Boxes, LayoutDashboard, MessageSquareQuote, Package, ShoppingCart, Wallet } from "lucide-react";
 
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -20,6 +20,7 @@ const LINKS = [
   { href: "/seller/products", label: "Products", icon: Package },
   { href: "/seller/orders", label: "Orders", icon: ShoppingCart },
   { href: "/seller/inventory", label: "Stock", icon: Boxes },
+  { href: "/seller/reviews", label: "Reviews", icon: MessageSquareQuote },
   { href: "/seller/earnings", label: "Earnings", icon: Wallet },
 ];
 

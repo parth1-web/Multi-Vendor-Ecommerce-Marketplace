@@ -156,7 +156,91 @@ public sealed class ReviewTests : IClassFixture<MarketplaceApiFactory>, IAsyncLi
     }
 
     [Fact]
+    public async Task A_sellers_reply_reaches_the_product_page()
+    {
+        // The review is written, the reply is written, the seller sees the reply on their own
+        // screen — and the shopper, who is the person it was written for, saw nothing. The
+        // product's reviews were loaded without their replies, so the field was always null on
+        // the way out. It passes through a cache, so a stale copy is the other half of the risk.
+        var (customer, _, item) = await DeliveredOrderAsync();
+        var created = await customer.PostAsync($"/api/products/{item.ProductId}/reviews", new
+        {
+            rating = 3,
+            title = "Does not go back in the box",
+            body = "The cable was loose in the packaging, so this is a note for whoever reads it.",
+            orderItemId = item.Id,
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var review = (await ApiClient.ReadAsync<ReviewResponse>(created))!;
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var replied = await seller.PostAsync($"/api/reviews/{review.Id}/reply",
+            new { body = "Thank you. We have changed the packaging and it is now taped in place." });
+        replied.StatusCode.Should().Be(HttpStatusCode.Created, await ApiClient.ReadTextAsync(replied));
+
+        var anonymous = new ApiClient(_factory.CreateClient());
+        var product = await anonymous.GetAsync<ProductDetailResponse>($"/api/products/{item.ProductId}");
+
+        var shown = product!.Reviews.Single(r => r.Id == review.Id);
+        shown.Reply.Should().NotBeNull("a reply the seller wrote is the point of writing it");
+        shown.Reply!.Body.Should().Contain("taped in place");
+        shown.Reply.SellerName.Should().NotBeNullOrWhiteSpace("and it is labelled as the store's, not as another customer");
+
+        // And the seller can see what they wrote, which is the other half. The list and the
+        // product page get their data by different routes: the page from the review's own query,
+        // the list from a projection that cannot carry a navigation, so the reply has to be
+        // fetched for the page separately. Getting one without the other is easy and invisible.
+        var theirs = await seller.GetAsync<PagedResult<ReviewResponse>>("/api/reviews/seller?page=1&pageSize=50");
+        var mine = theirs!.Items.SingleOrDefault(r => r.Id == review.Id);
+        mine.Should().NotBeNull();
+        mine!.Reply.Should().NotBeNull("a seller who has just replied can go back and see it");
+        mine.Reply!.Body.Should().Contain("taped in place");
+        mine.Reply.SellerName.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task A_seller_may_only_reply_once()
+    {
+        var (customer, _, item) = await DeliveredOrderAsync();
+        var created = await customer.PostAsync($"/api/products/{item.ProductId}/reviews", new
+        {
+            rating = 4,
+            title = "Worth a reply",
+            body = "Posting this so the one-reply rule is the thing being tested.",
+            orderItemId = item.Id,
+        });
+        var review = (await ApiClient.ReadAsync<ReviewResponse>(created))!;
+
+        var (seller, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        (await seller.PostAsync($"/api/reviews/{review.Id}/reply", new { body = "First reply, and the only one." }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var second = await seller.PostAsync($"/api/reviews/{review.Id}/reply", new { body = "Actually, one more thing." });
+        second.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, await ApiClient.ReadTextAsync(second));
+    }
+
+    [Fact]
+    public async Task A_seller_cannot_reply_to_a_review_of_someone_elses_product()
+    {
+        var (customer, _, item) = await DeliveredOrderAsync();
+        var created = await customer.PostAsync($"/api/products/{item.ProductId}/reviews", new
+        {
+            rating = 2,
+            title = "Not the seller's to answer",
+            body = "This is on the other seller's product, so the reply must be refused.",
+            orderItemId = item.Id,
+        });
+        var review = (await ApiClient.ReadAsync<ReviewResponse>(created))!;
+
+        var (other, _) = await AuthHelper.SignInAsync(_factory, MarketplaceTestData.SecondSellerEmail, MarketplaceTestData.SellerPassword);
+        var refused = await other.PostAsync($"/api/reviews/{review.Id}/reply", new { body = "This is not my product." });
+
+        refused.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, await ApiClient.ReadTextAsync(refused));
+    }
+
+    [Fact]
     public async Task A_rating_below_one_star_is_refused()
+
     {
         var (customer, _, item) = await DeliveredOrderAsync();
 

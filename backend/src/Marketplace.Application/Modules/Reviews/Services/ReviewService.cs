@@ -162,7 +162,7 @@ public sealed class ReviewService(
 
     public async Task<Result<ReviewResponse>> UpdateAsync(Guid reviewId, UpdateReviewRequest request, CancellationToken cancellationToken = default)
     {
-        var review = await reviews.Query().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
+        var review = await reviews.Query().Include(r => r.Reply).FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
             return Result<ReviewResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
@@ -231,7 +231,7 @@ public sealed class ReviewService(
             return Result<ReviewReplyResponse>.Failure("Seller access is required.");
         }
 
-        var review = await reviews.Query().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
+        var review = await reviews.Query().Include(r => r.Reply).FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
             return Result<ReviewReplyResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
@@ -254,6 +254,22 @@ public sealed class ReviewService(
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false) ?? "Seller";
 
+        // A product's detail carries the reviews, replies and all, and it is cached. A reply that
+        // only invalidated the review itself would leave the shopper reading a review with no
+        // answer to it until the entry expired.
+        var reviewed = await products.Query().AsNoTracking()
+            .Where(p => p.Id == review.ProductId)
+            .Select(p => new { p.SlugValue })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (reviewed is not null)
+        {
+            await cache.RemoveByTagAsync(CacheKeys.ProductTag(review.ProductId), cancellationToken).ConfigureAwait(false);
+            await cache.RemoveAsync(CacheKeys.Product(review.ProductId), cancellationToken).ConfigureAwait(false);
+            await cache.RemoveAsync(CacheKeys.ProductBySlug(reviewed.SlugValue), cancellationToken).ConfigureAwait(false);
+        }
+
         return Result<ReviewReplyResponse>.Success(new ReviewReplyResponse(reply.Id, reply.Body, storeName, reply.CreatedAt));
     }
 
@@ -272,7 +288,10 @@ public sealed class ReviewService(
 
     private async Task<Result<ReviewResponse>> GetByIdAsync(Guid reviewId, CancellationToken cancellationToken)
     {
-        var review = await reviews.Query().AsNoTracking().FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
+        // The reply is read here rather than projected, because this one is a single read and the
+        // navigation has to be loaded for the branch below to mean anything.
+        var review = await reviews.Query().AsNoTracking().Include(r => r.Reply)
+            .FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
         if (review is null)
         {
             return Result<ReviewResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
@@ -282,7 +301,7 @@ public sealed class ReviewService(
         [
             new ReviewResponse(review.Id, review.ProductId, string.Empty, string.Empty, null, review.Rating, review.Title,
                 review.Body, review.IsVerifiedPurchase, review.IsVisible, review.HelpfulCount, string.Empty, review.CreatedAt,
-                review.Reply is null ? null : new ReviewReplyResponse(review.Reply.Id, review.Reply.Body, string.Empty, review.Reply.CreatedAt))
+                ReplyOf(review))
         ], 1, 1, 1);
 
         var hydrated = await HydrateAsync(single, cancellationToken).ConfigureAwait(false);
@@ -396,16 +415,31 @@ public sealed class ReviewService(
 
         var authorByReview = raw.ToDictionary(r => r.Id, r => authorNames.GetValueOrDefault(r.CustomerId, "Customer"));
 
+        // A seller's reply, fetched for the page. It is not on the reviews the paging projected,
+        // because a projection into a record does not carry navigations: it was written, stored,
+        // and then shown to nobody, neither to the seller who wrote it nor to the shopper it was
+        // written for. One more query for the page, like the four above it.
+        var replies = await reviews.Query().AsNoTracking()
+            .Where(r => authorIds.Contains(r.Id) && r.Reply != null)
+            .Select(r => new { r.Id, Reply = new ReviewReplyResponse(r.Reply!.Id, r.Reply.Body, string.Empty, r.Reply.CreatedAt) })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var replyByReview = replies.ToDictionary(r => r.Id, r => r.Reply);
+
         var enriched = result.Items.Select(i =>
         {
             var product = productMap.GetValueOrDefault(i.ProductId);
+            var storeName = storeNames.GetValueOrDefault(product?.SellerId ?? Guid.Empty, "Seller");
+            var reply = replyByReview.GetValueOrDefault(i.Id);
+
             return i with
             {
                 ProductName = product?.Name ?? string.Empty,
                 ProductSlug = product?.SlugValue ?? string.Empty,
                 ProductImageUrl = product?.Url,
                 AuthorName = authorByReview.GetValueOrDefault(i.Id, "Customer"),
-                Reply = i.Reply is null ? null : i.Reply with { SellerName = storeNames.GetValueOrDefault(product?.SellerId ?? Guid.Empty, "Seller") }
+                Reply = reply is null ? null : reply with { SellerName = storeName }
             };
         }).ToList();
 
@@ -416,4 +450,18 @@ public sealed class ReviewService(
         string.IsNullOrEmpty(firstName)
             ? "Customer"
             : $"{firstName[0].ToString().ToUpperInvariant()}.";
+
+    /// <summary>
+    /// A review's reply, for a read that has the navigation loaded.
+    /// </summary>
+    /// <remarks>
+    /// Only usable where the query included the reply. A paged projection cannot use this: it
+    /// projects into a record, and a record does not carry navigations, so the value would be null
+    /// however it is written. The list paths fetch the replies in the hydration step instead.
+    /// </remarks>
+    private static ReviewReplyResponse? ReplyOf(Review review) =>
+        review.Reply is null
+            ? null
+            : new ReviewReplyResponse(review.Reply.Id, review.Reply.Body, string.Empty, review.Reply.CreatedAt);
+
 }
