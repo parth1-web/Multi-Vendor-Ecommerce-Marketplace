@@ -250,6 +250,44 @@
   width: 12rem;
 }
 
+/* The seller area's own navigation: a tab row, distinct from the shop's header links. */
+.mp-seller-nav {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-2);
+}
+
+.mp-seller-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+/* A figure large enough to be the thing you look at, not a number in a table. */
+.mp-stat-value {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-stat-row {
+  margin-bottom: 0;
+}
+
+/* A table that scrolls sideways on a phone rather than overflowing the page. */
+.mp-table-wrap {
+  overflow-x: auto;
+}
+
 /* Focus is never removed, only restyled: a keyboard user must always see where they are. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-500);
