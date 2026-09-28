@@ -1,9 +1,11 @@
 /**
  * Creating an account.
  *
- * The one decision on this page is whether you are here to buy or to sell, and it is a
- * checkbox rather than a hidden field: a seller account is a different product with a different
- * review process, and finding that out after filling in a form is how people give up.
+ * The one decision on this page is whether you are here to buy or to sell, and it is a checkbox
+ * rather than a hidden field: a seller account is a different product with a different review
+ * process, and finding that out after filling in a form is how people give up. Choosing it also
+ * changes what the button says and where you land afterwards, so the consequence is visible
+ * before the click and not after it.
  */
 
 "use client";
@@ -13,32 +15,36 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Check, Eye, EyeOff, Store, UserRound } from "lucide-react";
 
-import { CheckField, TextField } from "@/components/forms/FormField";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { CheckField, FieldWithButton, TextField } from "@/components/forms/FormField";
 import { AnonymousOnly } from "@/features/auth/components/AnonymousOnly";
-import { AuthPanel } from "@/features/auth/components/AuthPanel";
 import { authApi } from "@/features/auth/api/authApi";
 import { registerSchema, type RegisterValues } from "@/features/auth/schemas";
 import { errorMessage, fieldErrors } from "@/lib/errors";
+import { cx } from "@/lib/format";
 import { useAuth } from "@/providers/AuthProvider";
+import type { AuthShellProps } from "@/components/auth/AuthShell";
 
-export default function RegisterPage() {
+export default function RegisterPage({ stats }: { stats?: AuthShellProps["stats"] }) {
   return (
     <AnonymousOnly>
-      <RegisterForm />
+      <RegisterForm stats={stats} />
     </AnonymousOnly>
   );
 }
 
-function RegisterForm() {
+function RegisterForm({ stats }: { stats?: AuthShellProps["stats"] }) {
   const router = useRouter();
   const { signIn } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [wantsToSell, setWantsToSell] = useState(false);
 
   const {
     register,
     handleSubmit,
-    watch,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<RegisterValues>({
@@ -54,8 +60,6 @@ function RegisterForm() {
       terms: false,
     },
   });
-
-  const wantsToSell = watch("wantsToSell");
 
   async function onSubmit(values: RegisterValues) {
     setFormError(null);
@@ -85,15 +89,60 @@ function RegisterForm() {
   }
 
   return (
-    <AuthPanel
+    <AuthShell
+      stats={stats}
       title="Create an account"
       subtitle="One account for buying, selling, orders and everything in between."
-      footer={
-        <>
-          Already have one? <Link href="/login">Sign in</Link>
-        </>
-      }
     >
+      {/*
+        The choice, as two cards rather than one checkbox: it is the largest decision on the page
+        and it changes everything after it, so it is worth looking at rather than ticking.
+      */}
+      <fieldset style={{ border: 0, padding: 0, margin: "0 0 var(--space-4)" }}>
+        <legend className="mp-metric-label p-0 mb-2">I want to</legend>
+        <div className="row g-2">
+          <div className="col-12 col-sm-6">
+            <button
+              type="button"
+              className={cx("mp-choice", !wantsToSell && "is-selected")}
+              aria-pressed={!wantsToSell}
+              onClick={() => {
+                setWantsToSell(false);
+                setFormError(null);
+              }}
+            >
+              <UserRound size={18} aria-hidden />
+              <span>
+                <strong>Buy things</strong>
+                <small>Baskets, orders and saved items</small>
+              </span>
+              {!wantsToSell ? <Check size={16} aria-hidden className="ms-auto" /> : null}
+            </button>
+          </div>
+          <div className="col-12 col-sm-6">
+            <button
+              type="button"
+              className={cx("mp-choice", wantsToSell && "is-selected")}
+              aria-pressed={wantsToSell}
+              onClick={() => {
+                setWantsToSell(true);
+                setFormError(null);
+              }}
+            >
+              <Store size={18} aria-hidden />
+              <span>
+                <strong>Sell things</strong>
+                <small>Reviewed before you can list</small>
+              </span>
+              {wantsToSell ? <Check size={16} aria-hidden className="ms-auto" /> : null}
+            </button>
+          </div>
+        </div>
+        {/* The choice is held in state and sent in the body, but it is still a real form field:
+            the browser can autofill it, and a password manager can fill the rest around it. */}
+        <input type="hidden" {...register("wantsToSell")} value={wantsToSell ? "true" : "false"} />
+      </fieldset>
+
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="mp-stack">
         {formError ? (
           <p role="alert" className="mp-alert mp-alert-danger">
@@ -103,10 +152,22 @@ function RegisterForm() {
 
         <div className="row g-2">
           <div className="col-12 col-sm-6">
-            <TextField label="First name" autoComplete="given-name" required error={errors.firstName?.message} {...register("firstName")} />
+            <TextField
+              label="First name"
+              autoComplete="given-name"
+              required
+              error={errors.firstName?.message}
+              {...register("firstName")}
+            />
           </div>
           <div className="col-12 col-sm-6">
-            <TextField label="Last name" autoComplete="family-name" required error={errors.lastName?.message} {...register("lastName")} />
+            <TextField
+              label="Last name"
+              autoComplete="family-name"
+              required
+              error={errors.lastName?.message}
+              {...register("lastName")}
+            />
           </div>
         </div>
 
@@ -116,6 +177,7 @@ function RegisterForm() {
           inputMode="email"
           autoComplete="email"
           required
+          placeholder="you@example.com"
           error={errors.email?.message}
           {...register("email")}
         />
@@ -130,30 +192,37 @@ function RegisterForm() {
           {...register("phoneNumber")}
         />
 
-        <TextField
+        <FieldWithButton
           label="Password"
-          type="password"
+          type={showPassword ? "text" : "password"}
           autoComplete="new-password"
           required
           hint="At least 8 characters, with an upper-case letter, a lower-case letter and a digit."
           error={errors.password?.message}
           {...register("password")}
-        />
+        >
+          {({ id }) => (
+            <button
+              type="button"
+              className="mp-field-affix-btn"
+              onClick={() => setShowPassword(current => !current)}
+              aria-label={showPassword ? "Hide the password" : "Show the password"}
+              aria-pressed={showPassword}
+              aria-controls={id}
+              title={showPassword ? "Hide the password" : "Show the password"}
+            >
+              {showPassword ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+            </button>
+          )}
+        </FieldWithButton>
 
         <TextField
           label="Confirm password"
-          type="password"
+          type={showPassword ? "text" : "password"}
           autoComplete="new-password"
           required
           error={errors.confirmPassword?.message}
           {...register("confirmPassword")}
-        />
-
-        <CheckField
-          label="I want to sell on this marketplace"
-          hint="Your account is reviewed before you can list anything."
-          error={errors.wantsToSell?.message}
-          {...register("wantsToSell")}
         />
 
         <CheckField
@@ -163,9 +232,22 @@ function RegisterForm() {
         />
 
         <button type="submit" className="btn btn-primary w-100" disabled={isSubmitting}>
-          {isSubmitting ? "Creating your account…" : wantsToSell ? "Create a seller account" : "Create an account"}
+          {isSubmitting ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" aria-hidden />
+              Creating your account…
+            </>
+          ) : wantsToSell ? (
+            "Create a seller account"
+          ) : (
+            "Create an account"
+          )}
         </button>
       </form>
-    </AuthPanel>
+
+      <p style={{ margin: "var(--space-5) 0 0", textAlign: "center", color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+        Already have one? <Link href="/login">Sign in</Link>
+      </p>
+    </AuthShell>
   );
 }

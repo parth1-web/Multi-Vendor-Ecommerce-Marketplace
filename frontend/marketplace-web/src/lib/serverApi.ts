@@ -40,3 +40,17 @@ export async function serverGet<T>(path: string, revalidate = 60): Promise<T> {
 
   return (await response.json()) as T;
 }
+
+/**
+ * A public read for a page that must render even when the API is slow or down.
+ *
+ * A sign-in page is the one page that cannot be allowed to fail because a number would not load.
+ * The page is served with no figure rather than with an error, and the figure appears when it can.
+ */
+export async function serverGetQuietly<T>(path: string, revalidate = 60): Promise<T | null> {
+  try {
+    return await serverGet<T>(path, revalidate);
+  } catch {
+    return null;
+  }
+}

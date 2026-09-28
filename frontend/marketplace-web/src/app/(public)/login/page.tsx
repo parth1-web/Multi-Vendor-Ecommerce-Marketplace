@@ -11,6 +11,10 @@ import type { Metadata } from "next";
 
 import { AnonymousOnly } from "@/features/auth/components/AnonymousOnly";
 import { LoginForm } from "@/features/auth/components/LoginForm";
+import { serverGetQuietly } from "@/lib/serverApi";
+import type { PagedResult } from "@/types/api";
+import type { Category } from "@/types/product";
+import type { StoreDirectoryEntry } from "@/types/store";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -25,9 +29,25 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const candidate = params.returnUrl;
   const returnUrl = typeof candidate === "string" ? candidate : null;
 
+  // The figures on the left are the real ones, fetched quietly: a sign-in page that failed
+  // because a count would not load would be the worst possible place for that to happen.
+  const [products, stores, categories] = await Promise.all([
+    serverGetQuietly<PagedResult<unknown>>("/api/products?pageSize=1"),
+    serverGetQuietly<PagedResult<StoreDirectoryEntry>>("/api/stores?pageSize=1"),
+    serverGetQuietly<Category[]>("/api/categories"),
+  ]);
+
   return (
     <AnonymousOnly>
-      <LoginForm returnUrl={safeReturnUrl(returnUrl)} reason={reasonFrom(params.reason)} />
+      <LoginForm
+        returnUrl={safeReturnUrl(returnUrl)}
+        reason={reasonFrom(params.reason)}
+        stats={
+          products && stores && categories
+            ? { products: products.totalCount, stores: stores.totalCount, categories: categories.length }
+            : null
+        }
+      />
     </AnonymousOnly>
   );
 }

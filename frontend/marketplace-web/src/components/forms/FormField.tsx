@@ -102,6 +102,42 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   );
 });
 
+interface FieldWithButtonProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "children"> {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+  required?: boolean;
+  /** The control inside the field, usually a button: show a password, clear a search. */
+  children: (fields: { id: string; describedBy: string | undefined; invalid: boolean }) => ReactNode;
+}
+
+/**
+ * A text field with a control inside it.
+ *
+ * Written rather than assembled at each call site, because the reason it exists is that the label,
+ * the error announcement and the invalid border all have to be wired to the input, and doing that
+ * by hand in a sign-in form is how a password field ends up with an error message no screen reader
+ * ever announces.
+ */
+export function FieldWithButton({ label, error, hint, required, children, ...inputProps }: FieldWithButtonProps) {
+  return (
+    <FieldShell label={label} error={error} hint={hint} required={required}>
+      {({ id, describedBy, invalid }) => (
+        <div className="mp-field-affix">
+          <input
+            {...inputProps}
+            id={id}
+            aria-describedby={describedBy}
+            aria-invalid={invalid || undefined}
+            style={fieldStyle(invalid)}
+          />
+          {children({ id, describedBy, invalid })}
+        </div>
+      )}
+    </FieldShell>
+  );
+}
+
 interface TextAreaFieldProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id"> {
   label: string;
   error?: string;
