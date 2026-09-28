@@ -157,6 +157,47 @@ public sealed class CatalogBrowsingTests : IClassFixture<MarketplaceApiFactory>,
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    /// <summary>
+    /// A card whose image field is empty falls back to a grey box, and the response is otherwise
+    /// a perfectly plausible page of products, so nothing looks broken until someone notices that
+    /// the shop has no photographs. Every product in this catalogue has an image, so an empty
+    /// field here is a loading bug and never a product that simply lacks a photo.
+    /// </summary>
+    [Fact]
+    public async Task The_listing_carries_the_image_the_card_needs()
+    {
+        var page = await ListAsync();
+
+        page.Items.Should().NotBeEmpty();
+        page.Items.Should().OnlyContain(p => !string.IsNullOrWhiteSpace(p.PrimaryImageUrl));
+        page.Items.Should().OnlyContain(p => !string.IsNullOrWhiteSpace(p.PrimaryImageAlt));
+    }
+
+    [Fact]
+    public async Task A_storefront_carries_the_image_the_card_needs()
+    {
+        var store = await _shopper.GetAsync<StoreProfileResponse>($"/api/stores/{_data.SellerAStoreSlug}");
+
+        store.Should().NotBeNull();
+        store!.Products.Items.Should().NotBeEmpty();
+        store.Products.Items.Should().OnlyContain(p => !string.IsNullOrWhiteSpace(p.PrimaryImageUrl));
+    }
+
+    [Fact]
+    public async Task The_home_page_rails_carry_the_image_the_card_needs()
+    {
+        foreach (var rail in new[] { "new-arrivals", "best-sellers" })
+        {
+            var items = await _shopper.GetAsync<List<ProductSummaryResponse>>($"/api/products/{rail}");
+
+            items.Should().NotBeNull();
+            items!.Should().NotBeEmpty($"{rail} is what the home page shows", rail);
+            items.Should().OnlyContain(p => !string.IsNullOrWhiteSpace(p.PrimaryImageUrl),
+                "the home page rail renders cards, not placeholders", rail);
+        }
+    }
+
+
     /// <summary>Empties every inventory row for a product, so it is switched on but unsellable.</summary>
     private async Task<Guid> DrainInventoryAsync(Guid productId)
     {

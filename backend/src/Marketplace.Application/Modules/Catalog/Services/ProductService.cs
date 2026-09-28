@@ -72,10 +72,22 @@ public sealed class ProductService(
             _ => source.OrderByDescending(p => p.CreatedAt)
         };
 
-        var result = await source.ToPagedResultAsync(page, p => Project(p, p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url,
-            p.Images.FirstOrDefault(i => i.IsPrimary)?.AltText, null, null, null, null, 0, 0), cancellationToken).ConfigureAwait(false);
+        // The images come across with the page rather than being projected inside it.
+        // Product.Images is a collection held in a private field: nothing lazy-loads it, nothing
+        // auto-includes it, and Include is ignored the moment a query projects to another type.
+        // Reading it off an entity that was loaded without it yields an empty collection rather
+        // than an error, which is why every listing used to hand the card no image at all and
+        // fall back to its placeholder.
+        var result = await source
+            .Include(p => p.Images)
+            .ToPagedResultAsync(page, cancellationToken)
+            .ConfigureAwait(false);
 
-        var hydrated = await HydrateAsync(result.Items.ToList(), cancellationToken).ConfigureAwait(false);
+        var projected = result.Items
+            .Select(p => Project(p, PrimaryImageUrl(p), PrimaryImageAltText(p), null, null, null, null, 0, 0))
+            .ToList();
+
+        var hydrated = await HydrateAsync(projected, cancellationToken).ConfigureAwait(false);
         return new Application.Common.Models.PagedResult<ProductSummaryResponse>(hydrated, result.Page, result.PageSize, result.TotalCount);
     }
 
@@ -85,13 +97,13 @@ public sealed class ProductService(
         var items = await products.Query()
             .AsNoTracking()
             .Where(p => p.Status == ProductStatus.Published && !p.IsDeleted && p.IsFeatured)
+            .Include(p => p.Images)
             .OrderByDescending(p => p.SoldCount)
             .Take(Math.Clamp(take, 1, 40))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return await HydrateAsync(items.Select(p => Project(p, p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url,
-            p.Images.FirstOrDefault(i => i.IsPrimary)?.AltText, null, null, null, null, 0, 0)).ToList(), cancellationToken).ConfigureAwait(false);
+        return await HydrateAsync(items.Select(p => Project(p, PrimaryImageUrl(p), PrimaryImageAltText(p), null, null, null, null, 0, 0)).ToList(), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<ProductSummaryResponse>> GetBestSellersAsync(int take, CancellationToken cancellationToken = default)
@@ -99,14 +111,14 @@ public sealed class ProductService(
         var items = await products.Query()
             .AsNoTracking()
             .Where(p => p.Status == ProductStatus.Published && !p.IsDeleted)
+            .Include(p => p.Images)
             .OrderByDescending(p => p.SoldCount)
             .ThenByDescending(p => p.RatingCount)
             .Take(Math.Clamp(take, 1, 40))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return await HydrateAsync(items.Select(p => Project(p, p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url,
-            p.Images.FirstOrDefault(i => i.IsPrimary)?.AltText, null, null, null, null, 0, 0)).ToList(), cancellationToken).ConfigureAwait(false);
+        return await HydrateAsync(items.Select(p => Project(p, PrimaryImageUrl(p), PrimaryImageAltText(p), null, null, null, null, 0, 0)).ToList(), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<ProductSummaryResponse>> GetNewArrivalsAsync(int take, CancellationToken cancellationToken = default)
@@ -114,13 +126,13 @@ public sealed class ProductService(
         var items = await products.Query()
             .AsNoTracking()
             .Where(p => p.Status == ProductStatus.Published && !p.IsDeleted)
+            .Include(p => p.Images)
             .OrderByDescending(p => p.CreatedAt)
             .Take(Math.Clamp(take, 1, 40))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return await HydrateAsync(items.Select(p => Project(p, p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url,
-            p.Images.FirstOrDefault(i => i.IsPrimary)?.AltText, null, null, null, null, 0, 0)).ToList(), cancellationToken).ConfigureAwait(false);
+        return await HydrateAsync(items.Select(p => Project(p, PrimaryImageUrl(p), PrimaryImageAltText(p), null, null, null, null, 0, 0)).ToList(), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<Result<ProductDetailResponse>> GetBySlugAsync(string slug, CancellationToken cancellationToken = default)
@@ -997,6 +1009,14 @@ public sealed class ProductService(
             p.CategoryId, categoryName ?? string.Empty, categoryName ?? string.Empty, p.RatingAverage, ratingCount,
             available > 0, available, p.IsFeatured, false, p.SoldCount, p.CreatedAt);
 
+    /// <summary>The image a card should show, preferring the one the seller marked primary.</summary>
+    private static string? PrimaryImageUrl(Product p) =>
+        p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url;
+
+    /// <summary>Alt text for that image, so the card describes the product and not the file.</summary>
+    private static string? PrimaryImageAltText(Product p) =>
+        p.Images.FirstOrDefault(i => i.IsPrimary)?.AltText;
+
     /// <summary>
     /// Recounts a seller's live products onto their storefront.
     ///
@@ -1115,14 +1135,15 @@ public sealed class ProductService(
 
         var related = await products.Query().AsNoTracking()
             .Where(p => p.CategoryId == product.CategoryId && p.Id != product.Id && p.Status == ProductStatus.Published && !p.IsDeleted)
+            .Include(p => p.Images)
             .OrderByDescending(p => p.SoldCount)
             .Take(8)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var relatedDtos = await HydrateAsync(related.Select(p => Project(p,
-            p.Images.FirstOrDefault(i => i.IsPrimary)?.Url ?? p.Images.FirstOrDefault()?.Url,
-            p.Images.FirstOrDefault(i => i.IsPrimary)?.AltText, null, null, null, null, 0, 0)).ToList(), cancellationToken)
+            PrimaryImageUrl(p),
+            PrimaryImageAltText(p), null, null, null, null, 0, 0)).ToList(), cancellationToken)
             .ConfigureAwait(false);
 
         var variants = product.Variants
