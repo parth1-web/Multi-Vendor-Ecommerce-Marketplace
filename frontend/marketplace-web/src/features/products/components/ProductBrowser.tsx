@@ -5,17 +5,23 @@
  * and the metadata are rendered on the server while everything that reacts to a filter change
  * lives here. Filters are written to the URL rather than to component state, which is what
  * makes a filtered view shareable, bookmarkable and reachable with the back button.
+ *
+ * It carries "use client" itself rather than inheriting it from a parent. The pages that render
+ * it are server components, and a module a server component imports is server-side unless it
+ * says otherwise — so the hooks below were called from the server and every listing page threw
+ * at runtime while the build stayed green.
  */
+
+"use client";
 
 import Link from "next/link";
 
 import { EmptyState, ErrorState } from "@/components/shared/Feedback";
 import { useSavedProductIds } from "@/features/account/api/useWishlist";
 import { useProducts } from "@/features/products/api/useProducts";
-import { listingHref } from "@/features/products/api/readProductQuery";
+import { Pagination } from "@/components/navigation/Pagination";
 import { ProductCard } from "@/features/products/components/ProductCard";
 import { ProductFilters, SortSelect } from "@/features/products/components/ProductFilters";
-import { cx } from "@/lib/format";
 import type { ProductQuery } from "@/types/product";
 
 interface ProductBrowserProps {
@@ -82,36 +88,6 @@ export function ProductBrowser({ query, basePath = "/products" }: ProductBrowser
         </div>
       </div>
     </div>
-  );
-}
-
-function Pagination({ page, totalPages, query, basePath }: { page: number; totalPages: number; query: ProductQuery; basePath: string }) {
-  if (totalPages <= 1) {
-    return null;
-  }
-
-  return (
-    <nav aria-label="Pagination" className="d-flex justify-content-between align-items-center mt-4">
-      <Link
-        className={cx("btn btn-sm btn-outline-secondary", page <= 1 && "disabled")}
-        href={listingHref(basePath, query, Math.max(1, page - 1))}
-        aria-disabled={page <= 1}
-        scroll={false}
-      >
-        Previous
-      </Link>
-      <span style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
-        Page {page} of {totalPages}
-      </span>
-      <Link
-        className={cx("btn btn-sm btn-outline-secondary", page >= totalPages && "disabled")}
-        href={listingHref(basePath, query, Math.min(totalPages, page + 1))}
-        aria-disabled={page >= totalPages}
-        scroll={false}
-      >
-        Next
-      </Link>
-    </nav>
   );
 }
 
