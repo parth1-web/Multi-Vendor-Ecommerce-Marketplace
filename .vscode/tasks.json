@@ -1,0 +1,194 @@
+{
+  // One click starts the whole system: the API with its database, and the site in front of it.
+  //
+  // F5 (Run > Run Without Debugging) or Ctrl+Shift+B starts both, side by side, and keeps them
+  // running until you stop them. The ports here are the ones the code defaults to, so nothing has
+  // to be configured before the first run.
+  //
+  // Prerequisite, once: PostgreSQL on localhost:5432 with a role postgres/postgres. The API creates
+  // the marketplace database, applies the migrations and seeds the demo catalogue on first start.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Full stack (API + site)",
+      "detail": "Starts the API on :5000 and the site on :3000, side by side. Stop to shut both down.",
+      "type": "process",
+      "isBackground": true,
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true,
+        "showReuseMessage": false
+      },
+      "prompt": {
+        "message": "Start the API on port 5000 and the site on port 3000?",
+        "buttons": [{ "label": "Start", "detail": "Both, side by side" }]
+      },
+      "windows": [
+        {
+          "label": "api",
+          "command": "dotnet",
+          "args": ["run", "--project", "${workspaceFolder}/backend/src/Marketplace.API", "--urls", "http://localhost:5000"],
+          "options": { "cwd": "${workspaceFolder}/backend" },
+          "env": { "ASPNETCORE_ENVIRONMENT": "Development", "DOTNET_ENVIRONMENT": "Development" },
+          "problemMatcher": {
+            "owner": "dotnet",
+            "fileLocation": ["autoDetect", "${workspaceFolder}"],
+            "pattern": [
+              {
+                "regexp": "^\\s*(\\w+)\\s+error\\s+(\\w+):\\s+(.+) \\[(\\S+)\\]$",
+                "file": 4,
+                "location": 1,
+                "message": 3
+              }
+            ]
+          },
+          "isBackground": true
+        },
+        {
+          "label": "site",
+          "command": "npm",
+          "args": ["run", "dev", "--prefix", "${workspaceFolder}/frontend/marketplace-web"],
+          "options": { "cwd": "${workspaceFolder}/frontend/marketplace-web" },
+          "isBackground": true
+        }
+      ]
+    },
+    {
+      "label": "Wait for the API, then open the site",
+      "detail": "For when the terminals are open: opens the site once the API answers.",
+      "type": "shell",
+      "dependsOn": ["API only"],
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}" },
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$deadline = (Get-Date).AddSeconds(60); while ((Get-Date) -lt $deadline) { try { $null = Invoke-WebRequest -Uri 'http://localhost:5000/health' -UseBasicParsing -TimeoutSec 2; Write-Host 'The API is up. Opening the site.'; Start-Process 'http://localhost:3000'; exit 0 } catch { Start-Sleep -Milliseconds 750 } }; Write-Error 'The API did not answer on port 5000 within a minute.'; exit 1"
+      ]
+    },
+    {
+      "label": "API only",
+      "detail": "The API on :5000, with migrations and the demo catalogue.",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["run", "--project", "${workspaceFolder}/backend/src/Marketplace.API", "--urls", "http://localhost:5000"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development", "DOTNET_ENVIRONMENT": "Development" },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "dotnet",
+        "fileLocation": ["autoDetect", "${workspaceFolder}"],
+        "pattern": [
+          {
+            "regexp": "^\\s*(\\w+)\\s+error\\s+(\\w+):\\s+(.+) \\[(\\S+)\\]$",
+            "file": 4,
+            "location": 1,
+            "message": 3
+          }
+        ]
+      }
+    },
+    {
+      "label": "Site only",
+      "detail": "The site on :3000, against an API you started yourself.",
+      "type": "process",
+      "command": "npm",
+      "args": ["run", "dev", "--prefix", "${workspaceFolder}/frontend/marketplace-web"],
+      "options": { "cwd": "${workspaceFolder}/frontend/marketplace-web" },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "eslint",
+        "fileLocation": ["relative", "${workspaceFolder}/frontend/marketplace-web"],
+        "pattern": [
+          {
+            "regexp": "^(.+):(\\d+):(\\d+)\\s+(.+?)\\s*\\((.+?)\\)$",
+            "file": 1,
+            "location": 2,
+            "message": [4, 5]
+          }
+        ]
+      }
+    },
+    {
+      "label": "Install the site",
+      "detail": "npm install. Only needed once, and only if node_modules is missing.",
+      "type": "shell",
+      "command": "npm",
+      "args": ["install", "--prefix", "${workspaceFolder}/frontend/marketplace-web"],
+      "options": { "cwd": "${workspaceFolder}/frontend/marketplace-web" },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Restore packages",
+      "detail": "dotnet restore, so the first run does not have to.",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["restore", "${workspaceFolder}/backend/Marketplace.sln"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test the API",
+      "detail": "125 unit tests and 129 integration tests, against a real PostgreSQL database.",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["test", "${workspaceFolder}/backend/Marketplace.sln", "--nologo"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": {
+        "owner": "dotnet",
+        "fileLocation": ["autoDetect", "${workspaceFolder}"],
+        "pattern": [
+          {
+            "regexp": "^\\s*(\\w+)\\s+error\\s+(\\w+):\\s+(.+) \\[(\\S+)\\]$",
+            "file": 4,
+            "location": 1,
+            "message": 3
+          }
+        ]
+      },
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "Check the site",
+      "detail": "TypeScript, then lint, then a production build.",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "verify", "--prefix", "${workspaceFolder}/frontend/marketplace-web"],
+      "options": { "cwd": "${workspaceFolder}/frontend/marketplace-web" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Check everything",
+      "detail": "The API's tests and the site's checks, one after the other.",
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Test the API", "Check the site"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Reset the demo data",
+      "detail": "Drops and recreates the database, then the API rebuilds it on the next start.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$env:PGPASSWORD = 'postgres'; $psql = 'C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe'; if (-not (Test-Path $psql)) { $psql = (Get-ChildItem 'C:\\Program Files\\PostgreSQL' -Directory | ForEach-Object { Join-Path $_.FullName 'bin\\psql.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1) }; & $psql -h localhost -U postgres -d postgres -c 'DROP DATABASE IF EXISTS marketplace WITH (FORCE);' -c 'CREATE DATABASE marketplace;'"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}
