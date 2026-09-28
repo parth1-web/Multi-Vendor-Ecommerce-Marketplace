@@ -26,6 +26,45 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
+
+  /*
+   * Bootstrap's own brand variables are remapped here rather than only in :root.
+   *
+   * A link is brand-coloured on the page, and the brand picked for a white page is close to
+   * invisible on a near-black one. --brand-300 is the same hue at a lightness that reads on both,
+   * so a link is a link in either theme rather than a decoration in one of them.
+   */
+  --bs-body-color: var(--text);
+  --bs-body-bg: var(--bg-body);
+  --bs-border-color: var(--border);
+  --bs-secondary-color: var(--text-muted);
+  --bs-link-color: var(--brand-300);
+  --bs-link-hover-color: var(--brand-200);
+  --bs-emphasis-color: var(--text);
+}
+
+/* A visible focus ring, on everything that can be focused. The default outline is often invisible
+   against a coloured or dark surface, and "remove the outline" is not the same as "replace it". */
+:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Placeholders inherit the muted colour on a dark surface rather than staying grey-on-grey. */
+::placeholder {
+  color: var(--text-subtle);
+  opacity: 1;
+}
+
+/* The autofill the browser paints over an input, which ignores the theme and lands as a pale
+   yellow block unless told otherwise. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-surface) inset;
+  caret-color: var(--text);
 }
 
 html,
@@ -62,6 +101,357 @@ a:hover {
 }
 
 /* ---- surfaces ---------------------------------------------------------------- */
+
+.mp-card {
+  background-color: var(--bg-surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+}
+
+/*
+ * ---- the sign-in and register shell ------------------------------------------
+ *
+ * Two panels side by side on a wide screen: what the marketplace is, and the form. One panel on
+ * a narrow one, the form first, because a person who followed a link to sign in is here for the
+ * form and should not have to scroll past an advert to reach it.
+ *
+ * The brand panel's background is a gradient built from the brand tokens rather than a fixed
+ * colour, so it follows the theme instead of being the one bright thing on a dark page.
+ */
+
+.mp-auth {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: calc(100vh - var(--header-height));
+}
+
+.mp-auth-panel {
+  background: var(--auth-surface-gradient);
+  border-right: var(--border-width) solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: var(--space-6) var(--space-5);
+}
+
+.mp-auth-brand {
+  display: none;
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-7) var(--space-6);
+  color: #fff;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 90% at 12% 8%, var(--brand-500) 0%, transparent 58%),
+    radial-gradient(90% 80% at 88% 92%, var(--brand-700) 0%, transparent 55%),
+    linear-gradient(155deg, var(--brand-700) 0%, var(--brand-900, #2a1a68) 58%, #0b0e1a 100%);
+}
+
+/* A soft light behind the copy, so white text has something to sit on near the top left. */
+.mp-auth-brand::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 22% 18%, var(--auth-glow) 0%, transparent 70%);
+  z-index: -1;
+}
+
+.mp-auth-brand > * {
+  position: relative;
+  max-width: 34rem;
+}
+
+.mp-auth-title {
+  color: #fff;
+  font-size: var(--fs-display);
+  margin: 0 0 var(--space-4);
+  text-wrap: balance;
+}
+
+.mp-auth-lead {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: var(--fs-body);
+  margin: 0 0 var(--space-6);
+  max-width: 30rem;
+}
+
+.mp-auth-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.mp-auth-point {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: var(--fs-sm);
+}
+
+.mp-auth-point-icon {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.mp-auth-stat {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.mp-auth-stat-value {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
+  line-height: 1.1;
+}
+
+.mp-auth-stat-label {
+  display: block;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-xs);
+}
+
+.mp-auth-form {
+  display: flex;
+  align-items: center;
+  padding: var(--space-6) var(--space-5);
+}
+
+.mp-auth-form-inner {
+  width: 100%;
+  max-width: 27rem;
+  margin-inline: auto;
+}
+
+/* The demo accounts. A person evaluating the system should not have to read a table of
+   credentials off a wiki to see the seller or the admin area. */
+.mp-demo-accounts {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  background: var(--bg-subtle);
+}
+
+.mp-demo-account {
+  display: flex;
+  width: 100%;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  transition: background var(--transition), color var(--transition);
+}
+
+.mp-demo-account:hover {
+  background: var(--bg-surface);
+  color: var(--brand-600);
+  text-decoration: none;
+}
+
+.mp-demo-account small {
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+}
+
+/*
+ * A choice, drawn as a card.
+ *
+ * Used where a decision changes what happens next rather than setting a value quietly — buying
+ * or selling, for instance. A checkbox says "yes to this"; a card says "this is what you are
+ * choosing between", which is the thing a new account holder is actually deciding.
+ */
+.mp-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text);
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+
+.mp-choice:hover {
+  border-color: var(--border-strong);
+}
+
+.mp-choice.is-selected {
+  border-color: var(--brand-500);
+  background: color-mix(in srgb, var(--brand-500) 8%, var(--bg-surface));
+  box-shadow: 0 0 0 1px var(--brand-500);
+}
+
+.mp-choice strong {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.mp-choice small {
+  display: block;
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+}
+
+.mp-choice.is-selected strong {
+  color: var(--brand-600);
+}
+
+/* A field with a button inside it: the show/hide on a password, and anything like it. */
+.mp-field-affix {
+  position: relative;
+}
+
+.mp-field-affix .mp-input {
+  padding-right: 2.75rem;
+}
+
+.mp-field-affix-btn {
+  position: absolute;
+  inset-inline-end: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--text-subtle);
+  padding: 0.35rem;
+  border-radius: var(--radius-sm);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.mp-field-affix-btn:hover {
+  color: var(--text);
+}
+
+@media (min-width: 62rem) {
+  .mp-auth {
+    grid-template-columns: 1.05fr 1fr;
+  }
+
+  .mp-auth-brand {
+    display: block;
+  }
+}
+
+/* ---- surfaces ---------------------------------------------------------------- */
+
+.mp-card {
+  background-color: var(--bg-surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+}
+
+/*
+ * A count you can act on.
+ *
+ * Four of these across the top of a dashboard, each one a link to the thing it counts. A number
+ * with nothing behind it is decoration; the arrow is there to say so.
+ */
+.mp-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  height: 100%;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-1);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+
+.mp-tile:hover {
+  text-decoration: none;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+
+.mp-tile-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.mp-tile-icon.is-brand {
+  background: var(--violet-bg);
+  color: var(--violet);
+}
+
+.mp-tile-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.mp-tile-label {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.mp-tile-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
+}
+
+/* A coupon, on the deals page. The code is the point, so it is the largest thing on the card and
+   is set in the mono face: it is something to be copied, not read. */
+.mp-deal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border-width) dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.mp-deal-code {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--violet-bg);
+  color: var(--violet);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
 
 .mp-card {
   background-color: var(--bg-surface);

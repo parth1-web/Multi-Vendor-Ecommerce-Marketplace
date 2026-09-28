@@ -33,6 +33,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useThemeStore((state) => state.theme);
 
   useEffect(() => {
+    // The document head already set this before the first paint, so the page never flashes the
+    // wrong theme. Setting it again here is what makes a toggle take effect: the store changes,
+    // this runs, and the attribute changes. It also keeps the store in charge if the script was
+    // blocked, which is what "prefers light" is for.
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 

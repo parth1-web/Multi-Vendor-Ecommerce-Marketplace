@@ -37,11 +37,39 @@ export const viewport: Viewport = {
   ],
 };
 
+/**
+ * The theme, applied before the first paint.
+ *
+ * The store is the source of truth, but a store is read after hydration, and until then the page
+ * has no data-theme and every dark token is unused — a full white flash on every load for anyone
+ * who chose dark. This runs in the document head, before anything is painted, and is the only
+ * place a theme is set from storage. It is deliberately tiny and has no framework in it, because
+ * it runs before the framework exists.
+ */
+const themeScript = `
+(function () {
+  try {
+    var stored = localStorage.getItem('mp-theme');
+    var theme = stored ? JSON.parse(stored).state.theme : null;
+    if (theme !== 'light' && theme !== 'dark') {
+      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.dataset.theme = theme;
+  } catch (e) {
+    document.documentElement.dataset.theme = 'light';
+  }
+})();
+`.trim();
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // suppressHydrationWarning: the theme is applied by an effect from a persisted store, so
-    // the server cannot know it. The mismatch is expected and harmless.
+    // suppressHydrationWarning: the theme is applied from a persisted store, so the server cannot
+    // know it. The script above sets it before paint; this keeps React from objecting to the
+    // attribute the server did not render.
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={`${sans.variable} ${display.variable} ${heading.variable} ${mono.variable}`}>
         <AppProviders>{children}</AppProviders>
       </body>

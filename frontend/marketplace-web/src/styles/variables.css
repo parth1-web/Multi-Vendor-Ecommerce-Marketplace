@@ -7,6 +7,11 @@
  */
 
 :root {
+  /* The light scheme is declared rather than assumed, so the browser renders scrollbars, date
+     pickers, autofill and the platform's own controls for a light background instead of
+     guessing from the page. */
+  color-scheme: light;
+
   /* Brand */
   --brand-50: #f2f0ff;
   --brand-100: #e6e1ff;
@@ -106,12 +111,32 @@
   --row-height: 3.25rem;
 
   --transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* A focus ring, because a keyboard user has to be able to see where they are. Two pixels of
+     the brand with a soft spread reads on both themes, which a browser's default outline does
+     not once the background is dark. */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand-500) 40%, transparent);
+
+  /* The gradient behind a sign-in or register page, and the light it throws on the panel. */
+  --auth-glow: color-mix(in srgb, var(--brand-500) 22%, transparent);
+  --auth-surface-gradient: linear-gradient(160deg, var(--bg-surface) 0%, var(--bg-subtle) 100%);
 }
 
+/*
+ * The dark scheme.
+ *
+ * More than a swap of backgrounds. A colour chosen to be readable as text on white is close to
+ * invisible as text on near-black, and the semantic set is used as text â€” a badge is a coloured
+ * foreground on a tinted background, and a link is brand-coloured on the page. So every
+ * foreground gets a lighter variant here, and the backgrounds stay as they were.
+ */
 [data-theme="dark"] {
+  color-scheme: dark;
+
   --bg-body: #0b0e1a;
   --bg-surface: #141829;
   --bg-subtle: #1b2036;
+  --bg-elevated: #1d2338;
   --border: #262c44;
   --border-strong: #343c5c;
   --text: #eef1fa;
@@ -119,9 +144,27 @@
   --text-subtle: #7b84a1;
   --sidebar-bg: #0a0c16;
   --sidebar-bg-2: #12162a;
+
+  /* Semantic foregrounds, lightened for a dark ground. */
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --violet: #a78bfa;
+  --teal: #2dd4bf;
+
   --success-bg: #0f2a1c;
   --warning-bg: #33240c;
   --danger-bg: #3a1616;
   --info-bg: #12234a;
   --violet-bg: #1c1740;
+
+  /* Shadows read as a halo on a dark page rather than as depth, so they are deepened and
+     softened rather than reused from the light theme. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.55);
+
+  --auth-glow: color-mix(in srgb, var(--brand-400) 26%, transparent);
 }
+
