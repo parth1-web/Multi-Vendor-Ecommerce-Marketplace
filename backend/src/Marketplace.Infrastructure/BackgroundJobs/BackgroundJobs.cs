@@ -184,20 +184,30 @@ public sealed class SellerPayoutProcessor(
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        // Load the period once instead of asking the database per seller. The re-run guard used to
+        // query by reference, which could not see the payouts this same loop had already added
+        // because nothing is flushed until the end, so a duplicate only surfaced as a unique
+        // index violation at save time and took the whole batch down with it. Keying on the
+        // seller and the period is what "safe to re-run" actually means.
+        var alreadySettled = await context.SellerPayouts
+            .Where(p => p.PeriodStart == periodStart && p.PeriodEnd == periodEnd)
+            .Select(p => p.SellerId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var settled = alreadySettled.ToHashSet();
         var created = 0;
 
         foreach (var group in eligible)
         {
-            var reference = $"PO-{periodEnd:yyyyMMdd}-{group.SellerId.ToString()[..6].ToUpperInvariant()}";
-
-            if (await context.SellerPayouts.AnyAsync(p => p.Reference == reference, cancellationToken).ConfigureAwait(false))
+            if (!settled.Add(group.SellerId))
             {
                 continue;
             }
 
             var payout = SellerPayout.Create(
                 group.SellerId,
-                reference,
+                BuildReference(periodEnd, group.SellerId),
                 group.Gross,
                 group.Commission,
                 group.Count,
@@ -229,6 +239,19 @@ public sealed class SellerPayoutProcessor(
 
         return created;
     }
+
+    /// <summary>
+    /// Builds the seller-facing payout reference, which is the value of a unique index.
+    /// </summary>
+    /// <remarks>
+    /// It has to identify the seller and not just the day. Seller ids are time-ordered UUIDv7
+    /// values, so their leading hex characters are a Unix timestamp: every id minted inside the
+    /// same window shares those characters. Truncating the id to six of them produced the same
+    /// reference for sellers created together, which collided on the unique index and meant no
+    /// seller was ever paid. The full id cannot collide, so it goes in whole.
+    /// </remarks>
+    private static string BuildReference(DateTimeOffset periodEnd, Guid sellerId) =>
+        $"PO-{periodEnd:yyyyMMdd}-{sellerId:N}";
 }
 
 /// <summary>Purges expired refresh tokens and consumed webhook records.</summary>
