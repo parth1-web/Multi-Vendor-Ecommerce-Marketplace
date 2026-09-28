@@ -38,8 +38,8 @@
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
-        "-Command",
-        "$deadline = (Get-Date).AddSeconds(60); while ((Get-Date) -lt $deadline) { try { $null = Invoke-WebRequest -Uri 'http://localhost:5000/health' -UseBasicParsing -TimeoutSec 2; Write-Host 'The API is up. Opening the site.'; Start-Process 'http://localhost:3000'; exit 0 } catch { Start-Sleep -Milliseconds 750 } }; Write-Error 'The API did not answer on port 5000 within a minute.'; exit 1"
+        "-File",
+        "${workspaceFolder}/scripts/wait-for-api.ps1"
       ]
     },
     {
@@ -66,7 +66,7 @@
     },
     {
       "label": "Clear the site build cache",
-      "detail": "Removes .next. The dev server and the production build share that folder, and a cache left behind by either can make the dev server 404 a page that exists.",
+      "detail": "Removes .next, which the dev server, the production build and the type check all share.",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -74,9 +74,9 @@
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        "if (Test-Path -LiteralPath '${workspaceFolder}/frontend/marketplace-web/.next') { Write-Host 'Clearing the site build cache.'; Remove-Item -LiteralPath '${workspaceFolder}/frontend/marketplace-web/.next' -Recurse -Force }"
+        "Remove-Item .next -Recurse -Force -ErrorAction SilentlyContinue; Write-Host Cleared the site build cache."
       ],
-      "options": { "cwd": "${workspaceFolder}" },
+      "options": { "cwd": "${workspaceFolder}/frontend/marketplace-web" },
       "problemMatcher": []
     },
     {
@@ -168,8 +168,8 @@
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
-        "-Command",
-        "$env:PGPASSWORD = 'postgres'; $psql = 'C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe'; if (-not (Test-Path $psql)) { $psql = (Get-ChildItem 'C:\\Program Files\\PostgreSQL' -Directory | ForEach-Object { Join-Path $_.FullName 'bin\\psql.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1) }; & $psql -h localhost -U postgres -d postgres -c 'DROP DATABASE IF EXISTS marketplace WITH (FORCE);' -c 'CREATE DATABASE marketplace;'"
+        "-File",
+        "${workspaceFolder}/scripts/reset-data.ps1"
       ],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
