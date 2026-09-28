@@ -99,3 +99,22 @@ public sealed record StoreProfileResponse(
     bool IsActive,
     DateTimeOffset CreatedAt,
     PagedResult<ProductSummaryResponse> Products);
+/// <summary>
+/// One store as it appears in the public directory of stores.
+/// </summary>
+/// <remarks>
+/// Not a <see cref="StoreProfileResponse"/>: a directory is twenty shops at a glance, and a
+/// storefront is one shop in detail. Sending twenty sets of policies and twenty product pages to
+/// draw twenty cards would be sending almost all of it to be thrown away.
+/// </remarks>
+public sealed record StoreDirectoryEntryResponse(
+    Guid SellerId,
+    Guid StoreId,
+    string Name,
+    string Slug,
+    string? LogoUrl,
+    string? BannerUrl,
+    string? Description,
+    int ProductCount,
+    decimal RatingAverage,
+    int RatingCount);

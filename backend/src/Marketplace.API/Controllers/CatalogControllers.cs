@@ -141,6 +141,11 @@ public sealed class CategoriesController(ICategoryService categories) : Controll
 [AllowAnonymous]
 public sealed class StoresController(ISellerService sellers) : ControllerBase
 {
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResult<StoreDirectoryEntryResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> List([FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? search, CancellationToken cancellationToken) =>
+        Ok(await sellers.ListPublicStoresAsync(new PageRequest(page, pageSize), search, cancellationToken));
+
     [HttpGet("{slug}")]
     [ProducesResponseType(typeof(StoreProfileResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetBySlug(string slug, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>

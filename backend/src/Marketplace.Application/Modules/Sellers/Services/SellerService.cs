@@ -184,6 +184,43 @@ public sealed class SellerService(
         return Result<SellerResponse>.Success(await MapAsync(seller, cancellationToken).ConfigureAwait(false));
     }
 
+    /// <inheritdoc />
+    public async Task<PagedResult<StoreDirectoryEntryResponse>> ListPublicStoresAsync(
+        PageRequest page, string? search, CancellationToken cancellationToken = default)
+    {
+        var query = stores.Query().AsNoTracking().Where(s => s.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            // Matched without regard to case in the database, because "kathmandu" typed into a
+            // search box should find "Kathmandu" rather than nothing.
+            var term = search.Trim().ToLowerInvariant();
+            var matching = sellers.Query().AsNoTracking()
+                .Where(s => s.BusinessName.ToLower().Contains(term))
+                .Select(s => s.Id);
+
+            query = query.Where(s => matching.Contains(s.SellerId)
+                || s.Name.ToLower().Contains(term)
+                || s.Description.ToLower().Contains(term));
+        }
+
+        // Best rated first, then busiest: a directory ordered by nothing in particular is a
+        // directory nobody can find anything in.
+        query = query.OrderByDescending(s => s.RatingAverage).ThenByDescending(s => s.TotalSalesCount);
+
+        return await query.ToPagedResultAsync(page, s => new StoreDirectoryEntryResponse(
+            s.SellerId,
+            s.Id,
+            s.Name,
+            s.SlugValue,
+            s.LogoUrl,
+            s.BannerUrl,
+            s.Description,
+            s.ProductCount,
+            s.RatingAverage,
+            s.RatingCount), cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<Result<StoreProfileResponse>> GetStoreBySlugAsync(string slug, PageRequest page, CancellationToken cancellationToken = default)
     {
         var store = await stores.Query()
