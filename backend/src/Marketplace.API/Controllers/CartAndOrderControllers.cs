@@ -28,16 +28,9 @@ public sealed class CartController(ICartService cart) : ControllerBase
 
     [HttpPost("items")]
     [ProducesResponseType(typeof(CartResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> AddItem([FromBody] AddCartItemRequest request, CancellationToken cancellationToken)
-    {
-        var result = await cart.AddItemAsync(request, ReadGuestToken(), cancellationToken);
-        if (result.IsSuccess && result.Value!.CartId != Guid.Empty && User.Identity?.IsAuthenticated != true)
-        {
-            EnsureGuestCookie();
-        }
-
-        return result.ToActionResult();
-    }
+    public async Task<IActionResult> AddItem([FromBody] AddCartItemRequest request, CancellationToken cancellationToken) =>
+        // The token is resolved before the service runs, not after: a guest cart is keyed by it.
+        (await cart.AddItemAsync(request, ResolveGuestToken(), cancellationToken)).ToActionResult();
 
     [HttpPut("items/{itemId:guid}")]
     [ProducesResponseType(typeof(CartResponse), StatusCodes.Status200OK)]
@@ -72,20 +65,43 @@ public sealed class CartController(ICartService cart) : ControllerBase
 
     private string? ReadGuestToken() => Request.Cookies[GuestCookie];
 
-    private void EnsureGuestCookie()
+    /// <summary>
+    /// The guest token this request should use, minting one when the browser has none.
+    /// </summary>
+    /// <remarks>
+    /// It has to happen before the service runs rather than after it succeeds. A guest basket is
+    /// keyed by the token, so a shopper arriving without a cookie could not be given one at all,
+    /// and the cookie that would have let them have one used to be written only once an add had
+    /// already worked. That is a deadlock no visitor can escape: the first click on "add to
+    /// basket" failed, which is precisely the click that would have issued the cookie.
+    /// </remarks>
+    private string? ResolveGuestToken()
     {
-        if (string.IsNullOrWhiteSpace(ReadGuestToken()))
+        // A signed-in customer's basket is keyed by their account, so the token is not theirs to
+        // mint and they do not get one.
+        if (User.Identity?.IsAuthenticated == true)
         {
-            var token = Guid.NewGuid().ToString("N");
-            Response.Cookies.Append(GuestCookie, token, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = Request.IsHttps,
-                SameSite = SameSiteMode.Lax,
-                Path = "/api/cart",
-                Expires = DateTimeOffset.UtcNow.AddDays(60)
-            });
+            return ReadGuestToken();
         }
+
+        var existing = ReadGuestToken();
+        if (!string.IsNullOrWhiteSpace(existing))
+        {
+            return existing;
+        }
+
+        var token = Guid.NewGuid().ToString("N");
+
+        Response.Cookies.Append(GuestCookie, token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Path = "/api/cart",
+            Expires = DateTimeOffset.UtcNow.AddDays(60)
+        });
+
+        return token;
     }
 }
 

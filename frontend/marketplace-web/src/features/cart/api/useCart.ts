@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { STALE_TIME } from "@/lib/constants";
 import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/providers/ToastProvider";
+import type { ApiErrorShape } from "@/types/api";
 
 import { cartApi } from "./cartApi";
 import type { CartResponse } from "@/types/cart";
@@ -54,11 +55,14 @@ export function useAddToCart() {
       push({ tone: "success", title: "Added to your basket" });
     },
 
-    onError: (error: { response?: { data?: { detail?: string } } }) => {
+    // The response interceptor normalises every failure into an ApiErrorShape, so the reason is
+    // on `detail`. Reading the raw axios envelope here found nothing and showed "please try
+    // again" for every cause, which is the one message that cannot help anybody.
+    onError: (error: ApiErrorShape) => {
       push({
         tone: "danger",
         title: "Could not add to basket",
-        body: error.response?.data?.detail ?? "Please try again.",
+        body: error.detail ?? "Please try again.",
       });
     },
   });

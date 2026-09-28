@@ -67,6 +67,40 @@ public sealed class CheckoutTests : IClassFixture<MarketplaceApiFactory>, IAsync
     }
 
     [Fact]
+    public async Task A_guest_with_no_cookie_is_given_a_basket_and_the_token_to_keep_it()
+    {
+        // A guest cart is keyed by a token the browser does not have yet, so the first add has to
+        // mint one. The cookie used to be written only after an add had already succeeded, which
+        // left every signed-out shopper unable to start a basket at all: the one click that would
+        // have issued the cookie was the click that failed. Nothing else in this file notices,
+        // because everything else in this file is signed in.
+        var guest = new ApiClient(_factory.CreateClient());
+
+        var first = await guest.PostAsync("/api/cart/items", new AddCartItemRequest(
+            _data.SellerAProductId, _data.SellerAProductVariantId, 1));
+
+        first.IsSuccessStatusCode.Should().BeTrue("a shopper who is not signed in can still shop");
+
+        first.Headers.TryGetValues("Set-Cookie", out var setCookies).Should().BeTrue();
+        setCookies.Should().Contain(c => c.StartsWith("mp_cart="), "the token has to travel back to the browser");
+
+        var cart = await ApiClient.ReadAsync<CartResponse>(first);
+        cart.Should().NotBeNull();
+        cart!.ItemCount.Should().Be(1);
+        cart.TotalQuantity.Should().Be(1);
+
+        // The same guest adding again lands in the basket it already has, rather than a new one.
+        var second = await guest.PostAsync("/api/cart/items", new AddCartItemRequest(
+            _data.SellerAProductId, _data.SellerAProductVariantId, 1));
+
+        second.IsSuccessStatusCode.Should().BeTrue();
+        var merged = await ApiClient.ReadAsync<CartResponse>(second);
+        merged.Should().NotBeNull();
+        merged!.ItemCount.Should().Be(1);
+        merged.TotalQuantity.Should().Be(2);
+    }
+
+    [Fact]
     public async Task A_quote_prices_the_basket_without_writing_anything()
     {
         var (customer, addressId) = await NewCustomerAsync();
