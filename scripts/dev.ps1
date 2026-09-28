@@ -58,6 +58,16 @@ Write-Host "Waiting for the API, then the site." -ForegroundColor DarkGray
 Write-Host "Ctrl+C stops both." -ForegroundColor DarkGray
 Write-Host ""
 
+# The dev server and the production build share one output directory, and "npm run verify" ends
+# on a production build. A cache left behind that way, or by a run that was stopped midway, can
+# leave the dev server serving 404s for pages that exist. Clearing it costs a recompile of the
+# page you actually open, which is what the dev server does anyway.
+$nextCache = Join-Path $site '.next'
+if (Test-Path -LiteralPath $nextCache) {
+  Write-Host 'Clearing the site build cache.' -ForegroundColor DarkGray
+  Remove-Item -LiteralPath $nextCache -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 $apiJob = $null
 $siteJob = $null
 

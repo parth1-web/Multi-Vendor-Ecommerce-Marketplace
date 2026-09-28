@@ -24,14 +24,6 @@
         "panel": "dedicated",
         "clear": true,
         "showReuseMessage": false
-      },
-      "customize": {
-        "prompt": {
-          "message": "Start the API on port 5000 and the site on port 3000?",
-          "buttons": [
-            { "label": "Start", "detail": "Both, side by side" }
-          ]
-        }
       }
     },
     {
@@ -73,9 +65,26 @@
       }
     },
     {
+      "label": "Clear the site build cache",
+      "detail": "Removes .next. The dev server and the production build share that folder, and a cache left behind by either can make the dev server 404 a page that exists.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "if (Test-Path -LiteralPath '${workspaceFolder}/frontend/marketplace-web/.next') { Write-Host 'Clearing the site build cache.'; Remove-Item -LiteralPath '${workspaceFolder}/frontend/marketplace-web/.next' -Recurse -Force }"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
       "label": "Site only",
       "detail": "The site on :3000, against an API you started yourself.",
       "type": "process",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Clear the site build cache"],
       "command": "npm",
       "args": ["run", "dev", "--prefix", "${workspaceFolder}/frontend/marketplace-web"],
       "options": { "cwd": "${workspaceFolder}/frontend/marketplace-web" },
@@ -114,7 +123,7 @@
     },
     {
       "label": "Test the API",
-      "detail": "125 unit tests and 129 integration tests, against a real PostgreSQL database.",
+      "detail": "125 unit tests and 133 integration tests, against a real PostgreSQL database.",
       "type": "shell",
       "command": "dotnet",
       "args": ["test", "${workspaceFolder}/backend/Marketplace.sln", "--nologo"],
