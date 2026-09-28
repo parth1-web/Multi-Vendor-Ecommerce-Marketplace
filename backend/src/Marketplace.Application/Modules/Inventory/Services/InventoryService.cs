@@ -371,6 +371,7 @@ public sealed class InventoryService(
         var now = clock.UtcNow;
         var expired = await reservations.Query()
             .Where(r => r.ReleasedAt == null && r.ExpiresAt <= now)
+            .OrderBy(r => r.ExpiresAt)
             .Take(500)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
