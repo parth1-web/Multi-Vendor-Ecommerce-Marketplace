@@ -14,25 +14,42 @@ export function StatTile({
   value,
   hint,
   tone = "neutral",
+  lead = false,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "neutral" | "positive" | "warning" | "danger";
+  lead?: boolean;
 }) {
   const colour =
     tone === "positive" ? "var(--success)" : tone === "warning" ? "var(--warning)" : tone === "danger" ? "var(--danger)" : "var(--text)";
 
   return (
-    <div className="mp-card mp-stat" style={{ padding: "var(--space-4)", height: "100%" }}>
+    <div
+      // The lead tile is the one the eye should land on first, so it is the one painted in the
+      // brand. On it the value takes the card's own foreground: a tone colour chosen for the page
+      // would be a dark red on purple in the light theme, which is the one pairing here that does
+      // not survive the change.
+      className={`mp-metric-card ${lead ? "" : "mp-stat"}`}
+      style={{ padding: "var(--space-4)", height: "100%" }}
+    >
       <p className="mp-metric-label" style={{ margin: 0 }}>
         {label}
       </p>
-      <p className="mp-stat-value" style={{ color: colour }}>
+      <p className="mp-stat-value" style={{ color: lead ? undefined : colour }}>
         {value}
       </p>
       {hint ? (
-        <p style={{ margin: 0, color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>{hint}</p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "var(--fs-xs)",
+            color: lead ? "color-mix(in srgb, var(--on-accent) 88%, transparent)" : "var(--text-subtle)",
+          }}
+        >
+          {hint}
+        </p>
       ) : null}
     </div>
   );
@@ -90,7 +107,7 @@ export function RangePicker({
           padding: "0.35rem 0.5rem",
           borderRadius: "var(--radius-sm)",
           border: "1px solid var(--border)",
-          backgroundColor: "var(--surface)",
+          backgroundColor: "var(--bg-surface)",
           color: "var(--text)",
           fontSize: "var(--fs-sm)",
         }}

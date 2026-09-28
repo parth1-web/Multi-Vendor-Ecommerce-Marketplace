@@ -333,7 +333,7 @@ export function AdminReports() {
         {commissions.isPending ? (
           <div className="mp-skeleton" style={{ height: "8rem", borderRadius: "var(--radius)" }} />
         ) : (commissions.data?.length ?? 0) === 0 ? (
-          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--font-sm)" }}>No commission in this period.</p>
+          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>No commission in this period.</p>
         ) : (
           <div className="mp-table-wrap">
             <table className="mp-table">

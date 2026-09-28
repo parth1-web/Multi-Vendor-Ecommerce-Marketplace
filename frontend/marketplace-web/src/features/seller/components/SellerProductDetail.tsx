@@ -192,7 +192,7 @@ export function SellerProductDetail() {
                       onClick={() => removeImage.mutate(image.id)}
                       disabled={removeImage.isPending}
                       aria-label="Remove this image"
-                      style={{ position: "absolute", top: "0.25rem", right: "0.25rem", backgroundColor: "var(--surface)", borderRadius: "50%", padding: "0.2rem" }}
+                      style={{ position: "absolute", top: "0.25rem", right: "0.25rem", backgroundColor: "var(--bg-surface)", borderRadius: "50%", padding: "0.2rem" }}
                     >
                       <Trash2 size={14} aria-hidden />
                     </button>

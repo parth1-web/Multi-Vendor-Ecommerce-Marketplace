@@ -102,11 +102,202 @@ a:hover {
 
 /* ---- surfaces ---------------------------------------------------------------- */
 
+/*
+ * The one card every surface in the product is built from.
+ *
+ * The sheen is the point of it: a card that is a flat fill reads as a rectangle, and the same
+ * rectangle with the brand laid across the top of it reads as a panel. It is layered over the
+ * fill rather than replacing it, so the card is still `--bg-surface` underneath and still
+ * inherits whatever the theme says that is.
+ */
 .mp-card {
+  position: relative;
   background-color: var(--bg-surface);
+  background-image: var(--surface-sheen);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-1);
+}
+
+/* The dashboard's lead card: brand rather than surface, so the eye lands on it first. */
+.mp-metric-card {
+  position: relative;
+  overflow: hidden;
+  background-image: var(--surface-accent);
+  background-color: var(--brand-600);
+  color: var(--on-accent);
+  border: var(--border-width) solid color-mix(in srgb, var(--brand-300) 30%, transparent);
+  border-radius: var(--radius);
+  box-shadow: var(--surface-accent-glow);
+}
+
+/* The card the brand accent belongs on, for the tiles that sit beside the lead one. */
+.mp-metric-card--accent {
+  background-image: var(--surface-raised), var(--surface-sheen);
+  background-color: var(--bg-elevated);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--brand-400) 32%, var(--border));
+  box-shadow: var(--shadow-2);
+}
+
+/* Anything on an accent card reads in the accent's own foreground, not the page's. */
+.mp-metric-card .mp-metric-label,
+.mp-metric-card .mp-stat-value {
+  color: inherit;
+}
+
+.mp-metric-card .mp-metric-label {
+  color: color-mix(in srgb, var(--on-accent) 88%, transparent);
+}
+
+/* A filled control in the brand, so every button on a screen is the same purple. */
+.mp-btn-accent {
+  background-image: var(--accent-gradient);
+  background-color: var(--brand-600);
+  color: var(--on-accent);
+  border: 1px solid transparent;
+  font-weight: 500;
+  transition: filter var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+
+.mp-btn-accent:hover,
+.mp-btn-accent:focus-visible {
+  background-image: var(--accent-gradient-hover);
+  background-color: var(--brand-500);
+  color: var(--on-accent);
+  filter: saturate(1.05);
+}
+
+.mp-btn-accent:active {
+  transform: translateY(1px);
+}
+
+/*
+ * Chrome that sits over the page glow. Slightly transparent so the light behind it shows
+ * through, with a backdrop blur, and a hairline rather than a solid edge to keep it from
+ * looking like a bar laid on top of the page.
+ */
+.mp-glass {
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-color: var(--glass-border);
+}
+
+/*
+ * A status pill. Tinted ground with a foreground from the same semantic colour, which is what
+ * makes it legible on either theme: the light theme uses a pale tint with a dark text and the
+ * dark theme a deep tint with a light text, both declared as one pair of tokens.
+ */
+.mp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.mp-pill--success {
+  color: var(--success);
+  background-color: var(--success-bg);
+}
+
+.mp-pill--violet {
+  color: var(--violet);
+  background-color: var(--violet-bg);
+}
+
+.mp-pill--info {
+  color: var(--info);
+  background-color: var(--info-bg);
+}
+
+.mp-pill--warning {
+  color: var(--warning);
+  background-color: var(--warning-bg);
+}
+
+.mp-pill--danger {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+}
+
+.mp-pill--neutral {
+  color: var(--text-muted);
+  background-color: var(--bg-subtle);
+}
+
+/* The dot on a live indicator, small enough to sit inside a pill without crowding it. */
+.mp-pill-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  background-color: currentColor;
+  flex-shrink: 0;
+}
+
+/*
+ * A sidebar row. The current one is told apart by a tinted ground and a bright edge rather than
+ * by weight alone, because a bold label is not a state a screen reader announces and a colour
+ * shift on its own is not one a colour-blind reader can rely on.
+ */
+.mp-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+  transition: background-color var(--transition), color var(--transition);
+}
+
+.mp-nav-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  translate: 0 -50%;
+  width: 3px;
+  height: 1.1rem;
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  transition: background-color var(--transition), height var(--transition);
+}
+
+.mp-nav-item:hover {
+  background-color: var(--nav-hover-bg);
+  color: var(--sidebar-text-active);
+}
+
+.mp-nav-item[aria-current="page"] {
+  background-color: var(--nav-active-bg);
+  color: var(--sidebar-text-active);
+  font-weight: 500;
+}
+
+.mp-nav-item[aria-current="page"]::before {
+  background-color: var(--nav-active-edge);
+  height: 1.4rem;
+}
+
+/*
+ * The wash of light behind the whole application.
+ *
+ * Applied to the body rather than to a wrapper so it reaches the dashboard chrome and the shop
+ * alike, and fixed behind the content so it does not travel when the page scrolls.
+ */
+body {
+  background-color: var(--bg-body);
+  background-image: var(--page-glow);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 /*
@@ -144,7 +335,7 @@ a:hover {
   background:
     radial-gradient(120% 90% at 12% 8%, var(--brand-500) 0%, transparent 58%),
     radial-gradient(90% 80% at 88% 92%, var(--brand-700) 0%, transparent 55%),
-    linear-gradient(155deg, var(--brand-700) 0%, var(--brand-900, #2a1a68) 58%, #0b0e1a 100%);
+    linear-gradient(155deg, var(--brand-700) 0%, var(--brand-900) 58%, #0b0e1a 100%);
 }
 
 /* A soft light behind the copy, so white text has something to sit on near the top left. */
@@ -357,15 +548,6 @@ a:hover {
   }
 }
 
-/* ---- surfaces ---------------------------------------------------------------- */
-
-.mp-card {
-  background-color: var(--bg-surface);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-1);
-}
-
 /*
  * A count you can act on.
  *
@@ -451,13 +633,6 @@ a:hover {
   font-family: var(--font-mono);
   font-weight: 700;
   letter-spacing: 0.04em;
-}
-
-.mp-card {
-  background-color: var(--bg-surface);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-1);
 }
 
 .mp-card-elevated {
@@ -563,8 +738,14 @@ a:hover {
 
 /* ---- sidebar ----------------------------------------------------------------- */
 
+/*
+ * The one permanently dark surface in the product, so it carries a little of the accent rather
+ * than sitting as a black bar beside violet buttons. Kept dark in both themes on purpose: a
+ * sidebar is structure, and changing its value with the theme would move the whole page.
+ */
 .mp-sidebar {
   background-color: var(--sidebar-bg);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--brand-500) 12%, transparent) 0%, transparent 28%);
   color: var(--sidebar-text);
   border-right: var(--border-width) solid var(--sidebar-border);
 }
@@ -581,6 +762,7 @@ a:hover {
 }
 
 .mp-sidebar-link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -588,24 +770,49 @@ a:hover {
   color: var(--sidebar-text);
   font-size: var(--fs-sm);
   border-radius: var(--radius-sm);
+  text-decoration: none;
   transition: background-color var(--transition), color var(--transition);
 }
 
+/* The edge that marks the current section. A tinted ground alone is a state a colour-blind
+   reader cannot rely on, so the bar carries it as well. */
+.mp-sidebar-link::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  translate: 0 -50%;
+  width: 3px;
+  height: 1.1rem;
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  transition: background-color var(--transition), height var(--transition);
+}
+
 .mp-sidebar-link:hover {
-  background-color: rgba(255, 255, 255, 0.06);
+  background-color: var(--nav-hover-bg);
   color: var(--sidebar-text-active);
   text-decoration: none;
 }
 
-.mp-sidebar-link.is-active {
-  background-color: var(--brand-600);
-  color: #ffffff;
-  font-weight: 600;
+/*
+ * Current section. Tinted rather than filled: a solid brand block is a large saturated area at
+ * the edge of the eye, and on the reference layout the eye is meant to go to the numbers.
+ */
+.mp-sidebar-link[aria-current="page"] {
+  background-color: var(--nav-active-bg);
+  color: var(--sidebar-text-active);
+  font-weight: 500;
+}
+
+.mp-sidebar-link[aria-current="page"]::before {
+  background-color: var(--nav-active-edge);
+  height: 1.4rem;
 }
 
 .mp-sidebar-section {
   padding: var(--space-4) var(--space-4) var(--space-1);
-  color: var(--text-subtle);
+  color: color-mix(in srgb, var(--sidebar-text) 60%, transparent);
   font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;

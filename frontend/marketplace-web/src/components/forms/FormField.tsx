@@ -70,7 +70,7 @@ function fieldStyle(invalid: boolean): React.CSSProperties {
     padding: "0.55rem 0.7rem",
     borderRadius: "var(--radius-sm)",
     border: `1px solid ${invalid ? "var(--danger)" : "var(--border)"}`,
-    backgroundColor: "var(--surface)",
+    backgroundColor: "var(--bg-surface)",
     color: "var(--text)",
     fontSize: "var(--fs-sm)",
   };

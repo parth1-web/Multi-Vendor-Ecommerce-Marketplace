@@ -54,7 +54,7 @@ export function AdminOverview() {
 
       <StatRow columns={4}>
         <div className="col-6 col-lg-3">
-          <StatTile label="Revenue today" value={formatCurrency(data.revenueToday)} hint={`${data.ordersToday} orders today`} />
+          <StatTile lead label="Revenue today" value={formatCurrency(data.revenueToday)} hint={`${data.ordersToday} orders today`} />
         </div>
         <div className="col-6 col-lg-3">
           <StatTile
@@ -142,7 +142,7 @@ export function AdminOverview() {
                     <XAxis dataKey="period" tick={{ fontSize: 11, fill: "var(--text-subtle)" }} tickFormatter={shortDate} />
                     <YAxis tick={{ fontSize: 11, fill: "var(--text-subtle)" }} width={40} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                      contentStyle={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                       labelFormatter={label => formatDate(String(label))}
                     />
                     <Area type="monotone" dataKey="orders" stroke="#7c5cff" fill="url(#ordersFill)" strokeWidth={2} />

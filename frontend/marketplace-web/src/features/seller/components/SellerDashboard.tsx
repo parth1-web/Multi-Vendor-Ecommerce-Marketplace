@@ -169,7 +169,7 @@ export function SellerDashboard() {
                     <XAxis dataKey="period" tick={{ fontSize: 11, fill: "var(--text-subtle)" }} tickFormatter={shortDate} />
                     <YAxis tick={{ fontSize: 11, fill: "var(--text-subtle)" }} width={60} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                      contentStyle={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                       formatter={(value: number, name: string) => [formatCurrency(value), name === "revenue" ? "Revenue" : "Net earnings"]}
                       labelFormatter={label => formatDate(String(label))}
                     />
@@ -208,7 +208,7 @@ export function SellerDashboard() {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                         formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       />
                     </PieChart>

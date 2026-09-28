@@ -603,7 +603,7 @@ function SummaryPanel({
               padding: "0.5rem 0.65rem",
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
-              backgroundColor: "var(--surface)",
+              backgroundColor: "var(--bg-surface)",
               color: "var(--text)",
               textTransform: "uppercase",
             }}

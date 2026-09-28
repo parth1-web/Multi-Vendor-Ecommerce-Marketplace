@@ -22,17 +22,21 @@
   --brand-600: #6a44f5;
   --brand-700: #5734d1;
   --brand-800: #452aa5;
+  --brand-900: #2c1a68;
 
-  /* Neutrals */
-  --bg-body: #f6f7fb;
+  /* Neutrals.
+     These carry a little violet rather than being pure grey. A page built from flat grey
+     surfaces reads as unfinished next to a brand-coloured accent, and a trace of violet in the
+     greys ties the canvas to the accent without tinting text or borders. */
+  --bg-body: #f6f5fc;
   --bg-surface: #ffffff;
-  --bg-subtle: #f1f3f9;
+  --bg-subtle: #f1f0fb;
   --bg-elevated: #ffffff;
-  --border: #e4e7f0;
-  --border-strong: #cfd4e4;
-  --text: #151a2e;
-  --text-muted: #5b6480;
-  --text-subtle: #8b93ab;
+  --border: #e6e4f3;
+  --border-strong: #d3d0e8;
+  --text: #15132b;
+  --text-muted: #5b5878;
+  --text-subtle: #8b88a8;
 
   /* Sidebar: the one dark surface in the product */
   --sidebar-bg: #0f1222;
@@ -67,11 +71,16 @@
   /* Typography */
   --font-sans: var(--font-jakarta), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sora), var(--font-sans);
+  /* For the things that are codes rather than prose: a discount code, a SKU, a transaction
+     reference. Monospace is not decoration here, it is what makes two similar codes
+     distinguishable at a glance. */
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
   --fs-display: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
   --fs-h1: 1.5rem;
   --fs-h2: 1.25rem;
   --fs-h3: 1.0625rem;
+  --fs-h4: 1rem;
   --fs-body: 0.9375rem;
   --fs-sm: 0.8125rem;
   --fs-xs: 0.75rem;
@@ -120,6 +129,45 @@
   /* The gradient behind a sign-in or register page, and the light it throws on the panel. */
   --auth-glow: color-mix(in srgb, var(--brand-500) 22%, transparent);
   --auth-surface-gradient: linear-gradient(160deg, var(--bg-surface) 0%, var(--bg-subtle) 100%);
+
+  /* ---- Atmosphere ---------------------------------------------------------
+     The gradients and glows the layout is painted with, rather than a single flat fill.
+
+     Kept as tokens rather than written into components because every one of them has to change
+     between the themes, and a gradient written inline at the call site can only ever be right for
+     the theme it was written in. */
+  --on-accent: #ffffff;
+
+  /* The accent itself. One gradient for every filled control, so two buttons on one screen
+     cannot end up two different purples. */
+  --accent-gradient: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-600) 55%, var(--brand-700) 100%);
+  --accent-gradient-hover: linear-gradient(135deg, var(--brand-300) 0%, var(--brand-500) 55%, var(--brand-600) 100%);
+
+  /* The card at the top of a dashboard, in brand rather than in surface.
+     It starts at brand-600 rather than brand-500 on purpose: white on brand-500 measures 4.3:1,
+     which is under the 4.5:1 that small text needs, and the label on this card is small. */
+  --surface-accent: linear-gradient(140deg, var(--brand-600) 0%, var(--brand-800) 58%, #241455 100%);
+  --surface-accent-glow: 0 20px 44px -24px color-mix(in srgb, var(--brand-600) 85%, transparent);
+
+  /* A sheen laid over an ordinary card. Very light in the light theme: the card is still white
+     and still has to read as white, with only a hint of the brand across the top. */
+  --surface-sheen: linear-gradient(165deg, color-mix(in srgb, var(--brand-400) 7%, transparent) 0%, transparent 38%);
+  --surface-raised: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+
+  /* The light behind the whole application, and the second one on the opposite corner so the
+     page is lit from somewhere rather than merely tinted. */
+  --page-glow:
+    radial-gradient(1100px 620px at 8% -12%, color-mix(in srgb, var(--brand-500) 16%, transparent) 0%, transparent 62%),
+    radial-gradient(900px 520px at 92% -6%, color-mix(in srgb, var(--chart-4) 10%, transparent) 0%, transparent 58%);
+
+  /* Chrome that sits over the glow and has to stay readable while doing it. */
+  --glass-bg: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--border-strong) 70%, transparent);
+
+  /* The active row in a sidebar, which needs a tinted ground and an edge to read as current. */
+  --nav-active-bg: color-mix(in srgb, var(--brand-500) 14%, transparent);
+  --nav-active-edge: var(--brand-400);
+  --nav-hover-bg: color-mix(in srgb, var(--brand-400) 8%, transparent);
 }
 
 /*
@@ -133,17 +181,19 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --bg-body: #0b0e1a;
-  --bg-surface: #141829;
-  --bg-subtle: #1b2036;
-  --bg-elevated: #1d2338;
-  --border: #262c44;
-  --border-strong: #343c5c;
-  --text: #eef1fa;
-  --text-muted: #a3abc6;
-  --text-subtle: #7b84a1;
-  --sidebar-bg: #0a0c16;
-  --sidebar-bg-2: #12162a;
+  /* Near-black with violet in it, not the blue-grey it was. On a dark page the accent is the
+     only thing carrying colour, and a cool grey canvas makes a violet accent look foreign. */
+  --bg-body: #08080f;
+  --bg-surface: #121220;
+  --bg-subtle: #191930;
+  --bg-elevated: #1d1d33;
+  --border: #262640;
+  --border-strong: #343458;
+  --text: #f0eeff;
+  --text-muted: #a5a1c8;
+  --text-subtle: #7d79a3;
+  --sidebar-bg: #06060c;
+  --sidebar-bg-2: #10101d;
 
   /* Semantic foregrounds, lightened for a dark ground. */
   --success: #4ade80;
@@ -153,18 +203,41 @@
   --violet: #a78bfa;
   --teal: #2dd4bf;
 
-  --success-bg: #0f2a1c;
+  --success-bg: #0d2a1b;
   --warning-bg: #33240c;
   --danger-bg: #3a1616;
-  --info-bg: #12234a;
-  --violet-bg: #1c1740;
+  --info-bg: #12224d;
+  --violet-bg: #1e1746;
 
   /* Shadows read as a halo on a dark page rather than as depth, so they are deepened and
      softened rather than reused from the light theme. */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.3);
-  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.55);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.55), 0 8px 20px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 12px 34px rgba(0, 0, 0, 0.65);
 
   --auth-glow: color-mix(in srgb, var(--brand-400) 26%, transparent);
+
+  /* Atmosphere, retuned rather than reused. On a dark page a glow has to be stronger to be
+     visible at all, the sheen has to be faint so it does not grey the card, and the chrome has
+     to be more transparent because there is less light behind it to begin with. */
+  --accent-gradient: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-600) 50%, var(--brand-800) 100%);
+  --accent-gradient-hover: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-500) 50%, var(--brand-700) 100%);
+
+  --surface-accent: linear-gradient(140deg, #6a44f5 0%, #4a28b8 55%, #1d1046 100%);
+  --surface-accent-glow: 0 20px 46px -22px color-mix(in srgb, var(--brand-500) 80%, transparent);
+
+  --surface-sheen: linear-gradient(165deg, color-mix(in srgb, var(--brand-400) 9%, transparent) 0%, transparent 40%);
+  --surface-raised: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+
+  --page-glow:
+    radial-gradient(1100px 640px at 6% -14%, color-mix(in srgb, var(--brand-500) 30%, transparent) 0%, transparent 62%),
+    radial-gradient(900px 540px at 94% -8%, color-mix(in srgb, var(--chart-4) 18%, transparent) 0%, transparent 58%);
+
+  --glass-bg: color-mix(in srgb, #16162a 72%, transparent);
+  --glass-border: color-mix(in srgb, var(--border-strong) 60%, transparent);
+
+  --nav-active-bg: color-mix(in srgb, var(--brand-500) 20%, transparent);
+  --nav-active-edge: var(--brand-400);
+  --nav-hover-bg: color-mix(in srgb, var(--brand-400) 11%, transparent);
 }
 

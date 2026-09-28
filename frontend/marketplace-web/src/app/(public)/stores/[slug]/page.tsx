@@ -97,7 +97,7 @@ export default async function StorePage({ params, searchParams }: { params: Para
                 alt={store.name}
                 width={72}
                 height={72}
-                style={{ width: "4.5rem", height: "4.5rem", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--surface)" }}
+                style={{ width: "4.5rem", height: "4.5rem", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-surface)" }}
               />
             ) : (
               <div
