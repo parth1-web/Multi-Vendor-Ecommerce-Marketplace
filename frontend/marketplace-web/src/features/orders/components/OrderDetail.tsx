@@ -20,6 +20,7 @@ import { OrderReviews } from "@/features/orders/components/OrderReviews";
 import { cx, formatCurrency, formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
+import { useRealtime } from "@/providers/RealtimeProvider";
 import type { OrderStatus } from "@/types/order";
 
 function OrderDetailPage() {
@@ -41,6 +42,18 @@ function OrderDetailPage() {
       router.replace(`/login?returnUrl=${encodeURIComponent(`/orders/${id}`)}`);
     }
   }, [id, isAuthenticated, isHydrating, router]);
+
+  // This page is the one place a shopper watches a parcel, so it subscribes to that one order's
+  // updates. The server decides whether this connection is allowed into that group from the token,
+  // so a customer cannot watch somebody else's order by asking.
+  const { watchOrder } = useRealtime();
+
+  useEffect(() => {
+    if (id && isAuthenticated) {
+      void watchOrder(id);
+    }
+  }, [id, isAuthenticated, watchOrder]);
+
 
   if (!isAuthenticated) {
     return <div className="mp-skeleton" style={{ height: "20rem", borderRadius: "var(--radius)" }} />;
