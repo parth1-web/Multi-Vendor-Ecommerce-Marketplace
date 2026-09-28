@@ -153,7 +153,9 @@ export function PublicHeader() {
                   className="mp-card-elevated position-absolute end-0 mt-2"
                   style={{ minWidth: "13rem", padding: "var(--space-2)", zIndex: 1040 }}
                 >
+                  <MenuLink href="/dashboard" label="Dashboard" icon={<LayoutDashboard size={16} />} />
                   <MenuLink href="/orders" label="My orders" />
+                  <MenuLink href="/wishlist" label="Saved items" />
                   <MenuLink href="/addresses" label="Addresses" />
                   {user.role === "Seller" ? <MenuLink href="/seller" label="Seller dashboard" icon={<LayoutDashboard size={16} />} /> : null}
                   {user.role === "Admin" || user.role === "SuperAdmin" ? (

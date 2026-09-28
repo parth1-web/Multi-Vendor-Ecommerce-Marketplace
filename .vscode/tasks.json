@@ -12,8 +12,9 @@
     {
       "label": "Full stack (API + site)",
       "detail": "Starts the API on :5000 and the site on :3000, side by side. Stop to shut both down.",
-      "type": "process",
-      "isBackground": true,
+      "dependsOn": ["API only", "Site only"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -24,39 +25,14 @@
         "clear": true,
         "showReuseMessage": false
       },
-      "prompt": {
-        "message": "Start the API on port 5000 and the site on port 3000?",
-        "buttons": [{ "label": "Start", "detail": "Both, side by side" }]
-      },
-      "windows": [
-        {
-          "label": "api",
-          "command": "dotnet",
-          "args": ["run", "--project", "${workspaceFolder}/backend/src/Marketplace.API", "--urls", "http://localhost:5000"],
-          "options": { "cwd": "${workspaceFolder}/backend" },
-          "env": { "ASPNETCORE_ENVIRONMENT": "Development", "DOTNET_ENVIRONMENT": "Development" },
-          "problemMatcher": {
-            "owner": "dotnet",
-            "fileLocation": ["autoDetect", "${workspaceFolder}"],
-            "pattern": [
-              {
-                "regexp": "^\\s*(\\w+)\\s+error\\s+(\\w+):\\s+(.+) \\[(\\S+)\\]$",
-                "file": 4,
-                "location": 1,
-                "message": 3
-              }
-            ]
-          },
-          "isBackground": true
-        },
-        {
-          "label": "site",
-          "command": "npm",
-          "args": ["run", "dev", "--prefix", "${workspaceFolder}/frontend/marketplace-web"],
-          "options": { "cwd": "${workspaceFolder}/frontend/marketplace-web" },
-          "isBackground": true
+      "customize": {
+        "prompt": {
+          "message": "Start the API on port 5000 and the site on port 3000?",
+          "buttons": [
+            { "label": "Start", "detail": "Both, side by side" }
+          ]
         }
-      ]
+      }
     },
     {
       "label": "Wait for the API, then open the site",
