@@ -11,31 +11,19 @@ import { Store } from "lucide-react";
 import { DiscountBadge, RatingStars } from "@/components/shared/RatingStars";
 import { WishlistButton } from "@/features/account/components/WishlistButton";
 import { PriceDisplay } from "@/components/shared/PriceDisplay";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
 import type { ProductSummary } from "@/types/product";
 
 export function ProductCard({ product, saved = false }: { product: ProductSummary; saved?: boolean }) {
   return (
-    <article className="mp-card h-100 d-flex flex-column" style={{ padding: "var(--space-3)", position: "relative" }}>
+    <article className="mp-card mp-card-hover h-100 d-flex flex-column" style={{ padding: "var(--space-3)", position: "relative" }}>
       <Link href={`/products/${product.slug}`} className="d-block" style={{ position: "relative" }}>
-        {product.primaryImageUrl ? (
-          // A plain img rather than next/image: these are seller-supplied URLs on a host we do
-          // not control, and the optimiser would add a hop for no gain at this size.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={product.primaryImageUrl}
-            alt={product.primaryImageAlt ?? product.name}
-            loading="lazy"
-            width={320}
-            height={320}
-            style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: "var(--radius-sm)" }}
-          />
-        ) : (
-          <div
-            className="mp-skeleton"
-            aria-hidden
-            style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: "var(--radius-sm)" }}
-          />
-        )}
+        <ProductPhoto
+          src={product.primaryImageUrl}
+          alt={product.primaryImageAlt ?? product.name}
+          width={640}
+          height={640}
+        />
 
         <DiscountBadge percentage={product.discountPercentage} />
       </Link>
@@ -46,10 +34,22 @@ export function ProductCard({ product, saved = false }: { product: ProductSummar
 
 
       <div className="d-flex flex-column flex-grow-1" style={{ gap: "var(--space-1)", padding: "var(--space-2) var(--space-1) 0" }}>
-        <Link href={`/stores/${product.storeSlug}`} className="d-inline-flex align-items-center" style={{ gap: "0.25rem", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>
-          <Store size={12} aria-hidden />
-          {product.storeName}
-        </Link>
+        <div className="mp-card-meta">
+          <Link href={`/stores/${product.storeSlug}`} className="d-inline-flex align-items-center mp-truncate" style={{ gap: "0.25rem", color: "var(--text-subtle)", fontSize: "var(--fs-xs)", minWidth: 0 }}>
+            <Store size={12} aria-hidden style={{ flex: "none" }} />
+            <span className="mp-truncate">{product.storeName}</span>
+          </Link>
+          <span aria-hidden style={{ color: "var(--border-strong)" }}>
+            ·
+          </span>
+          <Link
+            href={`/categories/${product.categorySlug}`}
+            className="mp-truncate"
+            style={{ color: "var(--text-subtle)", fontSize: "var(--fs-xs)", minWidth: 0 }}
+          >
+            {product.categoryName}
+          </Link>
+        </div>
 
         <h3 className="mp-clamp-2" style={{ fontSize: "var(--fs-sm)", fontWeight: 500, margin: 0, lineHeight: 1.4 }}>
           <Link href={`/products/${product.slug}`} style={{ color: "var(--text)" }}>

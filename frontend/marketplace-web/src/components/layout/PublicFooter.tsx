@@ -27,7 +27,7 @@ const COLUMNS = [
       { href: "/seller", label: "Seller dashboard" },
       { href: "/seller/products", label: "Products" },
       { href: "/seller/orders", label: "Orders" },
-      { href: "/seller/analytics", label: "Analytics" },
+      { href: "/seller/earnings", label: "Earnings" },
     ],
   },
 ] as const;

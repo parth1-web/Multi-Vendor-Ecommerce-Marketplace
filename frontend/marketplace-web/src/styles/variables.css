@@ -12,38 +12,40 @@
      guessing from the page. */
   color-scheme: light;
 
-  /* Brand */
-  --brand-50: #f2f0ff;
-  --brand-100: #e6e1ff;
-  --brand-200: #cec6ff;
-  --brand-300: #aea1ff;
-  --brand-400: #8b78ff;
-  --brand-500: #7c5cff;
-  --brand-600: #6a44f5;
-  --brand-700: #5734d1;
-  --brand-800: #452aa5;
-  --brand-900: #2c1a68;
+  /* Brand: deep navy and marketplace blue.
+     The ramp is blue rather than decorative purple, and the deepest stop is the marketplace's
+     navy identity. Buttons and links draw from the middle of the ramp so they stay legible on
+     both themes without a separate palette. */
+  --brand-50: #eef3ff;
+  --brand-100: #dbe7ff;
+  --brand-200: #bfd2ff;
+  --brand-300: #9ab6ff;
+  --brand-400: #5f8df8;
+  --brand-500: #2f6bf1;
+  --brand-600: #2053cc;
+  --brand-700: #1a44a6;
+  --brand-800: #173a86;
+  --brand-900: #102a64;
 
   /* Neutrals.
-     These carry a little violet rather than being pure grey. A page built from flat grey
-     surfaces reads as unfinished next to a brand-coloured accent, and a trace of violet in the
-     greys ties the canvas to the accent without tinting text or borders. */
-  --bg-body: #f6f5fc;
+     Light surfaces stay near-white with only a cool cast; text is navy rather than black.
+     Colour is reserved for actions, ratings and status, not for page furniture. */
+  --bg-body: #f6f8fc;
   --bg-surface: #ffffff;
-  --bg-subtle: #f1f0fb;
+  --bg-subtle: #eef2f8;
   --bg-elevated: #ffffff;
-  --border: #e6e4f3;
-  --border-strong: #d3d0e8;
-  --text: #15132b;
-  --text-muted: #5b5878;
-  --text-subtle: #8b88a8;
+  --border: #e1e8f3;
+  --border-strong: #c6d2e5;
+  --text: #101d38;
+  --text-muted: #54607a;
+  --text-subtle: #828da5;
 
   /* Sidebar: the one dark surface in the product */
   --sidebar-bg: #0f1222;
   --sidebar-bg-2: #171b31;
   --sidebar-text: #a7aecb;
   --sidebar-text-active: #ffffff;
-  --sidebar-border: #252b45;
+  --sidebar-border: #22334f;
 
   /* Semantic */
   --success: #16a34a;
@@ -61,7 +63,7 @@
   --orange: #ea580c;
 
   /* Chart series, in the order a series is assigned */
-  --chart-1: #7c5cff;
+  --chart-1: #2f6bf1;
   --chart-2: #22c55e;
   --chart-3: #f97316;
   --chart-4: #0ea5e9;
@@ -146,7 +148,7 @@
   /* The card at the top of a dashboard, in brand rather than in surface.
      It starts at brand-600 rather than brand-500 on purpose: white on brand-500 measures 4.3:1,
      which is under the 4.5:1 that small text needs, and the label on this card is small. */
-  --surface-accent: linear-gradient(140deg, var(--brand-600) 0%, var(--brand-800) 58%, #241455 100%);
+  --surface-accent: linear-gradient(140deg, var(--brand-700) 0%, var(--brand-900) 62%, #071230 100%);
   --surface-accent-glow: 0 20px 44px -24px color-mix(in srgb, var(--brand-600) 85%, transparent);
 
   /* A sheen laid over an ordinary card. Very light in the light theme: the card is still white
@@ -181,19 +183,19 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Near-black with violet in it, not the blue-grey it was. On a dark page the accent is the
-     only thing carrying colour, and a cool grey canvas makes a violet accent look foreign. */
-  --bg-body: #08080f;
-  --bg-surface: #121220;
-  --bg-subtle: #191930;
-  --bg-elevated: #1d1d33;
-  --border: #262640;
-  --border-strong: #343458;
-  --text: #f0eeff;
-  --text-muted: #a5a1c8;
-  --text-subtle: #7d79a3;
-  --sidebar-bg: #06060c;
-  --sidebar-bg-2: #10101d;
+  /* Near-black navy rather than pure black. The accent remains blue, so surfaces keep a cool
+     cast without becoming grey panels beside blue controls. */
+  --bg-body: #090f1e;
+  --bg-surface: #0f1930;
+  --bg-subtle: #16233e;
+  --bg-elevated: #14203a;
+  --border: #233350;
+  --border-strong: #33496f;
+  --text: #eef3fd;
+  --text-muted: #a5b1c9;
+  --text-subtle: #7e89a3;
+  --sidebar-bg: #060c18;
+  --sidebar-bg-2: #0b1529;
 
   /* Semantic foregrounds, lightened for a dark ground. */
   --success: #4ade80;
@@ -223,7 +225,7 @@
   --accent-gradient: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-600) 50%, var(--brand-800) 100%);
   --accent-gradient-hover: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-500) 50%, var(--brand-700) 100%);
 
-  --surface-accent: linear-gradient(140deg, #6a44f5 0%, #4a28b8 55%, #1d1046 100%);
+  --surface-accent: linear-gradient(140deg, #2053cc 0%, #102a64 58%, #050c20 100%);
   --surface-accent-glow: 0 20px 46px -22px color-mix(in srgb, var(--brand-500) 80%, transparent);
 
   --surface-sheen: linear-gradient(165deg, color-mix(in srgb, var(--brand-400) 9%, transparent) 0%, transparent 40%);

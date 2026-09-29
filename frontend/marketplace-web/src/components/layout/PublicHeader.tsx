@@ -8,8 +8,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, LayoutDashboard, Menu, Moon, Search, ShoppingBag, Store, Sun, User, X } from "lucide-react";
-import { useState } from "react";
+import { Heart, LayoutDashboard, Menu, Moon, Search, Store, Sun, User, X } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { CartCountBadge } from "@/features/cart/components/CartCountBadge";
 
 import { APP_NAME } from "@/lib/constants";
 import { cx } from "@/lib/format";
@@ -29,6 +31,24 @@ export function PublicHeader() {
   const { theme, toggle } = useThemeStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+
+  // Menus belong to the page they were opened on. Link selection closes the account menu
+  // directly below; Escape closes either open menu.
+  useEffect(() => {
+    if (!accountOpen && !mobileOpen) {
+      return;
+    }
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAccountOpen(false);
+        setMobileOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [accountOpen, mobileOpen]);
 
   return (
     <header
@@ -115,7 +135,7 @@ export function PublicHeader() {
         <div className="ms-auto d-flex align-items-center" style={{ gap: "var(--space-2)" }}>
           <button
             type="button"
-            className="btn btn-sm"
+            className="btn btn-sm mp-icon-button"
             onClick={toggle}
             aria-label={theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme"}
             style={{ color: "var(--text-muted)" }}
@@ -123,13 +143,11 @@ export function PublicHeader() {
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          <Link href="/wishlist" className="btn btn-sm" aria-label="Wishlist" style={{ color: "var(--text-muted)" }}>
+          <Link href="/wishlist" className="btn btn-sm mp-icon-button" aria-label="Wishlist" style={{ color: "var(--text-muted)" }}>
             <Heart size={18} />
           </Link>
 
-          <Link href="/cart" className="btn btn-sm" aria-label="Cart" style={{ color: "var(--text-muted)" }}>
-            <ShoppingBag size={18} />
-          </Link>
+          <CartCountBadge />
 
           {isHydrating ? (
             <span className="mp-skeleton" style={{ width: "6rem", height: "2rem" }} aria-hidden />
@@ -153,13 +171,20 @@ export function PublicHeader() {
                   className="mp-card-elevated position-absolute end-0 mt-2"
                   style={{ minWidth: "13rem", padding: "var(--space-2)", zIndex: 1040 }}
                 >
-                  <MenuLink href="/dashboard" label="Dashboard" icon={<LayoutDashboard size={16} />} />
-                  <MenuLink href="/orders" label="My orders" />
-                  <MenuLink href="/wishlist" label="Saved items" />
-                  <MenuLink href="/addresses" label="Addresses" />
-                  {user.role === "Seller" ? <MenuLink href="/seller" label="Seller dashboard" icon={<LayoutDashboard size={16} />} /> : null}
+                  <MenuLink href="/dashboard" label="Dashboard" icon={<LayoutDashboard size={16} />} onNavigate={() => setAccountOpen(false)} />
+                  <MenuLink href="/orders" label="My orders" onNavigate={() => setAccountOpen(false)} />
+                  <MenuLink href="/wishlist" label="Saved items" onNavigate={() => setAccountOpen(false)} />
+                  <MenuLink href="/addresses" label="Addresses" onNavigate={() => setAccountOpen(false)} />
+                  {user.role === "Seller" ? (
+                    <MenuLink href="/seller" label="Seller dashboard" icon={<LayoutDashboard size={16} />} onNavigate={() => setAccountOpen(false)} />
+                  ) : null}
                   {user.role === "Admin" || user.role === "SuperAdmin" ? (
-                    <MenuLink href="/admin" label="Admin console" icon={<LayoutDashboard size={16} />} />
+                    <MenuLink
+                      href="/admin"
+                      label="Admin console"
+                      icon={<LayoutDashboard size={16} />}
+                      onNavigate={() => setAccountOpen(false)}
+                    />
                   ) : null}
                   <hr className="my-2" style={{ borderColor: "var(--border)" }} />
                   <button
@@ -190,9 +215,10 @@ export function PublicHeader() {
 
           <button
             type="button"
-            className="btn btn-sm d-lg-none"
+            className="btn btn-sm mp-icon-button d-lg-none"
             aria-label={mobileOpen ? "Close the menu" : "Open the menu"}
             aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation"
             onClick={() => setMobileOpen((open) => !open)}
             style={{ color: "var(--text)" }}
           >
@@ -203,10 +229,31 @@ export function PublicHeader() {
 
       {mobileOpen ? (
         <nav
+          id="mobile-navigation"
           aria-label="Mobile"
           className="d-lg-none"
           style={{ borderTop: "1px solid var(--border)", backgroundColor: "var(--bg-surface)", padding: "var(--space-3) var(--space-4)" }}
         >
+          <form role="search" action="/search" className="d-md-none" style={{ marginBottom: "var(--space-3)" }}>
+            <label htmlFor="mobile-search" className="visually-hidden">
+              Search products
+            </label>
+            <div className="d-flex" style={{ gap: "var(--space-2)" }}>
+              <input
+                id="mobile-search"
+                name="q"
+                type="search"
+                required
+                placeholder="Search products, stores and brands"
+                className="form-control"
+                autoComplete="off"
+              />
+              <button type="submit" className="btn btn-sm btn-primary" style={{ flex: "none" }}>
+                Search
+              </button>
+            </div>
+          </form>
+
           <div className="mp-stack-sm">
             {NAV_LINKS.map((link) => (
               <Link
@@ -227,11 +274,12 @@ export function PublicHeader() {
   );
 }
 
-function MenuLink({ href, label, icon }: { href: string; label: string; icon?: React.ReactNode }) {
+function MenuLink({ href, label, icon, onNavigate }: { href: string; label: string; icon?: React.ReactNode; onNavigate: () => void }) {
   return (
     <Link
       href={href}
       role="menuitem"
+      onClick={onNavigate}
       className="btn btn-sm w-100 d-flex align-items-center"
       style={{ gap: "var(--space-2)", justifyContent: "flex-start", color: "var(--text)" }}
     >

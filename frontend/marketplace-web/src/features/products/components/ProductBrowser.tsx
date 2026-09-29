@@ -33,9 +33,15 @@ interface ProductBrowserProps {
    * stopped being a category page.
    */
   basePath?: string;
+
+  /**
+   * The query shape pagination should write. Search keeps `q` in the address bar while the API
+   * expects `search`, so those two cannot be the same object without breaking page two.
+   */
+  paginationQuery?: Record<string, unknown>;
 }
 
-export function ProductBrowser({ query, basePath = "/products" }: ProductBrowserProps) {
+export function ProductBrowser({ query, basePath = "/products", paginationQuery }: ProductBrowserProps) {
   const { data, isPending, isError, error, isPlaceholderData } = useProducts(query);
   const savedIds = useSavedProductIds();
 
@@ -82,7 +88,7 @@ export function ProductBrowser({ query, basePath = "/products" }: ProductBrowser
                 ))}
               </div>
 
-              <Pagination page={data.page} totalPages={data.totalPages} query={query} basePath={basePath} />
+              <Pagination page={data.page} totalPages={data.totalPages} query={paginationQuery ?? query} basePath={basePath} />
             </>
           )}
         </div>

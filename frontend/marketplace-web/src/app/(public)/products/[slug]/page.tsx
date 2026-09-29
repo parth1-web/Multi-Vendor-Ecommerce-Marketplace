@@ -13,6 +13,7 @@ import { ChevronRight, Store } from "lucide-react";
 import { RatingStars } from "@/components/shared/RatingStars";
 import { PriceDisplay } from "@/components/shared/PriceDisplay";
 import { StatusBadge } from "@/components/shared/Feedback";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { BuyBox } from "@/features/products/components/BuyBox";
 import { ApiError, serverGet } from "@/lib/serverApi";
 import { formatDate } from "@/lib/format";
@@ -231,19 +232,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
               <div key={related.id} className="col-6 col-md-4 col-xl-3">
                 <article className="mp-card" style={{ padding: "var(--space-3)", height: "100%" }}>
                   <Link href={`/products/${related.slug}`} style={{ color: "var(--text)" }}>
-                    {related.primaryImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={related.primaryImageUrl}
-                        alt={related.name}
-                        width={200}
-                        height={200}
-                        loading="lazy"
-                        style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: "var(--radius-sm)", backgroundColor: "var(--bg-subtle)" }}
-                      />
-                    ) : (
-                      <div className="mp-skeleton" style={{ aspectRatio: "1 / 1", borderRadius: "var(--radius-sm)" }} />
-                    )}
+                    <ProductPhoto
+                      src={related.primaryImageUrl}
+                      alt={related.name}
+                      width={480}
+                      height={480}
+                      style={{ backgroundColor: "var(--bg-subtle)" }}
+                    />
 
                     <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--fs-sm)", fontWeight: 500 }}>{related.name}</p>
                     <p style={{ margin: "var(--space-1) 0 0", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>{related.storeName}</p>
@@ -319,30 +314,25 @@ function Gallery({ product }: { product: ProductDetail }) {
 
   return (
     <div className="mp-stack-sm">
-      {primary.url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={primary.url}
-          alt={primary.altText ?? product.name}
-          width={800}
-          height={800}
-          style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: "var(--radius)", backgroundColor: "var(--bg-subtle)" }}
-        />
-      ) : (
-        <div className="mp-skeleton" style={{ aspectRatio: "1 / 1", borderRadius: "var(--radius)" }} />
-      )}
+      <ProductPhoto
+        src={primary.url}
+        alt={primary.altText ?? product.name}
+        width={960}
+        height={960}
+        eager
+        style={{ borderRadius: "var(--radius)", backgroundColor: "var(--bg-subtle)" }}
+      />
 
       {rest.length > 0 ? (
         <div className="d-flex" style={{ gap: "var(--space-2)" }}>
           {rest.map((image) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <ProductPhoto
               key={image.id}
               src={image.url}
               alt={image.altText ?? product.name}
-              width={96}
-              height={96}
-              style={{ width: "4.5rem", height: "4.5rem", objectFit: "cover", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}
+              width={192}
+              height={192}
+              style={{ width: "4.5rem", height: "4.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}
             />
           ))}
         </div>

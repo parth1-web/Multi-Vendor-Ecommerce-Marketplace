@@ -330,3 +330,431 @@
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+
+/* Skip link: keyboard and screen-reader users should be able to bypass repeated navigation. */
+.mp-skip-link {
+  position: absolute;
+  inset-inline-start: var(--space-4);
+  top: -100rem;
+  z-index: 2000;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  background-color: var(--brand-700);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mp-skip-link:focus-visible {
+  top: var(--space-3);
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Buttons share height and alignment even when Bootstrap supplies their variant. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  font-weight: 500;
+}
+
+.btn-sm {
+  min-height: 2.125rem;
+  font-size: var(--fs-sm);
+}
+
+.btn-lg {
+  min-height: 3rem;
+}
+
+/* Compact header controls keep pointer targets usable without enlarging the bar. */
+.mp-icon-button {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  border-radius: var(--radius-pill);
+  padding-inline: var(--space-2);
+  position: relative;
+}
+
+.mp-cart-count {
+  position: absolute;
+  inset-block-start: -0.2rem;
+  inset-inline-end: -0.25rem;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding-inline: 0.25rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-600);
+  border: 2px solid var(--bg-surface);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* A consistent marketplace section rhythm. */
+.mp-section {
+  margin-top: var(--space-7);
+}
+
+.mp-section:first-child {
+  margin-top: 0;
+}
+
+.mp-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.mp-section-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--brand-600);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  min-height: 2.125rem;
+}
+
+.mp-section-action:hover {
+  color: var(--brand-700);
+}
+
+/* The non-sticky strip above the header. It scrolls away and stays one line on desktop. */
+.mp-utility-bar {
+  background-color: var(--brand-900);
+  color: #fff;
+  font-size: var(--fs-xs);
+}
+
+.mp-utility-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: 0.4rem;
+}
+
+.mp-utility-note {
+  color: rgba(255, 255, 255, 0.82);
+  white-space: nowrap;
+}
+
+.mp-utility-promo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  color: #fff;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.mp-utility-promo:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.mp-utility-link {
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mp-utility-link:hover {
+  color: #fff;
+}
+
+/* The real category row beneath the sticky header. One scrollable line, never page overflow. */
+.mp-category-nav {
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.mp-category-scroller {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding-block: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.mp-category-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mp-category-link:hover {
+  background-color: var(--bg-subtle);
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* The reusable storefront hero. Light and factual, with media stacked below calls to action. */
+.mp-hero {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  background-color: var(--bg-surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.mp-hero-eyebrow {
+  margin: 0 0 var(--space-2);
+  color: var(--brand-700);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-theme="dark"] .mp-hero-eyebrow {
+  color: var(--brand-300);
+}
+
+.mp-hero-title {
+  margin: 0;
+  font-size: var(--fs-display);
+  text-wrap: balance;
+}
+
+.mp-hero-description {
+  margin: var(--space-3) 0 0;
+  max-width: 38rem;
+  color: var(--text-muted);
+  font-size: var(--fs-body);
+}
+
+.mp-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.mp-hero-media {
+  min-width: 0;
+}
+
+.mp-hero-showcase {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1.35fr 1fr;
+  height: 100%;
+}
+
+.mp-hero-main,
+.mp-hero-thumb {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--bg-subtle);
+  color: inherit;
+  text-decoration: none;
+}
+
+.mp-hero-main:hover,
+.mp-hero-thumb:hover {
+  text-decoration: none;
+  border-color: var(--border-strong);
+}
+
+.mp-hero-caption {
+  position: absolute;
+  inset-inline: var(--space-3);
+  inset-block-end: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background-color: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.mp-hero-thumbs {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Trust claims backed by working marketplace behavior. */
+.mp-trust {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--bg-surface);
+}
+
+.mp-trust-item {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.mp-trust-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--brand-50);
+  color: var(--brand-700);
+}
+
+[data-theme="dark"] .mp-trust-icon {
+  background-color: color-mix(in srgb, var(--brand-400) 20%, transparent);
+  color: var(--brand-200);
+}
+
+.mp-trust-title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.mp-trust-body {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* Store grids use one system whether they live in the directory or a homepage rail. */
+.mp-store-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+}
+
+/* Product imagery stays square and stable across cards, heroes, and detail galleries. */
+.mp-product-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-subtle);
+}
+
+.mp-product-photo-contain {
+  object-fit: contain;
+}
+
+.mp-product-photo-empty {
+  display: grid;
+  place-items: center;
+  color: var(--text-subtle);
+  border: 1px dashed var(--border-strong);
+}
+
+/* Product cards remain scannable: store and category share one compact metadata line. */
+.mp-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* Cards that navigate somewhere lift slightly; static panels do not. */
+.mp-card-hover {
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+
+.mp-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+}
+
+@media (min-width: 64rem) {
+  .mp-hero {
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: center;
+    padding: var(--space-7);
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .mp-section {
+    margin-top: var(--space-6);
+  }
+
+  .mp-hero {
+    padding: var(--space-5);
+  }
+
+  .mp-utility-note,
+  .mp-utility-link {
+    display: none;
+  }
+
+  .mp-utility-inner {
+    justify-content: center;
+  }
+
+  .mp-trust {
+    padding: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mp-toast {
+    animation: mp-toast-in 180ms ease-out;
+  }
+}
+
+@keyframes mp-toast-in {
+  from {
+    transform: translateY(0.5rem);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
