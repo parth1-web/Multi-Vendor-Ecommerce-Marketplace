@@ -13,6 +13,7 @@ import { Suspense } from "react";
 import { Mail, Phone, ShieldCheck, Truck } from "lucide-react";
 
 import { RatingStars } from "@/components/shared/RatingStars";
+import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { readProductQuery } from "@/features/products/api/readProductQuery";
 import { ListingSkeleton } from "@/features/products/components/ListingSkeleton";
 import { ProductBrowser } from "@/features/products/components/ProductBrowser";
@@ -67,6 +68,9 @@ export default async function StorePage({ params, searchParams }: { params: Para
   return (
     <div style={{ paddingBlock: "var(--space-5)" }}>
       <header className="mp-container" style={{ marginBottom: "var(--space-5)" }}>
+        <Breadcrumbs
+          trail={[{ name: "Home", href: "/" }, { name: "Stores", href: "/stores" }, { name: store.name }]}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -183,7 +187,7 @@ export default async function StorePage({ params, searchParams }: { params: Para
 
       <div className="mp-container">
         <Suspense fallback={<ListingSkeleton />}>
-          <ProductBrowser query={query} basePath={`/stores/${store.slug}`} />
+          <ProductBrowser query={query} basePath={`/stores/${store.slug}`} lockedSellerSlug={store.slug} />
         </Suspense>
       </div>
 

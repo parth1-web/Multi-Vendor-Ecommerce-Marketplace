@@ -10,8 +10,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ChevronRight } from "lucide-react";
 
+import { ListingHeader } from "@/components/products/ListingHeader";
 import { readProductQuery } from "@/features/products/api/readProductQuery";
 import { ListingSkeleton } from "@/features/products/components/ListingSkeleton";
 import { ProductBrowser } from "@/features/products/components/ProductBrowser";
@@ -77,32 +77,15 @@ export default async function CategoryPage({ params, searchParams }: { params: P
         dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbJsonLd(crumbs)) }}
       />
 
-      <nav aria-label="Breadcrumb" className="mb-3">
-        <ol className="list-unstyled d-flex align-items-center flex-wrap mb-0" style={{ gap: "0.35rem", fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-          {crumbs.map((crumb, index) => (
-            <li key={crumb.path} className="d-flex align-items-center" style={{ gap: "0.35rem" }}>
-              {index > 0 ? <ChevronRight size={12} aria-hidden /> : null}
-              {index === crumbs.length - 1 ? (
-                <span aria-current="page" style={{ color: "var(--text)" }}>
-                  {crumb.name}
-                </span>
-              ) : (
-                <Link href={crumb.path}>{crumb.name}</Link>
-              )}
-            </li>
-          ))}
-        </ol>
-      </nav>
-
-
-      <div className="mp-page-header">
-        <div>
-          <h1 className="mp-page-title">{category.name}</h1>
-          <p className="mp-page-subtitle">
-            {category.description ?? `${category.productCount} products across this category and its subcategories.`}
-          </p>
-        </div>
-      </div>
+      <ListingHeader
+        breadcrumbs={crumbs.map((crumb, index) =>
+          index === crumbs.length - 1 ? { name: crumb.name } : { name: crumb.name, href: crumb.path },
+        )}
+        title={category.name}
+        subtitle={
+          category.description ?? `${category.productCount} products across this category and its subcategories.`
+        }
+      />
 
       {category.children.length > 0 ? (
         <nav aria-label={`Subcategories of ${category.name}`} className="d-flex flex-wrap mb-4" style={{ gap: "var(--space-2)" }}>
@@ -115,7 +98,7 @@ export default async function CategoryPage({ params, searchParams }: { params: P
       ) : null}
 
       <Suspense fallback={<ListingSkeleton />}>
-        <ProductBrowser query={query} basePath={`/categories/${category.slug}`} />
+        <ProductBrowser query={query} basePath={`/categories/${category.slug}`} lockedCategorySlug={category.slug} />
       </Suspense>
     </div>
   );

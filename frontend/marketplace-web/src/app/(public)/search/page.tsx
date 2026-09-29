@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { ListingHeader } from "@/components/products/ListingHeader";
 import { EmptyState } from "@/components/shared/Feedback";
 import { readProductQuery } from "@/features/products/api/readProductQuery";
 import { ListingSkeleton } from "@/features/products/components/ListingSkeleton";
@@ -36,16 +37,15 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
   if (!searched) {
     return (
       <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
-        <div className="mp-page-header">
-          <div>
-            <h1 className="mp-page-title">Search</h1>
-            <p className="mp-page-subtitle">Type a product, brand, or store in the search box above.</p>
-          </div>
-        </div>
+        <ListingHeader
+          breadcrumbs={[{ name: "Home", href: "/" }, { name: "Search" }]}
+          title="Search"
+          subtitle="Type a product name, description, or SKU in the search box above."
+        />
 
         <EmptyState
           title="What are you looking for?"
-          body="Search looks across product names, brands, and seller catalogues."
+          body="Search looks across product names, descriptions, and variant SKUs."
           action={
             <Link href="/products" className="btn btn-sm btn-primary">
               Browse all products
@@ -58,15 +58,19 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
 
   return (
     <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
-      <div className="mp-page-header">
-        <div>
-          <h1 className="mp-page-title">Results for “{searched}”</h1>
-          <p className="mp-page-subtitle">Matching products across independent stores.</p>
-        </div>
-      </div>
+      <ListingHeader
+        breadcrumbs={[{ name: "Home", href: "/" }, { name: "Search" }]}
+        title={`Results for “${searched}”`}
+        subtitle="Matching products across independent stores."
+      />
 
       <Suspense fallback={<ListingSkeleton />}>
-        <ProductBrowser query={query} basePath="/search" paginationQuery={{ ...query, search: undefined, q: searched }} />
+        <ProductBrowser
+          query={query}
+          basePath="/search"
+          paginationQuery={{ ...query, search: undefined, q: searched }}
+          searchParamName="q"
+        />
       </Suspense>
     </div>
   );

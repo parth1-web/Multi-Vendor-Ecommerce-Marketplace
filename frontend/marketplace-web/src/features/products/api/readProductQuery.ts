@@ -54,7 +54,7 @@ export function readProductQuery(params: Record<string, string | string[] | unde
  * Pagination has to carry the filters with it: a next link that drops them lands the shopper
  * on page two of the wrong result set, which looks like the end of the catalogue.
  */
-export function listingHref(basePath: string, query: ProductQuery, page: number): string {
+export function listingHref(basePath: string, query: Record<string, unknown>, page: number): string {
   const search = new URLSearchParams();
 
   for (const [key, raw] of Object.entries(query)) {

@@ -15,22 +15,35 @@ import { useState } from "react";
 
 import { SORT_OPTIONS } from "@/lib/constants";
 import { cx, formatCurrency } from "@/lib/format";
+import { flattenCategories } from "@/lib/categories";
 import { useCategories } from "@/features/products/api/useProducts";
-import type { Category } from "@/types/product";
 
 export interface ProductFiltersProps {
   totalCount: number;
+  /** Where filter changes navigate: the category, search, or store page hosting the island. */
+  basePath?: string;
+  /** The address-bar name of the search term: `q` on /search, `search` everywhere else. */
+  searchParamName?: "search" | "q";
+  /** Slugs owned by the page itself; shown as context elsewhere, never cleared here. */
+  lockedCategorySlug?: string;
+  lockedSellerSlug?: string;
 }
 
-export function ProductFilters({ totalCount }: ProductFiltersProps) {
+export function ProductFilters({
+  totalCount,
+  basePath = "/products",
+  searchParamName = "search",
+  lockedCategorySlug,
+  lockedSellerSlug,
+}: ProductFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // The text box holds what is being typed; the URL holds what is being searched. A keystroke
   // per request would hammer the API and make the results flicker, and the `key` on the input
   // resets the box whenever the URL changes underneath it, so the two can never disagree.
-  const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const searchKey = searchParams.get("search") ?? "";
+  const [search, setSearch] = useState(searchParams.get(searchParamName) ?? "");
+  const searchKey = searchParams.get(searchParamName) ?? "";
 
   const apply = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -45,10 +58,31 @@ export function ProductFilters({ totalCount }: ProductFiltersProps) {
 
     // Any filter change invalidates the current page number.
     next.delete("page");
-    router.push(`/products?${next.toString()}`);
+    const queryString = next.toString();
+    router.push(queryString ? `${basePath}?${queryString}` : basePath);
   };
 
   const current = (key: string) => searchParams.get(key) ?? "";
+
+  const clearable = hasRemovableFilters(searchParams, { searchParamName, lockedCategorySlug, lockedSellerSlug });
+  const clearAll = () => {
+    // Clearing removes filters, not context: the search term and sort order survive, while the
+    // page-owned category or seller lives in the path and was never in danger.
+    const next = new URLSearchParams();
+    const term = searchParams.get(searchParamName);
+    const sort = searchParams.get("sort");
+
+    if (term) {
+      next.set(searchParamName, term);
+    }
+
+    if (sort) {
+      next.set("sort", sort);
+    }
+
+    const queryString = next.toString();
+    router.push(queryString ? `${basePath}?${queryString}` : basePath);
+  };
 
   // The category tree is fetched here rather than passed in, so it cannot disagree with the
   // listing about what the catalogue actually contains.
@@ -59,7 +93,7 @@ export function ProductFilters({ totalCount }: ProductFiltersProps) {
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          apply({ search: search.trim() || undefined });
+          apply({ [searchParamName]: search.trim() || undefined });
         }}
         className="mp-stack-sm"
       >
@@ -74,7 +108,7 @@ export function ProductFilters({ totalCount }: ProductFiltersProps) {
             className="form-control form-control-sm"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Product or brand"
+            placeholder="Product, description, or SKU"
           />
           <button type="submit" className="btn btn-sm btn-primary">
             Go
@@ -82,22 +116,26 @@ export function ProductFilters({ totalCount }: ProductFiltersProps) {
         </div>
       </form>
 
-      <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-        <legend className="mp-metric-label p-0 mb-2">Category</legend>
-        <select
-          className="form-select form-select-sm"
-          value={current("categorySlug")}
-          onChange={(event) => apply({ categorySlug: event.target.value || undefined })}
-          aria-label="Category"
-        >
-          <option value="">All categories</option>
-          {flatten(categories ?? []).map((category) => (
-            <option key={category.id} value={category.slug}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-      </fieldset>
+      {/* A category page owns its category through the path, so offering to change it here
+          would fight the page. The category is context there, not a filter. */}
+      {!lockedCategorySlug ? (
+        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="mp-metric-label p-0 mb-2">Category</legend>
+          <select
+            className="form-select form-select-sm"
+            value={current("categorySlug")}
+            onChange={(event) => apply({ categorySlug: event.target.value || undefined })}
+            aria-label="Category"
+          >
+            <option value="">All categories</option>
+            {flattenCategories(categories ?? []).map((category) => (
+              <option key={category.id} value={category.slug}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </fieldset>
+      ) : null}
 
       <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
         <legend className="mp-metric-label p-0 mb-2">Price</legend>
@@ -164,12 +202,12 @@ export function ProductFilters({ totalCount }: ProductFiltersProps) {
         <span style={{ color: "var(--text-muted)", fontSize: "var(--fs-xs)" }}>
           {totalCount} {totalCount === 1 ? "product" : "products"}
         </span>
-        {hasFilters(searchParams) ? (
+        {clearable ? (
           <button
             type="button"
             className="btn btn-sm btn-link p-0"
             style={{ fontSize: "var(--fs-xs)" }}
-            onClick={() => router.push("/products")}
+            onClick={clearAll}
           >
             Clear all
           </button>
@@ -188,7 +226,7 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
   );
 }
 
-export function SortSelect() {
+export function SortSelect({ basePath = "/products" }: { basePath?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -199,6 +237,7 @@ export function SortSelect() {
         className="form-select form-select-sm"
         style={{ width: "auto" }}
         value={searchParams.get("sort") ?? "Newest"}
+        aria-label="Sort products"
         onChange={(event) => {
           const next = new URLSearchParams(searchParams.toString());
           if (event.target.value === "Newest") {
@@ -207,7 +246,8 @@ export function SortSelect() {
             next.set("sort", event.target.value);
           }
           next.delete("page");
-          router.push(`/products?${next.toString()}`);
+          const queryString = next.toString();
+          router.push(queryString ? `${basePath}?${queryString}` : basePath);
         }}
       >
         {SORT_OPTIONS.map((option) => (
@@ -220,13 +260,22 @@ export function SortSelect() {
   );
 }
 
-/** Categories arrive as a tree; the filter is a flat list, indented to show the hierarchy. */
-function flatten(categories: Category[], depth = 0): Array<Category & { depth: number }> {
-  return categories.flatMap((category) => [{ ...category, depth }, ...flatten(category.children ?? [], depth + 1)]);
-}
+/** Anything the shopper chose that a clear action should undo, leaving page-owned context alone. */
+function hasRemovableFilters(
+  searchParams: Pick<URLSearchParams, "has">,
+  locks: { searchParamName: "search" | "q"; lockedCategorySlug?: string; lockedSellerSlug?: string },
+): boolean {
+  const keys = [locks.searchParamName, "minPrice", "maxPrice", "minRating", "inStock", "onSale"];
 
-function hasFilters(searchParams: Pick<URLSearchParams, 'has'>): boolean {
-  return ["search", "categorySlug", "minPrice", "maxPrice", "minRating", "inStock", "onSale"].some((key) => searchParams.has(key));
+  if (!locks.lockedCategorySlug) {
+    keys.push("categorySlug");
+  }
+
+  if (!locks.lockedSellerSlug) {
+    keys.push("sellerSlug");
+  }
+
+  return keys.some((key) => searchParams.has(key));
 }
 
 export function PriceRangeSummary({ min, max }: { min?: number; max?: number }) {

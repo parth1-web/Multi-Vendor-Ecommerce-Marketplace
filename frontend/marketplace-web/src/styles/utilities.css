@@ -41,6 +41,110 @@
   white-space: nowrap;
 }
 
+/* One centered container for every major page, including the storefront. */
+.mp-container {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+
+/* Breadcrumbs: every step clickable except the page itself, truncated on small screens. */
+.mp-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.mp-breadcrumbs a {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 30rem) {
+  .mp-breadcrumbs li {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .mp-breadcrumbs a,
+  .mp-breadcrumbs span {
+    display: inline-block;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+}
+
+/* Applied filters: removable chips plus one clear action, never a second sidebar. */
+.mp-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.mp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  text-decoration: none;
+  min-height: 2rem;
+}
+
+.mp-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.mp-chip svg {
+  color: var(--text-subtle);
+  flex: none;
+}
+
+.mp-chip-clear {
+  background-color: transparent;
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.mp-filter-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding-inline: 0.3rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--brand-600);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* The drawer footer: one honest action that reports the live count before closing. */
+.mp-drawer-footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background-color: var(--bg-surface);
+}
+
 .mp-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

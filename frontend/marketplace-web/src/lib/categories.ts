@@ -32,3 +32,8 @@ export function selectStorefrontCategories(
     .sort((a, b) => a.displayOrder - b.displayOrder || b.productCount - a.productCount)
     .slice(0, Math.max(0, max));
 }
+
+/** The tree as a flat list, indented by depth for filter controls. */
+export function flattenCategories(categories: Category[], depth = 0): Array<Category & { depth: number }> {
+  return categories.flatMap((category) => [{ ...category, depth }, ...flattenCategories(category.children ?? [], depth + 1)]);
+}

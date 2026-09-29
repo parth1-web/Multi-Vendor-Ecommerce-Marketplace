@@ -117,11 +117,12 @@ export function PublicHeader() {
           <label htmlFor="site-search" className="visually-hidden">
             Search products
           </label>
-          <input
-            id="site-search"
-            name="q"
-            type="search"
-            placeholder="Search products, stores and brands"
+              <input
+                id="mobile-search"
+                name="q"
+                type="search"
+                required
+                placeholder="Search products, descriptions, SKUs"
             className="form-control"
             style={{ paddingInlineStart: "2.25rem", backgroundColor: "var(--bg-subtle)", borderColor: "var(--border)" }}
           />
@@ -244,7 +245,7 @@ export function PublicHeader() {
                 name="q"
                 type="search"
                 required
-                placeholder="Search products, stores and brands"
+            placeholder="Search products, descriptions, SKUs"
                 className="form-control"
                 autoComplete="off"
               />

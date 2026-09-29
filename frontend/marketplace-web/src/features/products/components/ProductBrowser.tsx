@@ -19,6 +19,8 @@ import Link from "next/link";
 import { EmptyState, ErrorState } from "@/components/shared/Feedback";
 import { useSavedProductIds } from "@/features/account/api/useWishlist";
 import { useProducts } from "@/features/products/api/useProducts";
+import { AppliedFilterChips, countActiveFilters } from "@/features/products/components/AppliedFilterChips";
+import { FilterDrawer } from "@/features/products/components/FilterDrawer";
 import { Pagination } from "@/components/navigation/Pagination";
 import { ProductCard } from "@/features/products/components/ProductCard";
 import { ProductFilters, SortSelect } from "@/features/products/components/ProductFilters";
@@ -39,27 +41,72 @@ interface ProductBrowserProps {
    * expects `search`, so those two cannot be the same object without breaking page two.
    */
   paginationQuery?: Record<string, unknown>;
+
+  /** The address-bar name of the search term: `q` on /search, `search` everywhere else. */
+  searchParamName?: "search" | "q";
+
+  /** Slugs owned by the page itself; shown as context elsewhere, never as removable chips. */
+  lockedCategorySlug?: string;
+  lockedSellerSlug?: string;
 }
 
-export function ProductBrowser({ query, basePath = "/products", paginationQuery }: ProductBrowserProps) {
+export function ProductBrowser({
+  query,
+  basePath = "/products",
+  paginationQuery,
+  searchParamName = "search",
+  lockedCategorySlug,
+  lockedSellerSlug,
+}: ProductBrowserProps) {
   const { data, isPending, isError, error, isPlaceholderData } = useProducts(query);
   const savedIds = useSavedProductIds();
+  const activeCount = countActiveFilters(query, { lockedCategorySlug, lockedSellerSlug });
 
   return (
-    <div className="row g-4">
-      <div className="col-12 col-lg-3">
-        <div className="mp-card" style={{ padding: "var(--space-4)" }}>
-          <ProductFilters totalCount={data?.totalCount ?? 0} />
-        </div>
-      </div>
+    <>
+      <AppliedFilterChips
+        query={query}
+        basePath={basePath}
+        searchParamName={searchParamName}
+        lockedCategorySlug={lockedCategorySlug}
+        lockedSellerSlug={lockedSellerSlug}
+      />
 
-      <div className="col-12 col-lg-9">
-        <div className="mp-spread mb-3">
-          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
-            {isPending ? "Loading products…" : `${data?.totalCount ?? 0} products`}
-          </p>
-          <SortSelect />
+      <div className="row g-4">
+        <div className="col-12 col-lg-3 d-none d-lg-block">
+          <div className="mp-card" style={{ padding: "var(--space-4)" }}>
+            <ProductFilters
+              totalCount={data?.totalCount ?? 0}
+              basePath={basePath}
+              searchParamName={searchParamName}
+              lockedCategorySlug={lockedCategorySlug}
+              lockedSellerSlug={lockedSellerSlug}
+            />
+          </div>
         </div>
+
+        <div className="col-12 col-lg-9">
+          <div className="d-lg-none d-flex align-items-center gap-2 mb-3">
+            <FilterDrawer
+              basePath={basePath}
+              searchParamName={searchParamName}
+              lockedCategorySlug={lockedCategorySlug}
+              totalCount={data?.totalCount ?? 0}
+              activeCount={activeCount}
+            />
+            <div className="ms-auto">
+              <SortSelect basePath={basePath} />
+            </div>
+          </div>
+
+          <div className="mp-spread mb-3">
+            <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+              {isPending ? "Loading products…" : `${data?.totalCount ?? 0} products`}
+            </p>
+            <span className="d-none d-lg-block">
+              <SortSelect basePath={basePath} />
+            </span>
+          </div>
 
         {/* The previous page stays on screen while the next one loads: blanking the grid on
             every filter change reads as "no results" when it is really "loading". */}
@@ -92,8 +139,9 @@ export function ProductBrowser({ query, basePath = "/products", paginationQuery 
             </>
           )}
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
