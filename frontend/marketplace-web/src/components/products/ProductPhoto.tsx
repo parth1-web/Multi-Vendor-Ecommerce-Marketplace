@@ -13,6 +13,7 @@ interface ProductPhotoProps {
   aspectRatio?: string;
   fit?: PhotoFit;
   eager?: boolean;
+  fetchPriority?: "high" | "low" | "auto";
   className?: string;
   style?: CSSProperties;
 }
@@ -32,6 +33,7 @@ export function ProductPhoto({
   aspectRatio = "1 / 1",
   fit = "cover",
   eager = false,
+  fetchPriority,
   className,
   style,
 }: ProductPhotoProps) {
@@ -59,6 +61,7 @@ export function ProductPhoto({
       height={height}
       loading={eager ? "eager" : "lazy"}
       decoding="async"
+      fetchPriority={fetchPriority}
       className={cx("mp-product-photo", fit === "contain" && "mp-product-photo-contain", className)}
       style={{ aspectRatio, objectFit: fit, ...style }}
     />

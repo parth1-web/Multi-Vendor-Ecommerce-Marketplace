@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 export interface HeroAction {
@@ -51,6 +52,7 @@ function HeroButton({ action }: { action: HeroAction }) {
   return (
     <Link href={action.href} className={className}>
       {action.label}
+      {action.variant === "secondary" ? null : <ArrowRight size={16} aria-hidden />}
     </Link>
   );
 }

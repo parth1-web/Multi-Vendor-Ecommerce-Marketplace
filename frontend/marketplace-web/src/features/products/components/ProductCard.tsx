@@ -18,12 +18,14 @@ export function ProductCard({ product, saved = false }: { product: ProductSummar
   return (
     <article className="mp-card mp-card-hover h-100 d-flex flex-column" style={{ padding: "var(--space-3)", position: "relative" }}>
       <Link href={`/products/${product.slug}`} className="d-block" style={{ position: "relative" }}>
-        <ProductPhoto
-          src={product.primaryImageUrl}
-          alt={product.primaryImageAlt ?? product.name}
-          width={640}
-          height={640}
-        />
+        <span className="mp-product-photo-frame">
+          <ProductPhoto
+            src={product.primaryImageUrl}
+            alt={product.primaryImageAlt ?? product.name}
+            width={640}
+            height={640}
+          />
+        </span>
 
         <DiscountBadge percentage={product.discountPercentage} />
       </Link>
