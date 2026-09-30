@@ -53,13 +53,25 @@ jobs:
       - name: Documentation links resolve
         shell: bash
         run: |
+          # Relative links resolve against the file that contains them — the same rule
+          # markdown renderers (including GitHub's) use — not against the repo root.
+          # Resolving from the root flags correct links (e.g. docs/api/../architecture)
+          # while letting genuinely broken ones through unnoticed. Absolute URLs and
+          # site-root paths are out of scope: there is no repo file they could point to.
+          # Dependency docs are excluded: vendored markdown is not ours to fix.
           fail=0
-          while read -r link; do
-            target="${link%%#*}"
-            [ -z "$target" ] && continue
-            if [ ! -e "$target" ]; then
-              echo "::error::Broken relative link in markdown: $link"
-              fail=1
-            fi
-          done < <(grep -rhoE '\]\((\.{0,2}/[^)#]+)(#[^)]*)?\)' --include='*.md' . | sed -E 's/^\]\(//' | sort -u)
+          while IFS= read -r -d '' file; do
+            dir=$(dirname "$file")
+            while IFS= read -r link; do
+              target="${link%%#*}"
+              [ -z "$target" ] && continue
+              case "$target" in
+                http://*|https://*|mailto:*|/*) continue ;;
+              esac
+              if [ ! -e "$dir/$target" ]; then
+                echo "::error::Broken relative link in $file: $link"
+                fail=1
+              fi
+            done < <(grep -hoE '\]\((\.{0,2}/[^)#]+)(#[^)]*)?\)' -- "$file" | sed -E 's/^\]\(//;s/\)$//')
+          done < <(find . -name '*.md' -not -path '*/node_modules/*' -print0)
           exit $fail

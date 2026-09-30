@@ -143,7 +143,7 @@ Additional rules:
 
 ## 6. Inventory integrity
 
-- Checkout cannot oversell: a single conditional `UPDATE` acts as the lock (see [`ARCHITECTURE.md`](../architecture/ARCHITECTURE.md) §4).
+- Checkout cannot oversell: a single conditional `UPDATE` acts as the lock (see [`ARCHITECTURE.md`](architecture/ARCHITECTURE.md) §4).
 - Every quantity change is an immutable `InventoryTransaction` row, so a dispute can always be reconstructed.
 - Reservations are time-boxed and released by a background job; release is idempotent (`WHERE reserved_quantity >= @qty`).
 - Manual seller adjustments require a reason and are audit-logged with before/after values.
