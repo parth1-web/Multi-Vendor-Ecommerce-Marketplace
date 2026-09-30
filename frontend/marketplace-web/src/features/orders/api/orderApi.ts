@@ -75,8 +75,28 @@ export const paymentApi = {
 };
 
 export const orderApi = {
-  async list(page = 1, pageSize = 20): Promise<OrderPage> {
-    const { data } = await apiClient.get<OrderPage>(`/api/orders?page=${page}&pageSize=${pageSize}`);
+  async list(
+    page = 1,
+    pageSize = 20,
+    filters: { status?: string; search?: string; sort?: string } = {},
+  ): Promise<OrderPage> {
+    const search = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+
+    // Only the backend's own filter names travel: status, search, sort. Anything else would be
+    // silently ignored by the API and lie in the address bar.
+    if (filters.status) {
+      search.set("status", filters.status);
+    }
+
+    if (filters.search) {
+      search.set("search", filters.search);
+    }
+
+    if (filters.sort) {
+      search.set("sort", filters.sort);
+    }
+
+    const { data } = await apiClient.get<OrderPage>(`/api/orders?${search.toString()}`);
     return data;
   },
 
@@ -88,5 +108,22 @@ export const orderApi = {
   async cancel(id: string, reason?: string): Promise<Order> {
     const { data } = await apiClient.post<Order>(`/api/orders/${id}/cancel`, { reason: reason ?? null });
     return data;
+  },
+};
+
+export const refundApi = {
+  /**
+   * Asks for money back on specific lines of an order.
+   *
+   * Eligibility lives on the server — the item's `canRefund` flag and the request validation —
+   * so a refusal arrives as an answer, never as a client-side guess.
+   */
+  async request(orderId: string, itemIds: string[], reason: string, description?: string | null): Promise<void> {
+    await apiClient.post("/api/refunds", {
+      orderId,
+      orderItemIds: itemIds,
+      reason,
+      description: description?.trim() || null,
+    });
   },
 };

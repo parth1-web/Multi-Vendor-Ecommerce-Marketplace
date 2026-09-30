@@ -1,11 +1,13 @@
 /** The order history: the signed-in person's own orders, newest first. */
 
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { OrderList } from "@/features/orders/components/OrderList";
 
 export const metadata: Metadata = {
   title: "Your orders",
+  description: "Every order you have placed, and how far along it is.",
   robots: { index: false, follow: false },
 };
 
@@ -19,7 +21,12 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      <OrderList />
+      {/* The list reads the address bar, and address-bar readers suspend while navigating. */}
+      <Suspense
+        fallback={<div className="mp-skeleton" style={{ height: "16rem", borderRadius: "var(--radius)" }} aria-hidden />}
+      >
+        <OrderList />
+      </Suspense>
     </div>
   );
 }

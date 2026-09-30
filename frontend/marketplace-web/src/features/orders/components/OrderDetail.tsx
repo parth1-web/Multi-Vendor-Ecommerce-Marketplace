@@ -10,17 +10,21 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
-import { CheckCircle2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Check, CheckCircle2, Copy } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Modal } from "react-bootstrap";
 
+import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { ErrorState, StatusBadge } from "@/components/shared/Feedback";
-import { orderApi } from "@/features/orders/api/orderApi";
+import { orderApi, refundApi } from "@/features/orders/api/orderApi";
 import { OrderReviews } from "@/features/orders/components/OrderReviews";
 import { cx, formatCurrency, formatDate } from "@/lib/format";
+import { errorMessage } from "@/lib/errors";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRealtime } from "@/providers/RealtimeProvider";
+import { useToast } from "@/providers/ToastProvider";
 import type { OrderStatus } from "@/types/order";
 
 function OrderDetailPage() {
@@ -28,6 +32,20 @@ function OrderDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { isAuthenticated, isHydrating } = useAuth();
+  const queryClient = useQueryClient();
+  const { push } = useToast();
+  const [cancelling, setCancelling] = useState(false);
+  const [refundFor, setRefundFor] = useState<{ itemId: string; productName: string } | null>(null);
+
+  const cancelOrder = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => orderApi.cancel(id, reason || undefined),
+    onSuccess: async () => {
+      setCancelling(false);
+      push({ tone: "success", title: "Order cancelled" });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+    onError: (failure) => push({ tone: "danger", title: "Could not cancel the order", body: errorMessage(failure) }),
+  });
 
   const justPlaced = searchParams.get("placed") === "1";
 
@@ -77,8 +95,19 @@ function OrderDetailPage() {
 
   const data = order.data;
 
+  // The button is offered while the documented rule allows it — Pending, Confirmed, Processing —
+  // but the server has the last word: a refusal arrives as an answer, not a silent no-op.
+  const cancellable = ["Pending", "Confirmed", "Processing"].includes(data.status);
+
+  const trackedParcels = data.sellerOrders.filter(
+    (sellerOrder) => sellerOrder.carrierName || sellerOrder.trackingNumber || sellerOrder.estimatedDeliveryAt,
+  );
+
   return (
     <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
+      <Breadcrumbs
+        trail={[{ name: "Home", href: "/" }, { name: "Orders", href: "/orders" }, { name: data.orderNumber }]}
+      />
       {justPlaced ? (
         <p className="mp-alert mp-alert-success" role="status">
           <CheckCircle2 size={16} aria-hidden className="me-2" />
@@ -100,10 +129,30 @@ function OrderDetailPage() {
           </div>
         </div>
 
-        <Link href="/orders" className="btn btn-sm btn-outline-secondary">
-          All your orders
-        </Link>
+        <div className="d-flex align-items-center flex-wrap" style={{ gap: "var(--space-2)" }}>
+          <Link href="/orders" className="btn btn-sm btn-outline-secondary">
+            All your orders
+          </Link>
+          {cancellable ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              style={{ color: "var(--danger)" }}
+              onClick={() => setCancelling(true)}
+            >
+              Cancel order
+            </button>
+          ) : null}
+        </div>
       </div>
+
+      <CancelOrderModal
+        orderNumber={data.orderNumber}
+        open={cancelling}
+        pending={cancelOrder.isPending}
+        onClose={() => setCancelling(false)}
+        onConfirm={(reason) => cancelOrder.mutate({ id: data.id, reason })}
+      />
 
       <div className="row g-4">
         <div className="col-12 col-lg-8">
@@ -142,6 +191,16 @@ function OrderDetailPage() {
                       {item.variantName} · {item.sku} · {item.quantity} × {formatCurrency(item.unitPrice, data.currency)}
                     </p>
                     <p style={{ margin: 0, color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>Sold by {item.storeName}</p>
+                    {item.canRefund ? (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link p-0"
+                        style={{ fontSize: "var(--fs-xs)" }}
+                        onClick={() => setRefundFor({ itemId: item.id, productName: item.productName })}
+                      >
+                        Request a refund
+                      </button>
+                    ) : null}
                   </div>
 
                   <span>{formatCurrency(item.lineTotal, data.currency)}</span>
@@ -150,8 +209,7 @@ function OrderDetailPage() {
             </ul>
           </section>
 
-          {/*
-            A marketplace order is one order split per seller, so with more than one store this
+          {/* A marketplace order is one order split per seller, so with more than one store this
             is the part that says who is actually packing what.
           */}
           {data.sellerOrders.length > 1 ? (
@@ -184,6 +242,47 @@ function OrderDetailPage() {
                       ) : null}
                     </span>
                     <span>{formatCurrency(sellerOrder.totalAmount, data.currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {trackedParcels.length > 0 ? (
+            <section className="mp-card mt-3" style={{ padding: "var(--space-4)" }} aria-labelledby="order-tracking">
+              <h2 className="mp-section-title" id="order-tracking" style={{ fontSize: "var(--fs-h3)" }}>
+                Tracking
+              </h2>
+              <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)", marginTop: 0 }}>
+                What the seller reported for each parcel — nothing here is estimated by this page.
+              </p>
+
+              <ul className="list-unstyled mb-0">
+                {trackedParcels.map((parcel, index) => (
+                  <li
+                    key={parcel.id}
+                    style={{
+                      padding: "var(--space-2) 0",
+                      borderTop: index === 0 ? "none" : "1px solid var(--border)",
+                      fontSize: "var(--fs-sm)",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontWeight: 600 }}>{parcel.storeName}</p>
+                    {parcel.carrierName ? (
+                      <p style={{ margin: 0, color: "var(--text-muted)" }}>Carrier: {parcel.carrierName}</p>
+                    ) : null}
+                    {parcel.trackingNumber ? (
+                      <p style={{ margin: 0, color: "var(--text-muted)" }}>
+                        Tracking number:{" "}
+                        <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)" }}>{parcel.trackingNumber}</code>{" "}
+                        <CopyTrackingNumber trackingNumber={parcel.trackingNumber} />
+                      </p>
+                    ) : null}
+                    {parcel.estimatedDeliveryAt ? (
+                      <p style={{ margin: 0, color: "var(--text-muted)" }}>
+                        Expected delivery: {formatDate(parcel.estimatedDeliveryAt)}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -287,6 +386,19 @@ function OrderDetailPage() {
           <OrderReviews order={data} />
         </div>
       </div>
+
+      {refundFor ? (
+        <RefundRequestModal
+          orderId={data.id}
+          itemId={refundFor.itemId}
+          productName={refundFor.productName}
+          onClose={() => setRefundFor(null)}
+          onRequested={async () => {
+            setRefundFor(null);
+            await queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(data.id) });
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -314,3 +426,178 @@ function statusTone(status: OrderStatus): "success" | "warning" | "danger" | "in
 }
 
 export { OrderDetailPage as OrderDetail };
+
+function CancelOrderModal({
+  orderNumber,
+  open,
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  orderNumber: string;
+  open: boolean;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+
+  return (
+    <Modal show={open} onHide={onClose} centered aria-labelledby="cancel-order-title">
+      <Modal.Header closeButton>
+        <Modal.Title id="cancel-order-title">Cancel this order?</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+          Order {orderNumber} will be cancelled and any reserved stock released. This action cannot be undone.
+        </p>
+        <label htmlFor="cancel-reason" className="mp-metric-label">
+          Reason
+        </label>
+        <input
+          id="cancel-reason"
+          className="form-control form-control-sm"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="Optional — helps the seller understand"
+          maxLength={500}
+          autoComplete="off"
+        />
+      </Modal.Body>
+      <Modal.Footer>
+        <button type="button" className="btn btn-outline-secondary" onClick={onClose} disabled={pending}>
+          Keep order
+        </button>
+        <button
+          type="button"
+          className="btn btn-danger"
+          disabled={pending}
+          aria-busy={pending}
+          onClick={() => onConfirm(reason.trim())}
+        >
+          {pending ? "Cancelling…" : "Cancel order"}
+        </button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+function RefundRequestModal({
+  orderId,
+  itemId,
+  productName,
+  onClose,
+  onRequested,
+}: {
+  orderId: string;
+  itemId: string;
+  productName: string;
+  onClose: () => void;
+  onRequested: () => Promise<void>;
+}) {
+  const { push } = useToast();
+  const [reason, setReason] = useState("");
+  const [description, setDescription] = useState("");
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const requestRefund = useMutation({
+    mutationFn: () => refundApi.request(orderId, [itemId], reason.trim(), description.trim() || null),
+    onSuccess: async () => {
+      push({ tone: "success", title: "Refund requested", body: "The seller has been notified." });
+      await onRequested();
+    },
+    onError: (failure) => setFailed(errorMessage(failure, "We could not send the refund request.")),
+  });
+
+  return (
+    <Modal show onHide={onClose} centered aria-labelledby="refund-request-title">
+      <Modal.Header closeButton>
+        <Modal.Title id="refund-request-title">Request a refund</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)", marginTop: 0 }}>
+          For <strong style={{ color: "var(--text)" }}>{productName}</strong>. The seller reviews the
+          request; nothing is refunded until they approve it.
+        </p>
+
+        {failed ? (
+          <p role="alert" className="mp-alert mp-alert-danger">
+            {failed}
+          </p>
+        ) : null}
+
+        <label htmlFor="refund-reason" className="mp-metric-label">
+          Reason
+        </label>
+        <input
+          id="refund-reason"
+          className="form-control form-control-sm"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="Why are you asking for a refund?"
+          maxLength={200}
+          autoComplete="off"
+          aria-describedby="refund-reason-hint"
+        />
+        <p id="refund-reason-hint" style={{ color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>
+          Required, up to 200 characters.
+        </p>
+
+        <label htmlFor="refund-description" className="mp-metric-label" style={{ marginTop: "var(--space-2)" }}>
+          Details
+        </label>
+        <textarea
+          id="refund-description"
+          className="form-control form-control-sm"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Anything that helps the seller decide (optional)"
+          maxLength={2000}
+          rows={3}
+        />
+      </Modal.Body>
+      <Modal.Footer>
+        <button type="button" className="btn btn-outline-secondary" onClick={onClose} disabled={requestRefund.isPending}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={requestRefund.isPending || reason.trim().length === 0}
+          aria-busy={requestRefund.isPending}
+          onClick={() => requestRefund.mutate()}
+        >
+          {requestRefund.isPending ? "Sending…" : "Send request"}
+        </button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+function CopyTrackingNumber({ trackingNumber }: { trackingNumber: string }) {
+  const { push } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      type="button"
+      className="btn btn-sm btn-link p-0"
+      style={{ fontSize: "var(--fs-xs)", verticalAlign: "baseline" }}
+      onClick={() => {
+        navigator.clipboard
+          .writeText(trackingNumber)
+          .then(() => {
+            setCopied(true);
+            push({ tone: "success", title: "Tracking number copied" });
+            window.setTimeout(() => setCopied(false), 3000);
+          })
+          .catch(() =>
+            push({ tone: "danger", title: "Could not copy the tracking number", body: "Copy it manually instead." }),
+          );
+      }}
+      aria-label={copied ? "Tracking number copied" : `Copy tracking number ${trackingNumber}`}
+    >
+      {copied ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />} {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
