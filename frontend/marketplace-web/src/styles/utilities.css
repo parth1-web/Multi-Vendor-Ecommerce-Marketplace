@@ -1041,6 +1041,42 @@
   }
 }
 
+/* ---- product page ------------------------------------------------------------ */
+
+/* Thumbnail buttons: the active one carries a brand edge as well as a tint, so the selection
+   does not depend on colour alone. Unstyled buttons would inherit the browser default. */
+.mp-gallery-thumb {
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  cursor: pointer;
+  line-height: 0;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.mp-gallery-thumb:hover {
+  border-color: var(--border-strong);
+}
+
+.mp-gallery-thumb.is-active {
+  border-color: var(--brand-600);
+  box-shadow: 0 0 0 1px var(--brand-600);
+}
+
+/*
+ * The purchase panel follows the gallery on wide screens, so the price and the buy button stay
+ * in reach while a shopper scrolls through images and details. It sticks inside its own column
+ * only — never over content, never past the section — and only where the column is tall enough
+ * for sticking to mean something.
+ */
+@media (min-width: 62rem) {
+  .mp-sticky-buy {
+    position: sticky;
+    top: calc(var(--header-height) + var(--space-4));
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .mp-toast {
     animation: mp-toast-in 180ms ease-out;

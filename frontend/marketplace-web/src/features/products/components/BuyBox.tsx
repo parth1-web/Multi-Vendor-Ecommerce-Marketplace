@@ -14,7 +14,7 @@ import { useSavedProductIds } from "@/features/account/api/useWishlist";
 import { VariantPicker } from "@/features/products/components/VariantPicker";
 import type { ProductDetail } from "@/types/product";
 
-export function BuyBox({ product }: { product: ProductDetail }) {
+export function BuyBox({ product, initialVariantId }: { product: ProductDetail; initialVariantId?: string }) {
   const savedIds = useSavedProductIds();
 
   return (
@@ -24,7 +24,7 @@ export function BuyBox({ product }: { product: ProductDetail }) {
         <WishlistButton productId={product.id} saved={savedIds.has(product.id)} label="Save for later" />
       </div>
 
-      <VariantPicker productId={product.id} variants={product.variants} />
+      <VariantPicker productId={product.id} variants={product.variants} initialVariantId={initialVariantId} />
     </div>
   );
 }

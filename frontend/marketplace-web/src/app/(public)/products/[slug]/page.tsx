@@ -8,13 +8,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Store } from "lucide-react";
 
+import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { RatingStars } from "@/components/shared/RatingStars";
 import { PriceDisplay } from "@/components/shared/PriceDisplay";
 import { StatusBadge } from "@/components/shared/Feedback";
+import { SectionHeader } from "@/components/shared/SectionHeader";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
+import { SellerCard } from "@/components/stores/SellerCard";
 import { BuyBox } from "@/features/products/components/BuyBox";
+import { ProductGallery } from "@/features/products/components/ProductGallery";
+import { ProductReviews } from "@/features/products/components/ProductReviews";
+import { ReviewItem } from "@/features/products/components/ReviewItem";
 import { ApiError, serverGet } from "@/lib/serverApi";
 import { formatDate } from "@/lib/format";
 import { breadcrumbJsonLd, canonical, jsonLdScript, pageMetadata } from "@/lib/seo";
@@ -76,40 +81,25 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
         dangerouslySetInnerHTML={{ __html: jsonLdScript(productJsonLd(product, crumbs)) }}
       />
 
-      <nav aria-label="Breadcrumb" className="mb-3">
-        <ol className="list-unstyled d-flex align-items-center flex-wrap mb-0" style={{ gap: "0.35rem", fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-          {crumbs.map((crumb, index) => (
-            <li key={crumb.path} className="d-flex align-items-center" style={{ gap: "0.35rem" }}>
-              {index > 0 ? <ChevronRight size={12} aria-hidden /> : null}
-              {index === crumbs.length - 1 ? (
-                <span aria-current="page" style={{ color: "var(--text)" }}>
-                  {crumb.name}
-                </span>
-              ) : (
-                <Link href={crumb.path}>{crumb.name}</Link>
-              )}
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <Breadcrumbs
+        trail={crumbs.map((crumb, index) =>
+          index === crumbs.length - 1 ? { name: crumb.name } : { name: crumb.name, href: crumb.path },
+        )}
+      />
 
 
       <div className="row g-4">
         <div className="col-12 col-lg-7">
-          <Gallery product={product} />
+          <ProductGallery images={product.images} productName={product.name} />
         </div>
 
         <div className="col-12 col-lg-5">
           <div className="mp-stack">
             <div>
-              <Link
-                href={`/stores/${product.storeSlug}`}
-                className="d-inline-flex align-items-center"
-                style={{ gap: "0.35rem", color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}
-              >
-                <Store size={14} aria-hidden />
-                {product.storeName}
-              </Link>
+              <p className="mp-metric-label" style={{ margin: 0 }}>
+                {product.categoryName}
+                {product.brand ? ` · ${product.brand}` : ""}
+              </p>
 
               <h1 className="mp-page-title" style={{ fontSize: "var(--fs-h1)", marginTop: "var(--space-2)" }}>
                 {product.name}
@@ -133,17 +123,20 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
 
             <p style={{ color: "var(--text-muted)" }}>{product.shortDescription}</p>
 
-            <BuyBox product={product} />
+            <SellerCard
+              storeName={product.storeName}
+              storeSlug={product.storeSlug}
+              storeLogoUrl={product.storeLogoUrl}
+              storeRating={product.storeRating}
+              storeRatingCount={product.storeRatingCount}
+              sellerName={product.sellerName}
+            />
+
+            <div className="mp-sticky-buy">
+              <BuyBox product={product} initialVariantId={variant} />
+            </div>
 
             <dl className="mp-stack-sm mb-0" style={{ fontSize: "var(--fs-sm)" }}>
-              {product.brand ? (
-                <div className="d-flex">
-                  <dt className="mp-metric-label" style={{ minWidth: "7rem" }}>
-                    Brand
-                  </dt>
-                  <dd className="mb-0">{product.brand}</dd>
-                </div>
-              ) : null}
               <div className="d-flex">
                 <dt className="mp-metric-label" style={{ minWidth: "7rem" }}>
                   Listed
@@ -190,47 +183,47 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
             <RatingSummary breakdown={product.ratingBreakdown} />
 
             {product.reviews.length === 0 ? (
-              <p style={{ color: "var(--text-muted)" }}>No reviews for this product yet.</p>
+              <p style={{ color: "var(--text-muted)" }}>
+                No reviews for this product yet. If you have bought it, you can write one from{" "}
+                <Link href="/orders">your orders</Link>.
+              </p>
             ) : (
               <ul className="list-unstyled mp-stack" style={{ marginBottom: 0 }}>
                 {product.reviews.map((review) => (
                   <li key={review.id} style={{ borderBottom: "1px solid var(--border)", paddingBottom: "var(--space-3)" }}>
-                    <div className="d-flex justify-content-between align-items-center">
-                      <strong style={{ fontSize: "var(--fs-sm)" }}>{review.authorName}</strong>
-                      <RatingStars rating={review.rating} showCount={false} />
-                    </div>
-                    {review.title ? <p style={{ margin: "var(--space-1) 0 0", fontWeight: 600 }}>{review.title}</p> : null}
-                    <p style={{ margin: "var(--space-1) 0 0", color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>{review.body}</p>
-
-                    {review.isVerifiedPurchase ? (
-                      <p style={{ margin: "var(--space-1) 0 0" }}>
-                        <StatusBadge tone="success">Verified purchase</StatusBadge>
-                      </p>
-                    ) : null}
-
-                    {review.reply ? (
-                      <p style={{ margin: "var(--space-2) 0 0", paddingLeft: "var(--space-3)", borderLeft: "2px solid var(--border)", color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
-                        <strong>{review.reply.authorName}</strong> {review.reply.body}
-                      </p>
-                    ) : null}
+                    <ReviewItem
+                      rating={review.rating}
+                      title={review.title}
+                      body={review.body}
+                      authorName={review.authorName}
+                      isVerifiedPurchase={review.isVerifiedPurchase}
+                      createdAt={review.createdAt}
+                      reply={review.reply}
+                    />
                   </li>
                 ))}
               </ul>
             )}
+
+            <ProductReviews productId={product.id} totalCount={product.reviewCount} />
           </section>
         </div>
       </div>
 
       {product.relatedProducts.length > 0 ? (
         <section aria-labelledby="related" className="mt-5">
-          <h2 className="mp-section-title" id="related">
-            You might also like
-          </h2>
+          <SectionHeader
+            id="related"
+            title="You might also like"
+            description={`More from ${product.categoryName}.`}
+            actionHref={`/categories/${product.categorySlug}`}
+            actionLabel="More in this category"
+          />
 
           <div className="row g-3">
             {product.relatedProducts.map((related) => (
               <div key={related.id} className="col-6 col-md-4 col-xl-3">
-                <article className="mp-card" style={{ padding: "var(--space-3)", height: "100%" }}>
+                <article className="mp-card mp-card-hover" style={{ padding: "var(--space-3)", height: "100%" }}>
                   <Link href={`/products/${related.slug}`} style={{ color: "var(--text)" }}>
                     <ProductPhoto
                       src={related.primaryImageUrl}
@@ -242,6 +235,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pa
 
                     <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--fs-sm)", fontWeight: 500 }}>{related.name}</p>
                     <p style={{ margin: "var(--space-1) 0 0", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>{related.storeName}</p>
+                    <RatingStars rating={related.ratingAverage} count={related.ratingCount} />
                     <PriceDisplay price={related.basePrice} compareAtPrice={related.compareAtPrice} discountPercentage={related.discountPercentage} />
                   </Link>
                 </article>
@@ -305,38 +299,6 @@ function RatingSummary({ breakdown }: { breakdown: RatingBreakdown }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-function Gallery({ product }: { product: ProductDetail }) {
-  const [primary, ...rest] = product.images.length > 0 ? product.images : [{ id: "", url: "", altText: product.name, isPrimary: true, sortOrder: 0 }];
-
-  return (
-    <div className="mp-stack-sm">
-      <ProductPhoto
-        src={primary.url}
-        alt={primary.altText ?? product.name}
-        width={960}
-        height={960}
-        eager
-        style={{ borderRadius: "var(--radius)", backgroundColor: "var(--bg-subtle)" }}
-      />
-
-      {rest.length > 0 ? (
-        <div className="d-flex" style={{ gap: "var(--space-2)" }}>
-          {rest.map((image) => (
-            <ProductPhoto
-              key={image.id}
-              src={image.url}
-              alt={image.altText ?? product.name}
-              width={192}
-              height={192}
-              style={{ width: "4.5rem", height: "4.5rem", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

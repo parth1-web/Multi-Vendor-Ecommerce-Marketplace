@@ -14,9 +14,24 @@ import { StockBadge } from "@/components/shared/Feedback";
 import { useAddToCart } from "@/features/cart/api/useCart";
 import type { ProductVariant } from "@/types/product";
 
-export function VariantPicker({ productId, variants }: { productId: string; variants: ProductVariant[] }) {
+export function VariantPicker({
+  productId,
+  variants,
+  initialVariantId,
+}: {
+  productId: string;
+  variants: ProductVariant[];
+  /** A variant id from the URL, honoured only when it names a real, active option. */
+  initialVariantId?: string;
+}) {
   const purchasable = variants.filter((variant) => variant.isActive);
-  const [selectedId, setSelectedId] = useState<string | null>(purchasable.length === 1 ? purchasable[0].id : null);
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    purchasable.some((variant) => variant.id === initialVariantId)
+      ? (initialVariantId as string)
+      : purchasable.length === 1
+        ? purchasable[0].id
+        : null,
+  );
   const [quantity, setQuantity] = useState(1);
 
   const selected = purchasable.find((variant) => variant.id === selectedId) ?? null;
@@ -93,6 +108,7 @@ export function VariantPicker({ productId, variants }: { productId: string; vari
         type="button"
         className="btn btn-primary w-100"
         disabled={!selected || selected.availableQuantity <= 0 || addToCart.isPending}
+        aria-describedby={!selected && purchasable.length > 1 ? "variant-help" : undefined}
         onClick={() => selected && addToCart.mutate({ productId, productVariantId: selected.id, quantity })}
       >
         <ShoppingBag size={16} aria-hidden className="me-2" />
@@ -100,7 +116,7 @@ export function VariantPicker({ productId, variants }: { productId: string; vari
       </button>
 
       {!selected && purchasable.length > 1 ? (
-        <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-xs)", margin: 0 }}>
+        <p id="variant-help" style={{ color: "var(--text-muted)", fontSize: "var(--fs-xs)", margin: 0 }}>
           Choose an option to continue.
         </p>
       ) : null}
