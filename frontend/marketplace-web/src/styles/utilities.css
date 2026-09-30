@@ -1077,6 +1077,82 @@
   }
 }
 
+/* ---- cart -------------------------------------------------------------------- */
+
+/*
+ * One cart line: image, identity, actions. On narrow screens the quantity row drops beneath the
+ * identity so thumbs and fingers both fit; on wider screens everything sits on one row.
+ */
+.mp-cart-line {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.mp-cart-line-media {
+  width: 4rem;
+}
+
+.mp-cart-line-info {
+  min-width: 0;
+}
+
+.mp-cart-line-remove {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+
+/* Cart controls keep full touch targets: quantity and remove are the most-tapped buttons here. */
+.mp-cart-line .btn {
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+}
+
+.mp-cart-line-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+@media (min-width: 48rem) {
+  .mp-cart-line {
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto auto auto;
+    align-items: center;
+  }
+
+  .mp-cart-line-media {
+    width: 4.5rem;
+  }
+
+  .mp-cart-line-actions {
+    grid-column: auto;
+    display: contents;
+  }
+
+  .mp-cart-line-remove {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+/*
+ * The summary sticks beside the items on desktop only. On a phone it would cover content while
+ * scrolling, and the totals already sit directly beneath the last line.
+ */
+@media (min-width: 62rem) {
+  .mp-cart-summary {
+    position: sticky;
+    top: calc(var(--header-height) + var(--space-4));
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .mp-toast {
     animation: mp-toast-in 180ms ease-out;

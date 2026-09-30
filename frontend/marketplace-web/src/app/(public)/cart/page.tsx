@@ -1,4 +1,4 @@
-/** The basket. A client page: the basket is live state and the totals are what is at stake. */
+/** The basket. A client island: the basket is live state and the totals are what is at stake. */
 
 import type { Metadata } from "next";
 
@@ -11,16 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default function CartPage() {
-  return (
-    <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
-      <div className="mp-page-header">
-        <div>
-          <h1 className="mp-page-title">Your basket</h1>
-          <p className="mp-page-subtitle">Grouped by store, because that is how it ships.</p>
-        </div>
-      </div>
-
-      <CartView />
-    </div>
-  );
+  // Everything below — heading, counts, skeleton, error, empty state — renders inside the view,
+  // because only the live basket knows which of those the shopper should see.
+  return <CartView />;
 }

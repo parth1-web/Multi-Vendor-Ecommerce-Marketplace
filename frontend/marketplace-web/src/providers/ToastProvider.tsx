@@ -17,6 +17,12 @@ interface Toast {
   tone: ToastTone;
   title: string;
   body?: string;
+  /**
+   * One follow-up action, for the rare toast that can genuinely be undone. The viewport renders
+   * it as a real button rather than text, and running it dismisses the toast first so the
+   * follow-up never stacks on top of the thing it undoes.
+   */
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastContextValue {
@@ -85,6 +91,21 @@ function ToastViewport({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id:
           <div style={{ fontWeight: 600, color: "var(--text)" }}>{toast.title}</div>
           {toast.body ? (
             <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>{toast.body}</div>
+          ) : null}
+          {toast.action ? (
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDismiss(toast.id);
+                  toast.action?.onClick();
+                }}
+              >
+                {toast.action.label}
+              </button>
+            </div>
           ) : null}
         </div>
       ))}

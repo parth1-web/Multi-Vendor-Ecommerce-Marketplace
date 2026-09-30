@@ -41,6 +41,28 @@ export function useRemoveCartItem() {
   });
 }
 
+export function useClearCart() {
+  const queryClient = useQueryClient();
+  const { push } = useToast();
+
+  return useMutation({
+    mutationFn: () => cartApi.clear(),
+    // The API answers with the emptied basket, so nothing needs refetching — and the header
+    // badge follows the same cache, so it clears in the same render.
+    onSuccess: (cart) => {
+      queryClient.setQueryData(queryKeys.cart.detail(), cart);
+      push({ tone: "success", title: "Basket cleared" });
+    },
+    onError: (error: ApiErrorShape) => {
+      push({
+        tone: "danger",
+        title: "Could not clear the basket",
+        body: error.detail ?? "Please try again.",
+      });
+    },
+  });
+}
+
 export function useAddToCart() {
   const queryClient = useQueryClient();
   const { push } = useToast();
