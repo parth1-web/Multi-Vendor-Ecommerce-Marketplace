@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -64,6 +64,13 @@ export function CheckoutWizard() {
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+
+  // Moving between steps moves keyboard focus to the new step heading. A sighted shopper sees
+  // the new panel; a keyboard or screen-reader shopper is told, by being placed in it.
+  useEffect(() => {
+    document.getElementById(`step-${step}`)?.focus({ preventScroll: true });
+  }, [step]);
 
   // One key per attempt at this order, and the same key for every retry of it. The API keeps a
   // key for good and returns the order it already made, which is what makes a retry safe and
@@ -184,10 +191,19 @@ export function CheckoutWizard() {
             isLoading={addresses.isPending}
             selectedId={addressId}
             onSelect={setChosenAddressId}
-            onToggleAdd={() => setAdding(value => !value)}
+            onToggleAdd={() => {
+              setEditingAddress(null);
+              setAdding(value => !value);
+            }}
             adding={adding}
+            editingAddress={editingAddress}
+            onEdit={(address) => {
+              setAdding(false);
+              setEditingAddress(address);
+            }}
             onSaved={async () => {
               setAdding(false);
+              setEditingAddress(null);
               await addresses.refetch();
             }}
             onContinue={() => addressId && setStep("payment")}
@@ -196,7 +212,7 @@ export function CheckoutWizard() {
 
         {step === "payment" ? (
           <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="step-payment">
-            <h2 className="mp-section-title" id="step-payment" style={{ fontSize: "var(--fs-h3)" }}>
+            <h2 className="mp-section-title" id="step-payment" tabIndex={-1} style={{ fontSize: "var(--fs-h3)" }}>
               How would you like to pay?
             </h2>
 
@@ -237,7 +253,7 @@ export function CheckoutWizard() {
 
         {step === "review" ? (
           <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="step-review">
-            <h2 className="mp-section-title" id="step-review" style={{ fontSize: "var(--fs-h3)" }}>
+            <h2 className="mp-section-title" id="step-review" tabIndex={-1} style={{ fontSize: "var(--fs-h3)" }}>
               Check it over
             </h2>
 
@@ -250,7 +266,14 @@ export function CheckoutWizard() {
             {quote.isError ? (
               <ErrorState message="We could not price this order." />
             ) : (
-              <OrderSummary quote={quote.data} address={selectedAddress} cart={cart.data} />
+              <OrderSummary
+                quote={quote.data}
+                address={selectedAddress}
+                paymentLabel={paymentLabel(paymentMethod)}
+                onEditAddress={() => setStep("address")}
+                onEditPayment={() => setStep("payment")}
+                cart={cart.data}
+              />
             )}
 
             <div className="d-flex justify-content-between mt-4">
@@ -263,7 +286,7 @@ export function CheckoutWizard() {
                 onClick={placeOrder}
                 disabled={placing || quote.isPending || !addressId}
               >
-                {placing ? "Placing your order…" : "Place the order"}
+                {placing ? "Placing your order…" : quote.data ? `Place order · ${formatCurrency(quote.data.totalAmount, quote.data.currency)}` : "Place the order"}
               </button>
             </div>
 
@@ -279,7 +302,7 @@ export function CheckoutWizard() {
       <div className="col-12 col-lg-5">
         <SummaryPanel
           quote={quote.data}
-          isQuoting={quote.isPending}
+          isQuoting={quote.isFetching}
           addressId={addressId}
           couponInput={couponInput}
           onCouponInput={setCouponInput}
@@ -303,6 +326,8 @@ function AddressStep({
   onSelect,
   onToggleAdd,
   adding,
+  editingAddress,
+  onEdit,
   onSaved,
   onContinue,
 }: {
@@ -312,12 +337,16 @@ function AddressStep({
   onSelect: (id: string) => void;
   onToggleAdd: () => void;
   adding: boolean;
+  editingAddress: Address | null;
+  onEdit: (address: Address) => void;
   onSaved: () => Promise<void>;
   onContinue: () => void;
 }) {
+  const formOpen = adding || editingAddress !== null;
+
   return (
     <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="step-address">
-      <h2 className="mp-section-title" id="step-address" style={{ fontSize: "var(--fs-h3)" }}>
+      <h2 className="mp-section-title" id="step-address" tabIndex={-1} style={{ fontSize: "var(--fs-h3)" }}>
         Where should this go?
       </h2>
 
@@ -328,20 +357,33 @@ function AddressStep({
           <legend className="visually-hidden">Choose a delivery address</legend>
 
           {addresses.map(address => (
-            <label
-              key={address.id}
-              className="mp-choice"
-              style={{ borderColor: address.id === selectedId ? "var(--brand-600)" : "var(--border)" }}
-            >
-              <input type="radio" name="address" checked={address.id === selectedId} onChange={() => onSelect(address.id)} />
-              <span>
-                <strong style={{ fontSize: "var(--fs-sm)" }}>
-                  {address.label}
-                  {address.isDefault ? " (default)" : ""}
-                </strong>
-                <span style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--fs-xs)" }}>{formatAddress(address)}</span>
-              </span>
-            </label>
+            <div key={address.id} className="d-flex align-items-stretch" style={{ gap: "var(--space-2)" }}>
+              <label
+                className="mp-choice"
+                style={{
+                  flex: 1,
+                  borderColor: address.id === selectedId ? "var(--brand-600)" : "var(--border)",
+                }}
+              >
+                <input type="radio" name="address" checked={address.id === selectedId} onChange={() => onSelect(address.id)} />
+                <span>
+                  <strong style={{ fontSize: "var(--fs-sm)" }}>
+                    {address.label}
+                    {address.isDefault ? " (default)" : ""}
+                  </strong>
+                  <span style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--fs-xs)" }}>{formatAddress(address)}</span>
+                </span>
+              </label>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary align-self-center"
+                style={{ flex: "none" }}
+                onClick={() => onEdit(address)}
+                aria-label={`Edit address ${address.label}`}
+              >
+                Edit
+              </button>
+            </div>
           ))}
         </fieldset>
       ) : (
@@ -350,58 +392,95 @@ function AddressStep({
 
       <div className="d-flex justify-content-between mt-4">
         <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onToggleAdd}>
-          {adding ? "Choose a saved address" : "Add a new address"}
+          {formOpen ? "Choose a saved address" : "Add a new address"}
         </button>
         <button type="button" className="btn btn-sm btn-primary" onClick={onContinue} disabled={!selectedId}>
           Continue to payment
         </button>
       </div>
 
-      {adding ? <AddressForm onSaved={onSaved} /> : null}
+      {formOpen ? (
+        <AddressForm
+          key={editingAddress?.id ?? "new"}
+          initial={editingAddress}
+          onSaved={onSaved}
+          onCancel={() => onToggleAdd()}
+        />
+      ) : null}
     </section>
   );
 }
 
-function AddressForm({ onSaved }: { onSaved: () => Promise<void> }) {
+/** The label the review step shows for a payment method id. */
+function paymentLabel(methodId: string): string {
+  return PAYMENT_METHODS.find(method => method.id === methodId)?.label ?? methodId;
+}
+
+function AddressForm({ initial, onSaved, onCancel }: { initial: Address | null; onSaved: () => Promise<void>; onCancel: () => void }) {
   const queryClient = useQueryClient();
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    setFocus,
+    formState: { errors, isSubmitting, isSubmitted },
   } = useForm<AddressValues>({
     resolver: zodResolver(addressSchema),
-    defaultValues: {
-      label: "Home",
-      recipientName: "",
-      phoneNumber: "",
-      line1: "",
-      line2: "",
-      city: "",
-      state: "",
-      postalCode: "",
-      country: "NP",
-      isDefault: false,
-    },
+    defaultValues: initial
+      ? {
+          label: initial.label,
+          recipientName: initial.recipientName,
+          phoneNumber: initial.phoneNumber,
+          line1: initial.line1,
+          line2: initial.line2 ?? "",
+          city: initial.city,
+          state: initial.state ?? "",
+          postalCode: initial.postalCode,
+          country: initial.country,
+          isDefault: initial.isDefault,
+        }
+      : {
+          label: "Home",
+          recipientName: "",
+          phoneNumber: "",
+          line1: "",
+          line2: "",
+          city: "",
+          state: "",
+          postalCode: "",
+          country: "NP",
+          isDefault: false,
+        },
   });
+
+  // A failed submit lists every problem once at the top, and each entry moves focus to its
+  // field. Inline messages alone ask a keyboard user to hunt the form for what went wrong.
+  const errorEntries = (Object.keys(errors) as (keyof AddressValues)[]).filter((key) => errors[key]?.message);
 
   async function onSubmit(values: AddressValues) {
     setFormError(null);
 
+    const payload = {
+      label: values.label,
+      recipientName: values.recipientName,
+      phoneNumber: values.phoneNumber,
+      line1: values.line1,
+      line2: values.line2?.trim() || null,
+      city: values.city,
+      state: values.state?.trim() || null,
+      postalCode: values.postalCode,
+      country: values.country.toUpperCase(),
+      isDefault: values.isDefault,
+    };
+
     try {
-      await addressApi.create({
-        label: values.label,
-        recipientName: values.recipientName,
-        phoneNumber: values.phoneNumber,
-        line1: values.line1,
-        line2: values.line2?.trim() || null,
-        city: values.city,
-        state: values.state?.trim() || null,
-        postalCode: values.postalCode,
-        country: values.country.toUpperCase(),
-        isDefault: values.isDefault,
-      });
+      // The same form adds and edits: the backend owns both, this only chooses the endpoint.
+      if (initial) {
+        await addressApi.update(initial.id, payload);
+      } else {
+        await addressApi.create(payload);
+      }
 
       await queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
       await onSaved();
@@ -418,13 +497,33 @@ function AddressForm({ onSaved }: { onSaved: () => Promise<void> }) {
       style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-4)" }}
     >
       <h3 className="mp-section-title" style={{ fontSize: "var(--fs-h3)" }}>
-        Add an address
+        {initial ? `Edit ${initial.label}` : "Add an address"}
       </h3>
 
       {formError ? (
         <p role="alert" className="mp-alert mp-alert-danger">
           {formError}
         </p>
+      ) : null}
+
+      {isSubmitted && errorEntries.length > 0 ? (
+        <div role="alert" className="mp-alert mp-alert-danger">
+          <p style={{ margin: "0 0 var(--space-1)", fontWeight: 600 }}>Please correct the following:</p>
+          <ul style={{ margin: 0, paddingInlineStart: "1.25rem" }}>
+            {errorEntries.map((key) => (
+              <li key={key}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link p-0"
+                  style={{ color: "inherit", fontSize: "var(--fs-sm)", textDecoration: "underline" }}
+                  onClick={() => setFocus(key)}
+                >
+                  {errors[key]?.message}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       <div className="row g-2">
@@ -465,9 +564,14 @@ function AddressForm({ onSaved }: { onSaved: () => Promise<void> }) {
 
       <CheckField label="Use this as my default address" {...register("isDefault")} />
 
-      <button type="submit" className="btn btn-sm btn-primary" disabled={isSubmitting}>
-        {isSubmitting ? "Saving…" : "Save this address"}
-      </button>
+      <div className="d-flex" style={{ gap: "var(--space-2)" }}>
+        <button type="submit" className="btn btn-sm btn-primary" disabled={isSubmitting}>
+          {isSubmitting ? "Saving…" : initial ? "Save changes" : "Save this address"}
+        </button>
+        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onCancel} disabled={isSubmitting}>
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }
@@ -475,21 +579,41 @@ function AddressForm({ onSaved }: { onSaved: () => Promise<void> }) {
 function OrderSummary({
   quote,
   address,
+  paymentLabel,
+  onEditAddress,
+  onEditPayment,
   cart,
 }: {
   quote?: Quote;
   address: Address | null;
+  paymentLabel: string;
+  onEditAddress: () => void;
+  onEditPayment: () => void;
   cart: {
     groups: { storeName: string; items: { productName: string; variantName: string; quantity: number }[] }[];
   };
 }) {
   return (
     <div className="mp-stack">
-      {address ? (
+      <div className="d-flex justify-content-between align-items-start" style={{ gap: "var(--space-3)" }}>
+        {address ? (
+          <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: 0 }}>
+            Delivering to <strong style={{ color: "var(--text)" }}>{address.recipientName}</strong>, {formatAddress(address)}
+          </p>
+        ) : null}
+        <button type="button" className="btn btn-sm btn-link p-0" style={{ flex: "none" }} onClick={onEditAddress}>
+          Change
+        </button>
+      </div>
+
+      <div className="d-flex justify-content-between align-items-start" style={{ gap: "var(--space-3)" }}>
         <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: 0 }}>
-          Delivering to <strong style={{ color: "var(--text)" }}>{address.recipientName}</strong>, {formatAddress(address)}
+          Paying with <strong style={{ color: "var(--text)" }}>{paymentLabel}</strong>
         </p>
-      ) : null}
+        <button type="button" className="btn btn-sm btn-link p-0" style={{ flex: "none" }} onClick={onEditPayment}>
+          Change
+        </button>
+      </div>
 
       {cart.groups.map(group => (
         <div key={group.storeName} style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
@@ -613,8 +737,14 @@ function SummaryPanel({
               Remove
             </button>
           ) : (
-            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onApplyCoupon} disabled={!couponInput.trim() || isQuoting}>
-              Apply
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={onApplyCoupon}
+              disabled={!couponInput.trim() || isQuoting}
+              aria-busy={isQuoting}
+            >
+              {isQuoting ? "Applying…" : "Apply"}
             </button>
           )}
         </div>
