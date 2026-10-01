@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 
 import { AccountPage } from "@/features/account/components/AccountPanel";
+import { AccountNav } from "@/features/account/components/AccountNav";
 
 export const metadata: Metadata = {
   title: "Your account",
@@ -19,6 +20,7 @@ export default function Page() {
         </div>
       </div>
 
+      <AccountNav />
       <AccountPage />
     </div>
   );

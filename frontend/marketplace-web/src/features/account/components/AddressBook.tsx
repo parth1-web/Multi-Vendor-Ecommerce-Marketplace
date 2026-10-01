@@ -13,6 +13,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
+import { Modal } from "react-bootstrap";
 import { z } from "zod";
 
 import { CheckField, TextField } from "@/components/forms/FormField";
@@ -22,6 +23,7 @@ import { addressApi } from "@/features/orders/api/orderApi";
 import { errorMessage, fieldErrors } from "@/lib/errors";
 import { formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
+import { useToast } from "@/providers/ToastProvider";
 import type { Address, CreateAddressRequest } from "@/types/order";
 
 const addressSchema = z.object({
@@ -41,9 +43,11 @@ type AddressValues = z.infer<typeof addressSchema>;
 
 function AddressBook() {
   const queryClient = useQueryClient();
+  const { push } = useToast();
   const [editing, setEditing] = useState<Address | null>(null);
   const [adding, setAdding] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Address | null>(null);
 
   const addresses = useQuery({ queryKey: queryKeys.addresses.list(), queryFn: () => addressApi.list() });
 
@@ -59,7 +63,14 @@ function AddressBook() {
 
   const remove = useMutation({
     mutationFn: (id: string) => addressApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all }),
+    onSuccess: async (_, id) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
+      setDeleting(null);
+      const label = addresses.data?.find((address) => address.id === id)?.label;
+      push({ tone: "success", title: label ? `Deleted the ${label} address` : "Address deleted" });
+    },
+    onError: (failure) =>
+      push({ tone: "danger", title: "Could not delete the address", body: errorMessage(failure) }),
   });
 
   const {
@@ -179,8 +190,7 @@ function AddressBook() {
                   <button
                     type="button"
                     className="btn btn-sm"
-                    onClick={() => remove.mutate(address.id)}
-                    disabled={remove.isPending}
+                    onClick={() => setDeleting(address)}
                     aria-label={`Delete the ${address.label} address`}
                     style={{ color: "var(--text-subtle)" }}
                   >
@@ -262,6 +272,36 @@ function AddressBook() {
           </form>
         </section>
       ) : null}
+
+      <Modal show={deleting !== null} onHide={() => setDeleting(null)} centered aria-labelledby="delete-address-title">
+        <Modal.Header closeButton>
+          <Modal.Title id="delete-address-title">Delete this address?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+            {deleting ? (
+              <>
+                The <strong style={{ color: "var(--text)" }}>{deleting.label}</strong> address will be removed.
+                This action cannot be undone.
+              </>
+            ) : null}
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <button type="button" className="btn btn-outline-secondary" onClick={() => setDeleting(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            disabled={remove.isPending || !deleting}
+            aria-busy={remove.isPending}
+            onClick={() => deleting && remove.mutate(deleting.id)}
+          >
+            {remove.isPending ? "Deleting…" : "Delete address"}
+          </button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

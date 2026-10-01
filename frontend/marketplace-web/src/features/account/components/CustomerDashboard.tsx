@@ -19,6 +19,7 @@ import { useQueries } from "@tanstack/react-query";
 import { Bell, Heart, MapPin, Package, Truck } from "lucide-react";
 
 import { EmptyState, ErrorState, StatusBadge } from "@/components/shared/Feedback";
+import { AccountNav } from "@/features/account/components/AccountNav";
 import { notificationApi, wishlistApi } from "@/features/account/api/accountApi";
 import { addressApi, orderApi } from "@/features/orders/api/orderApi";
 import { cx, formatCurrency, formatDate } from "@/lib/format";
@@ -62,6 +63,7 @@ export function CustomerDashboard() {
 
   return (
     <div className="mp-page section">
+      <AccountNav />
       <header className="mp-page-header">
         <div>
           <h1 className="mp-page-title">{firstName ? `Hello, ${firstName}` : "Your account"}</h1>

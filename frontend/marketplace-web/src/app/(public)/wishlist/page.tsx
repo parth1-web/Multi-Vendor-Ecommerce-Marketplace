@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 
 import { WishlistPage } from "@/features/account/components/WishlistView";
+import { AccountNav } from "@/features/account/components/AccountNav";
 
 export const metadata: Metadata = {
   title: "Saved items",
@@ -19,6 +20,7 @@ export default function Page() {
         </div>
       </div>
 
+      <AccountNav />
       <WishlistPage />
     </div>
   );

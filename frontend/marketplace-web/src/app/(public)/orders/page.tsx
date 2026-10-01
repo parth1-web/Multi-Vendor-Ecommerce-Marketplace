@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { OrderList } from "@/features/orders/components/OrderList";
+import { AccountNav } from "@/features/account/components/AccountNav";
 
 export const metadata: Metadata = {
   title: "Your orders",
@@ -22,6 +23,8 @@ export default function OrdersPage() {
       </div>
 
       {/* The list reads the address bar, and address-bar readers suspend while navigating. */}
+      <AccountNav />
+
       <Suspense
         fallback={<div className="mp-skeleton" style={{ height: "16rem", borderRadius: "var(--radius)" }} aria-hidden />}
       >

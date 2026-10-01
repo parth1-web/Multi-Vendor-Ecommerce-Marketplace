@@ -66,7 +66,7 @@ function AccountPanel() {
     defaultValues: {
       firstName: user?.firstName ?? "",
       lastName: user?.lastName ?? "",
-      phoneNumber: "",
+      phoneNumber: user?.phoneNumber ?? "",
     },
   });
 

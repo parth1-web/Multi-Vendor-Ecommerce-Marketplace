@@ -18,11 +18,14 @@ import { RequireAuth } from "@/features/account/components/RequireAuth";
 import { useWishlist } from "@/features/account/api/useWishlist";
 import { wishlistApi } from "@/features/account/api/accountApi";
 import { formatDate } from "@/lib/format";
+import { errorMessage } from "@/lib/errors";
 import { queryKeys } from "@/lib/queryKeys";
+import { useToast } from "@/providers/ToastProvider";
 import type { WishlistItem } from "@/types/account";
 
 function WishlistView() {
   const queryClient = useQueryClient();
+  const { push } = useToast();
 
   // The same query the hearts read, so a heart turned on a product card has already filled this
   // page in. Two keys for one list is two answers to the same question.
@@ -30,12 +33,23 @@ function WishlistView() {
 
   const remove = useMutation({
     mutationFn: (productId: string) => wishlistApi.remove(productId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all }),
+    onSuccess: (_data, productId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all });
+      const name = wishlist.data?.find((item) => item.productId === productId)?.name;
+      push({ tone: "success", title: name ? `Removed ${name} from your saved items` : "Removed from your saved items" });
+    },
+    onError: (failure) =>
+      push({ tone: "danger", title: "Could not remove the saved item", body: errorMessage(failure) }),
   });
 
   const clear = useMutation({
     mutationFn: () => wishlistApi.clear(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all });
+      push({ tone: "success", title: "Wishlist cleared" });
+    },
+    onError: (failure) =>
+      push({ tone: "danger", title: "Could not clear the wishlist", body: errorMessage(failure) }),
   });
 
   if (wishlist.isPending) {
