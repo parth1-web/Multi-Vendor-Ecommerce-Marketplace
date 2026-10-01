@@ -9,12 +9,14 @@ import type {
   OrderStatusCount,
   PayoutPage,
   RevenuePoint,
+  SellerIdentity,
   SellerOrderDetail,
   SellerOrderPage,
   SellerOrderStatus,
   SellerProductPage,
   SellerSummary,
   TopProduct,
+  UpdateStoreRequest,
 } from "@/types/seller";
 import type {
   CreateImageInput,
@@ -23,8 +25,25 @@ import type {
   SellerProductDetail,
   UpdateProductRequest,
 } from "@/types/productAuthoring";
+import type { StoreProfile } from "@/types/store";
 
 export const sellerApi = {
+  /**
+   * The signed-in seller's own identity: status, commission rate and store handle. Scoped by the
+   * token, so there is no id to pass and no other seller to ask for.
+   */
+  me: () => apiClient.get<SellerIdentity>("/api/sellers/me").then(data => data.data),
+
+  /**
+   * The seller's own storefront profile, with one page of its products attached. The products
+   * ride along whether the settings form wants them or not, so callers that only need the
+   * profile fields ignore that page rather than fetching it twice.
+   */
+  ownStore: () => apiClient.get<StoreProfile>("/api/sellers/me/store").then(data => data.data),
+
+  updateOwnStore: (request: UpdateStoreRequest) =>
+    apiClient.put<StoreProfile>("/api/sellers/me/store", request).then(data => data.data),
+
   summary: () => apiClient.get<SellerSummary>("/api/seller/analytics/summary").then(data => data.data),
 
   revenue: (range: DateRange) =>

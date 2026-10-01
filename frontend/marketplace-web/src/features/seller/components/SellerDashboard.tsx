@@ -51,7 +51,7 @@ export function SellerDashboard() {
   // showing zeros that look like a business with no customers.
   if (user?.role === "Seller" && user.sellerStatus && user.sellerStatus !== "Active") {
     return (
-      <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
+      <div>
         <Panel title="Your seller account">
           <p>
             Your account is <strong>{user.sellerStatus.toLowerCase()}</strong>. A marketplace moderator reviews new
@@ -72,7 +72,7 @@ export function SellerDashboard() {
 
   if (isHydrating || summary.isPending) {
     return (
-      <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
+      <div>
         <div className="mp-skeleton" style={{ height: "24rem", borderRadius: "var(--radius)" }} />
       </div>
     );
@@ -80,7 +80,7 @@ export function SellerDashboard() {
 
   if (summary.isError || !summary.data) {
     return (
-      <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
+      <div>
         <ErrorState message="We could not load your dashboard." />
       </div>
     );
@@ -91,7 +91,7 @@ export function SellerDashboard() {
   const categorySlice = (categories.data ?? []).slice(0, 6);
 
   return (
-    <div className="mp-page" style={{ paddingBlock: "var(--space-5)" }}>
+    <div>
       <div className="mp-page-header">
         <div>
           <h1 className="mp-page-title">

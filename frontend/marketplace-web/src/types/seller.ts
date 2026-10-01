@@ -3,6 +3,36 @@
 import type { PagedResult } from "@/types/api";
 import type { ProductStatus } from "@/types/product";
 
+/**
+ * The signed-in seller's own identity, as the seller profile endpoint returns it. One seller,
+ * one store: the backend models a single storefront per seller, so there is no store picker
+ * anywhere in the workspace.
+ */
+export interface SellerIdentity {
+  id: string;
+  status: string;
+  businessName: string;
+  defaultCommissionRate: number;
+  productCount: number;
+  storeName: string | null;
+  storeSlug: string | null;
+  storeRating: number;
+  storeRatingCount: number;
+}
+
+/** The nine store fields the backend accepts, no more and no fewer. */
+export interface UpdateStoreRequest {
+  name: string;
+  description?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  supportEmail?: string | null;
+  supportPhone?: string | null;
+  returnPolicy?: string | null;
+  shippingPolicy?: string | null;
+  foundedYear?: number | null;
+}
+
 
 export type DateRange = "Last7Days" | "Last30Days" | "Last90Days" | "ThisMonth" | "LastMonth" | "ThisYear";
 
