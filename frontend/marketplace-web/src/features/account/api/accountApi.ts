@@ -24,9 +24,9 @@ export const wishlistApi = {
 };
 
 export const notificationApi = {
-  async list(page = 1, pageSize = 20, unreadOnly = false): Promise<NotificationPage> {
+  async list(page = 1, pageSize = 20, unreadOnly = false, type?: string): Promise<NotificationPage> {
     const { data } = await apiClient.get<NotificationPage>(
-      `/api/notifications?page=${page}&pageSize=${pageSize}${unreadOnly ? "&unreadOnly=true" : ""}`,
+      `/api/notifications?page=${page}&pageSize=${pageSize}${unreadOnly ? "&unreadOnly=true" : ""}${type ? `&type=${encodeURIComponent(type)}` : ""}`,
     );
     return data;
   },

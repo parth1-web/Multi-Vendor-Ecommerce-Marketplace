@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, LayoutDashboard, LogOut, MapPin, Package, User } from "lucide-react";
+import { Bell, Heart, LayoutDashboard, LogOut, MapPin, Package, User } from "lucide-react";
 
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -20,6 +20,7 @@ const LINKS = [
   { href: "/orders", label: "Orders", icon: Package },
   { href: "/wishlist", label: "Wishlist", icon: Heart },
   { href: "/addresses", label: "Addresses", icon: MapPin },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/profile", label: "Profile", icon: User },
 ];
 

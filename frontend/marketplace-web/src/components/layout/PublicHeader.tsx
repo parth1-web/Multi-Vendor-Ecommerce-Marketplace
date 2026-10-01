@@ -12,6 +12,7 @@ import { Heart, LayoutDashboard, Menu, Moon, Search, Store, Sun, User, X } from 
 import { useEffect, useState } from "react";
 
 import { CartCountBadge } from "@/features/cart/components/CartCountBadge";
+import { NotificationBell } from "@/features/account/components/NotificationBell";
 
 import { APP_NAME } from "@/lib/constants";
 import { cx } from "@/lib/format";
@@ -118,7 +119,7 @@ export function PublicHeader() {
             Search products
           </label>
               <input
-                id="mobile-search"
+                id="site-search"
                 name="q"
                 type="search"
                 required
@@ -147,6 +148,8 @@ export function PublicHeader() {
           <Link href="/wishlist" className="btn btn-sm mp-icon-button" aria-label="Wishlist" style={{ color: "var(--text-muted)" }}>
             <Heart size={18} />
           </Link>
+
+          <NotificationBell />
 
           <CartCountBadge />
 

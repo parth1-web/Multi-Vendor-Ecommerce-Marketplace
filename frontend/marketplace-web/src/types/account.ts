@@ -34,6 +34,9 @@ export type NotificationType =
   | "SellerSuspended"
   | "ProductApproved"
   | "ProductRejected"
+  | "LowStock"
+  | "NewReview"
+  | "SystemNotification"
   | "PayoutProcessed"
   | "SystemAlert";
 
