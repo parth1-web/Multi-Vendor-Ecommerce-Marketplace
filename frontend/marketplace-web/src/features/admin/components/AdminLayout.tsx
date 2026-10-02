@@ -18,8 +18,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import {
   BarChart3,
+  Boxes,
   ChevronRight,
+  CreditCard,
   FileText,
+  FolderTree,
   LogOut,
   Moon,
   Package,
@@ -28,24 +31,65 @@ import {
   Store,
   Sun,
   Tag,
+  Undo2,
   Users,
   UserSquare,
+  Warehouse,
+  type LucideIcon,
 } from "lucide-react";
 
 import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "@/providers/AuthProvider";
 import { useThemeStore } from "@/providers/ThemeProvider";
 
-const LINKS = [
-  { href: "/admin", label: "Overview", icon: BarChart3 },
-  { href: "/admin/moderation", label: "Moderation", icon: ShieldCheck },
-  { href: "/admin/orders", label: "Orders", icon: Package },
-  { href: "/admin/coupons", label: "Discounts", icon: Tag },
-  { href: "/admin/sellers", label: "Sellers", icon: Store },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/reports", label: "Reports", icon: FileText },
-  { href: "/admin/audit", label: "Audit log", icon: UserSquare },
+/**
+ * The console's sections, and nothing else.
+ *
+ * Every entry here is a screen built on an endpoint the API actually exposes. There is no Settings
+ * link because there is no settings endpoint, and no review queue because the API has no way to
+ * list reviews across the marketplace — a link to either would be a page of broken promises.
+ *
+ * Grouped by what an operator is doing rather than alphabetically, because the two questions that
+ * come up all day are "what needs deciding" and "what needs checking".
+ */
+const LINK_GROUPS: { label: string; links: { href: string; label: string; icon: LucideIcon }[] }[] = [
+  {
+    label: "Decide",
+    links: [
+      { href: "/admin", label: "Overview", icon: BarChart3 },
+      { href: "/admin/moderation", label: "Moderation", icon: ShieldCheck },
+      { href: "/admin/sellers", label: "Sellers", icon: Store },
+      { href: "/admin/refunds", label: "Refunds", icon: Undo2 },
+    ],
+  },
+  {
+    label: "Operate",
+    links: [
+      { href: "/admin/orders", label: "Orders", icon: Package },
+      { href: "/admin/products", label: "Products", icon: Boxes },
+      { href: "/admin/categories", label: "Categories", icon: FolderTree },
+      { href: "/admin/inventory", label: "Stock", icon: Warehouse },
+      { href: "/admin/payments", label: "Payments", icon: CreditCard },
+      { href: "/admin/coupons", label: "Discounts", icon: Tag },
+      { href: "/admin/users", label: "Accounts", icon: Users },
+    ],
+  },
+  {
+    label: "Understand",
+    links: [
+      { href: "/admin/reports", label: "Reports", icon: FileText },
+      { href: "/admin/audit", label: "Audit log", icon: UserSquare },
+    ],
+  },
 ];
+
+/** Every section in one list, for the mobile row and for the breadcrumb lookup. */
+const LINKS = LINK_GROUPS.flatMap(group => group.links);
+
+/** A section is current on its own page and on everything beneath it. */
+function isCurrent(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -89,7 +133,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  const current = LINKS.find(link => link.href === pathname) ?? LINKS[0];
+  const current = LINKS.find(link => isCurrent(pathname, link.href)) ?? LINKS[0];
 
   return (
     <div className="d-flex align-items-stretch" style={{ minHeight: "100vh" }}>
@@ -121,24 +165,27 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
-        <p className="mp-sidebar-section">Marketplace</p>
-
         <nav aria-label="Admin sections" className="flex-grow-1 overflow-y-auto pb-3">
-          {LINKS.map(link => {
-            const Icon = link.icon;
+          {LINK_GROUPS.map(group => (
+            <div key={group.label}>
+              <p className="mp-sidebar-section">{group.label}</p>
+              {group.links.map(link => {
+                const Icon = link.icon;
 
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="mp-sidebar-link"
-                aria-current={pathname === link.href ? "page" : undefined}
-              >
-                <Icon size={16} aria-hidden />
-                {link.label}
-              </Link>
-            );
-          })}
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="mp-sidebar-link"
+                    aria-current={isCurrent(pathname, link.href) ? "page" : undefined}
+                  >
+                    <Icon size={16} aria-hidden />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div style={{ borderTop: "1px solid var(--sidebar-border)", padding: "var(--space-3)" }}>
@@ -237,7 +284,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                     key={link.href}
                     href={link.href}
                     className="mp-seller-link"
-                    aria-current={pathname === link.href ? "page" : undefined}
+                    aria-current={isCurrent(pathname, link.href) ? "page" : undefined}
                   >
                     <Icon size={15} aria-hidden />
                     {link.label}

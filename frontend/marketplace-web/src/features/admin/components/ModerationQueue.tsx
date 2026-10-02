@@ -47,7 +47,7 @@ export function ModerationQueue() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const queue = useQuery({
-    queryKey: queryKeys.admin.moderation({ page }),
+    queryKey: queryKeys.admin.products({ page, status: "PendingApproval" }),
     queryFn: () => adminApi.moderationQueue({ page, status: "PendingApproval" }),
   });
 

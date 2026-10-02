@@ -26,10 +26,14 @@ export function AdminOverview() {
 
   const summary = useQuery({ queryKey: queryKeys.admin.summary(), queryFn: () => adminApi.summary() });
   const growth = useQuery({ queryKey: queryKeys.admin.growth(range), queryFn: () => adminApi.growth(range) });
-  const refunds = useQuery({ queryKey: queryKeys.admin.refunds(range), queryFn: () => adminApi.refunds(range) });
+  const refunds = useQuery({ queryKey: queryKeys.admin.refundAnalytics(range), queryFn: () => adminApi.refundAnalytics(range) });
   const queue = useQuery({
-    queryKey: queryKeys.admin.moderation({ page: 1 }),
+    queryKey: queryKeys.admin.products({ page: 1, status: "PendingApproval" }),
     queryFn: () => adminApi.moderationQueue({ page: 1, status: "PendingApproval" }),
+  });
+  const lowStock = useQuery({
+    queryKey: queryKeys.admin.platformInventory({ page: 1, lowStockOnly: true }),
+    queryFn: () => adminApi.inventory({ page: 1, lowStockOnly: true }),
   });
 
   if (summary.isPending) {
@@ -82,7 +86,7 @@ export function AdminOverview() {
         so it goes below them.
       */}
       <div className="row g-3">
-        <div className="col-12 col-md-4">
+        <div className="col-12 col-sm-6 col-md-3">
           <Link href="/admin/moderation" className="mp-card d-block" style={{ padding: "var(--space-4)", color: "var(--text)" }}>
             <p className="mp-metric-label" style={{ margin: 0 }}>
               Waiting for moderation
@@ -94,7 +98,7 @@ export function AdminOverview() {
           </Link>
         </div>
 
-        <div className="col-12 col-md-4">
+        <div className="col-12 col-sm-6 col-md-3">
           <Link href="/admin/sellers" className="mp-card d-block" style={{ padding: "var(--space-4)", color: "var(--text)" }}>
             <p className="mp-metric-label" style={{ margin: 0 }}>
               Sellers to review
@@ -108,8 +112,10 @@ export function AdminOverview() {
           </Link>
         </div>
 
-        <div className="col-12 col-md-4">
-          <Link href="/admin/orders" className="mp-card d-block" style={{ padding: "var(--space-4)", color: "var(--text)" }}>
+        <div className="col-12 col-sm-6 col-md-3">
+          {/* Refunds have their own screen: approving one moves money, so it is not something to
+              be done from a summary tile. */}
+          <Link href="/admin/refunds" className="mp-card d-block" style={{ padding: "var(--space-4)", color: "var(--text)" }}>
             <p className="mp-metric-label" style={{ margin: 0 }}>
               Open refunds
             </p>
@@ -118,6 +124,20 @@ export function AdminOverview() {
             </p>
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
               {refunds.data ? `${refunds.data.pending} awaiting a decision` : "awaiting a decision"}
+            </p>
+          </Link>
+        </div>
+
+        <div className="col-12 col-sm-6 col-md-3">
+          <Link href="/admin/inventory" className="mp-card d-block" style={{ padding: "var(--space-4)", color: "var(--text)" }}>
+            <p className="mp-metric-label" style={{ margin: 0 }}>
+              Low on stock
+            </p>
+            <p className="mp-stat-value" style={{ color: (lowStock.data?.totalCount ?? 0) > 0 ? "var(--warning)" : undefined }}>
+              {lowStock.isPending ? "…" : (lowStock.data?.totalCount ?? 0)}
+            </p>
+            <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+              variants across every store
             </p>
           </Link>
         </div>
@@ -166,7 +186,20 @@ export function AdminOverview() {
               <Row label="Sellers" value={data.totalSellers} hint={`${data.newSellersThisMonth} this month`} />
               <Row label="Products" value={data.totalProducts} hint={`${data.publishedProducts} live`} />
               <Row label="Orders" value={data.totalOrders} hint={`${formatCurrency(data.averageOrderValue)} average`} />
-              <Row label="Conversion" value={`${data.conversionRate.toFixed(1)}%`} hint="Of visits to baskets" />
+              {/*
+                Refund volume, from the API's own refund analytics for the chosen period. The
+                summary's `conversionRate` is deliberately not shown: the service returns a hard-coded
+                zero for it, and a rate that is always 0.0% is worse than no rate at all.
+              */}
+              <Row
+                label="Refunds"
+                value={refunds.data ? refunds.data.totalRequests : "—"}
+                hint={
+                  refunds.data
+                    ? `${formatCurrency(refunds.data.amount)} · ${refunds.data.rate.toFixed(1)}% of orders`
+                    : "in this period"
+                }
+              />
             </ul>
           </Panel>
 

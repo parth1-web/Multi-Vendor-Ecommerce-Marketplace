@@ -146,7 +146,6 @@ seller: {
     summary: () => [...queryKeys.admin.all, "summary"] as const,
     revenue: (range: string) => [...queryKeys.admin.all, "revenue", range] as const,
     growth: (range: string) => [...queryKeys.admin.all, "growth", range] as const,
-    refunds: (range: string) => [...queryKeys.admin.all, "refunds", range] as const,
     /** The moderation queue, named apart from `products` so a decision invalidates only the queue. */
     moderation: (params: unknown) => [...queryKeys.admin.all, "moderation", params] as const,
     users: (params: unknown) => [...queryKeys.admin.all, "users", params] as const,
@@ -155,6 +154,33 @@ seller: {
     orders: (params: unknown) => [...queryKeys.admin.all, "orders", params] as const,
     order: (id: string) => [...queryKeys.admin.all, "orders", "detail", id] as const,
     coupons: (params: unknown) => [...queryKeys.admin.all, "coupons", params] as const,
+    /**
+     * The platform product list. The moderation queue is a filter over the same endpoint, so both
+     * share one prefix: a stock adjustment or a category change refreshes the catalogue and the
+     * queue together, because they are the same rows read differently.
+     */
+    products: (params: unknown) => [...queryKeys.admin.all, "products", params] as const,
+    /**
+     * Refunds, payments, categories and platform stock each get their own prefix rather than
+     * living under `admin.all`, so a refund decision refetches refunds rather than the whole
+     * console — and so a category write does not drag the seller report with it.
+     */
+    /**
+     * Refund analytics for the overview, kept apart from the refund *list* below: one is an
+     * aggregate over a period, the other is the queue an administrator works through. Sharing a
+     * key would mean approving a refund refetching every chart on the dashboard.
+     */
+    refundAnalytics: (range: string) => [...queryKeys.admin.all, "refund-analytics", range] as const,
+    /** The refund queue an administrator works through, and the single refund behind it. */
+    refunds: (params: unknown) => [...queryKeys.admin.all, "refunds", "list", params] as const,
+    refund: (id: string) => [...queryKeys.admin.all, "refunds", "detail", id] as const,
+    payments: (params: unknown) => [...queryKeys.admin.all, "payments", "list", params] as const,
+    payment: (id: string) => [...queryKeys.admin.all, "payments", "detail", id] as const,
+    categories: () => [...queryKeys.admin.all, "categories"] as const,
+    /** Platform stock, read through the shared inventory route with the seller predicate dropped. */
+    platformInventory: (params: unknown) => [...queryKeys.admin.all, "platform-inventory", "list", params] as const,
+    platformInventoryTransactions: (variantId: string) =>
+      [...queryKeys.admin.all, "platform-inventory", "transactions", variantId] as const,
     salesReport: (range: string) => [...queryKeys.admin.all, "report-sales", range] as const,
     sellerReport: () => [...queryKeys.admin.all, "report-sellers"] as const,
     inventoryReport: () => [...queryKeys.admin.all, "report-inventory"] as const,

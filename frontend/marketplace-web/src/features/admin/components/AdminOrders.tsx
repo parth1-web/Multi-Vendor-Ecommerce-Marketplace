@@ -22,12 +22,32 @@ import { cx, formatCurrency, formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
 import type { OrderStatus } from "@/types/order";
 
-/** The states an order can be moved to from the admin side, and nothing else. */
+/**
+ * The order state machine, exactly as the API enforces it.
+ *
+ * An illegal step comes back as 409 with the transition it refused, so the frontend's job is to
+ * offer only the legal ones rather than to discover the rule at the moment somebody clicks. The
+ * chain is Pending → Confirmed → Processing → Packed → Shipped → Delivered, with Cancelled allowed
+ * up to Packed, and Returned or Completed once delivered; the last three states are terminal.
+ *
+ * Cancelling is marked destructive because it is the one step here a seller cannot undo and a
+ * shopper will notice, so it goes through the confirmation rather than firing on a click.
+ */
 const MOVABLE: { from: OrderStatus[]; to: OrderStatus; label: string; tone: "primary" | "danger" }[] = [
-  { from: ["Pending", "Confirmed", "Processing", "Packed"], to: "Shipped", label: "Mark shipped", tone: "primary" },
+  { from: ["Pending"], to: "Confirmed", label: "Confirm", tone: "primary" },
+  { from: ["Confirmed"], to: "Processing", label: "Start processing", tone: "primary" },
+  { from: ["Processing"], to: "Packed", label: "Mark packed", tone: "primary" },
+  { from: ["Packed"], to: "Shipped", label: "Mark shipped", tone: "primary" },
   { from: ["Shipped"], to: "Delivered", label: "Mark delivered", tone: "primary" },
-  { from: ["Pending", "Confirmed", "Processing", "Packed", "Shipped", "Delivered"], to: "Cancelled", label: "Cancel", tone: "danger" },
+  { from: ["Delivered"], to: "Completed", label: "Complete the order", tone: "primary" },
+  { from: ["Delivered"], to: "Returned", label: "Record a return", tone: "danger" },
+  { from: ["Pending", "Confirmed", "Processing", "Packed"], to: "Cancelled", label: "Cancel the order", tone: "danger" },
 ];
+
+/** True when the API will accept no further step, so the panel says so instead of offering one. */
+function isTerminal(status: OrderStatus): boolean {
+  return MOVABLE.every(move => !move.from.includes(status));
+}
 
 export function AdminOrders() {
   const queryClient = useQueryClient();
@@ -304,10 +324,9 @@ export function AdminOrders() {
                       <button
                         key={option.to}
                         type="button"
-                        className={cx("btn btn-sm", option.tone === "primary" ? "btn-primary" : "btn-outline-secondary")}
+                        className={cx("btn btn-sm", option.tone === "primary" ? "btn-primary" : "btn-outline-danger")}
                         disabled={move.isPending || note.trim().length === 0}
                         title={note.trim().length === 0 ? "A reason is required, and it is recorded" : undefined}
-                        style={option.tone === "danger" ? { color: "var(--danger)" } : undefined}
                         onClick={() => move.mutate({ id: detail.data!.id, to: option.to, reason: note.trim() })}
                       >
                         {option.label}
@@ -315,6 +334,18 @@ export function AdminOrders() {
                     ))}
                   </div>
                 </div>
+              ) : null}
+
+              {/*
+                A terminal order says so, rather than showing an empty panel. The API accepts no
+                further step from Cancelled, Returned or Completed, and saying that is more use to
+                whoever is reading than an empty form.
+              */}
+              {isTerminal(detail.data.status) ? (
+                <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+                  This order is {detail.data.status.toLowerCase()} and accepts no further step. The timeline above is the
+                  record of how it got there.
+                </p>
               ) : null}
             </div>
           )}
