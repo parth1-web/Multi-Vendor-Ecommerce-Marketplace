@@ -16,8 +16,8 @@
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export interface SellerListUrl {
-  status?: string;
+export interface SellerListUrl<T extends string = string> {
+  status?: T;
   search?: string;
   /** The stock view: "low" or "out", set through a single `filter` parameter. */
   filter?: "low" | "out";
@@ -30,12 +30,20 @@ export interface SellerListUrl {
   filtered: boolean;
 }
 
-interface SellerListUrlOptions {
+interface SellerListUrlOptions<T extends string = string> {
   /** The statuses this list accepts. An unknown value is dropped rather than sent to the API. */
-  statuses?: readonly string[];
+  statuses?: readonly T[];
 }
 
-export function useSellerListUrl(basePath: string, options: SellerListUrlOptions = {}): SellerListUrl {
+/**
+ * Generic over the status type on purpose: without it a list of, say, coupons would hand its status
+ * to the API as a plain string, and the call site would lose the compile-time check that the chips
+ * on screen and the enum the API parses are the same set.
+ */
+export function useSellerListUrl<T extends string = string>(
+  basePath: string,
+  options: SellerListUrlOptions<T> = {},
+): SellerListUrl<T> {
   const router = useRouter();
   const searchParams = useSearchParams();
 

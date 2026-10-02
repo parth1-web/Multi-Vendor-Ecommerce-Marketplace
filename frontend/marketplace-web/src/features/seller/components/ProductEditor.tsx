@@ -36,6 +36,11 @@ import type { CreateProductRequest, SellerProductDetail } from "@/types/productA
  *
  * `basePrice` is bounded at both ends by the server, and `compareAtPrice` must be above it —
  * a "was" price at or below the price being charged is not a discount, and the API rejects it.
+ *
+ * The slug has no rule here on purpose. On update the API validates nothing: it lowercases what it
+ * is sent, turns anything that is not a letter or a digit into a dash and stores the result. Writing
+ * a competing client-side slugifier would only ever disagree with the server at the edges, so the
+ * form takes what is typed and shows the canonical value the API returns after a save.
  */
 const basicsSchema = z
   .object({
@@ -52,6 +57,7 @@ const basicsSchema = z
       .max(20000),
     brand: z.string().trim().max(100).optional(),
     model: z.string().trim().max(100).optional(),
+    slug: z.string().trim().max(160, "That address is longer than the API accepts.").optional(),
     basePrice: z.coerce
       .number({ invalid_type_error: "Enter a price." })
       .min(0.01, "Enter a price above zero.")
@@ -156,14 +162,37 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
           description: existing.description,
           brand: existing.brand ?? "",
           model: existing.model ?? "",
+          slug: existing.slug,
           basePrice: existing.basePrice,
           compareAtPrice: existing.compareAtPrice ?? undefined,
           categoryId: existing.categoryId,
         }
-      : { name: "", shortDescription: "", description: "", brand: "", model: "", basePrice: 0, categoryId: "" },
+      : {
+          name: "",
+          shortDescription: "",
+          description: "",
+          brand: "",
+          model: "",
+          slug: "",
+          basePrice: 0,
+          categoryId: "",
+        },
   });
 
   const changed = isDirty || listsChanged;
+
+  /*
+   * The address the product answers on. Before a save it is the stored one; once the field is
+   * touched it is what is in the box, because that is what the seller is deciding. It is never
+   * normalised in the browser: the API decides what the stored value becomes, and showing a preview
+   * the server would not produce is worse than showing none.
+   *
+   * Mirrored into state rather than read back with `watch()`, which the React Compiler cannot
+   * memoise and which would opt this whole form out of memoisation.
+   */
+  const [typedSlug, setTypedSlug] = useState(existing?.slug ?? "");
+  const slugInEffect = typedSlug.trim() || existing?.slug || "";
+  const slugChanged = isEdit && typedSlug.trim() !== (existing?.slug ?? "");
 
   function setVariants(update: (list: VariantDraft[]) => VariantDraft[]) {
     setVariantsState(update);
@@ -200,6 +229,9 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
 
     const request: CreateProductRequest = {
       name: values.name,
+      // Only sent when there is one: a blank slug means "let the API generate it from the name" on
+      // create, and "leave the address alone" on update. The API treats those two cases differently.
+      slug: values.slug?.trim() || null,
       shortDescription: values.shortDescription,
       description: values.description,
       categoryId: values.categoryId,
@@ -239,10 +271,42 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
       }
     }
 
+    /*
+     * A duplicate address is refused by the API as a plain failure with a sentence and no field
+     * attached to it, so it has to be recognised from the message and put on the field the seller
+     * typed it into. There is no availability endpoint to ask beforehand, so the save is the check.
+     */
+    function reportServerFailure(error: unknown) {
+      const mapped = fieldErrors(error);
+
+      // The domain names the slug's source text "source" when nothing survives slugification, so
+      // both spellings of the same complaint land on the address field.
+      const alias: Record<string, string> = { source: "slug" };
+      let addressed = false;
+
+      for (const [field, message] of Object.entries(mapped)) {
+        const key = alias[field] ?? field.toLowerCase();
+
+        if (key in getValues()) {
+          setError(key as keyof BasicsValues, { message });
+          addressed = true;
+        }
+      }
+
+      if (!addressed && /slug/i.test(errorMessage(error))) {
+        setError("slug", { message: errorMessage(error) });
+      }
+
+      setFormError(errorMessage(error));
+    }
+
     try {
       if (isEdit && productId) {
         // The API updates the product's own fields here; images, variants and specifications are
-        // separate calls, because they are separate operations with their own rules.
+        // separate calls, because they are separate operations with their own rules. The slug is
+        // sent only when it has actually changed, because the API skips its uniqueness check and
+        // its timestamp when the value is unchanged — and a needless edit is not a free no-op:
+        // `UpdateDetails` sends a live listing back for approval on every update it receives.
         await sellerApi.updateProduct(productId, {
           name: request.name,
           shortDescription: request.shortDescription,
@@ -252,13 +316,15 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
           compareAtPrice: request.compareAtPrice,
           brand: request.brand,
           model: request.model,
+          ...(request.slug && request.slug !== existing?.slug ? { slug: request.slug } : {}),
         });
       } else {
         await sellerApi.createProduct(request);
       }
 
       // The list, the dashboard's counts and the public catalogue all read what was just saved, so
-      // they are refreshed before the redirect rather than after it lands on a stale page.
+      // they are refreshed before the redirect rather than after it lands on a stale page. The
+      // product's own read is refreshed too, because a slug edit moves it out of Published.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.seller.productLists() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.seller.summary() }),
@@ -269,19 +335,14 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
       push({
         tone: "success",
         title: isEdit ? "Changes saved" : "Listing created",
-        body: isEdit ? "Your catalogue and the public product page show the new details." : "It is with a moderator now. Shoppers see it once it is approved.",
+        body: isEdit
+          ? "A live listing goes back to a moderator after an edit, so it stops being buyable until it is approved again."
+          : "It is with a moderator now. Shoppers see it once it is approved.",
       });
 
       router.push(`/seller/products${listContextFor(searchParams)}`);
     } catch (error) {
-      for (const [field, message] of Object.entries(fieldErrors(error))) {
-        const key = field.toLowerCase();
-        if (key in getValues()) {
-          setError(key as keyof BasicsValues, { message });
-        }
-      }
-
-      setFormError(errorMessage(error));
+      reportServerFailure(error);
     }
   }
 
@@ -338,7 +399,7 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
         </div>
       </section>
 
-      <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="editor-price">
+<section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="editor-price">
         <h2 className="mp-section-title" id="editor-price" style={{ fontSize: "var(--fs-h3)" }}>
           What does it cost?
         </h2>
@@ -369,6 +430,55 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
             />
           </div>
         </div>
+      </section>
+
+      <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="editor-url">
+        <h2 className="mp-section-title" id="editor-url" style={{ fontSize: "var(--fs-h3)" }}>
+          Where it lives
+        </h2>
+
+        <TextField
+          label="Public address"
+          required={!isEdit}
+          maxLength={160}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="leave blank and one is made from the name"
+          hint={
+            isEdit
+              ? "The part after /products/ in the product's address. Letters, digits and dashes; the API makes it that shape whatever you type."
+              : "Optional. The part after /products/. Leave it blank and the API builds one from the product's name."
+          }
+          error={errors.slug?.message}
+          {...register("slug", { onChange: event => setTypedSlug(event.target.value) })}
+        />
+
+        {/*
+          The address is shown from the public route the marketplace actually serves, so what is
+          shown here is the link a shopper will use. The current one is the saved value, not the
+          field: until the save succeeds the old address is the one that works.
+        */}
+        <p style={{ margin: 0, fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
+          Address:{" "}
+          <span style={{ fontFamily: "var(--font-mono)" }}>/products/{slugInEffect || "…"}</span>
+          {slugChanged ? (
+            <span style={{ display: "block", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>
+              Currently /products/{existing?.slug}. The new address is used once you save.
+            </span>
+          ) : null}
+        </p>
+
+        {/*
+          The API sends a published listing back to a moderator on every update, slug or not. A
+          seller who saves one word of copy and loses a live product to a review queue deserves to
+          know that before they press the button, not after.
+        */}
+        {isEdit && existing?.status === "Published" ? (
+          <p className="mp-alert mp-alert-warning" role="status" style={{ marginBottom: 0 }}>
+            This listing is live. Saving any change — including the address — takes it off sale and back to a moderator
+            until it is approved again.
+          </p>
+        ) : null}
       </section>
 
       <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="editor-images">
@@ -704,6 +814,13 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
           {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Create this listing"}
         </button>
+
+        {/* Shown here rather than in the header: the link only works while the listing is approved. */}
+        {isEdit && existing?.status === "Published" ? (
+          <Link href={`/products/${existing?.slug}`} className="btn btn-outline-secondary">
+            View listing
+          </Link>
+        ) : null}
         <Link href={`/seller/products${listContextFor(searchParams)}`} className="btn btn-outline-secondary">
           Cancel
         </Link>

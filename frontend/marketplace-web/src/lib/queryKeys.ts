@@ -128,6 +128,19 @@ seller: {
     payouts: (params: unknown) => [...queryKeys.seller.all, "payouts", params] as const,
   },
 
+  /**
+   * The seller's own discount codes.
+   *
+   * Separate from `seller` on purpose: these are the only coupon reads a seller performs, they are
+   * invalidated by their own mutations, and nothing else in the workspace should be refetched
+   * because a code was stopped. There is no detail key because the API has no coupon-by-id route.
+   */
+  sellerCoupons: {
+    all: ["seller-coupons"] as const,
+    lists: () => [...queryKeys.sellerCoupons.all, "list"] as const,
+    list: (params: unknown) => [...queryKeys.sellerCoupons.lists(), params] as const,
+  },
+
   admin: {
     all: ["admin"] as const,
     summary: () => [...queryKeys.admin.all, "summary"] as const,

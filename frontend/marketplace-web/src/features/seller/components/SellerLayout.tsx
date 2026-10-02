@@ -29,6 +29,7 @@ import {
   ShoppingBag,
   Store,
   Sun,
+  TicketPercent,
   Wallet,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ const WORKSPACE_LINKS = [
   { href: "/seller/products", label: "Products", icon: Package },
   { href: "/seller/orders", label: "Orders", icon: ShoppingBag },
   { href: "/seller/inventory", label: "Stock", icon: Boxes },
+  { href: "/seller/coupons", label: "Coupons", icon: TicketPercent },
   { href: "/seller/reviews", label: "Reviews", icon: MessageSquareQuote },
   { href: "/seller/earnings", label: "Earnings", icon: Wallet },
 ];
