@@ -103,21 +103,23 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         () => {
           void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
           void queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
-          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.orders({})[0] });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.orderLists() });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.summary() });
         },
       ],
       [
         EVENTS.orderUpdated,
         () => {
           void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.orders({})[0] });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.orderLists() });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.orderDetails() });
         },
       ],
       [
         EVENTS.orderStatusChanged,
         () => {
           void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.orders({})[0] });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.orderLists() });
         },
       ],
       [
@@ -137,7 +139,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       [
         EVENTS.inventoryLow,
         () => {
-          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.inventory(1) });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.inventoryLists() });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.seller.summary() });
           void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
         },
       ],

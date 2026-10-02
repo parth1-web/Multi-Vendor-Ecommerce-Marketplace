@@ -29,6 +29,7 @@ import { AlertTriangle, LayoutDashboard } from "lucide-react";
 import { Panel, RangePicker, StatRow, StatTile } from "@/components/dashboard/DashboardParts";
 import { ErrorState, StatusBadge } from "@/components/shared/Feedback";
 import { sellerApi } from "@/features/seller/api/sellerApi";
+import { orderStatusLabel, orderStatusTone } from "@/features/seller/lib/orderStatus";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
@@ -116,10 +117,13 @@ export function SellerDashboard() {
             </Alert>
           ) : null}
           {data.outOfStockProducts > 0 ? (
-            <Alert tone="warning">
-              {data.outOfStockProducts} {data.outOfStockProducts === 1 ? "product is" : "products are"} out of stock.
-              Shoppers can still find them, and they cannot be bought.
-            </Alert>
+            <p className="mp-alert mp-alert-warning">
+              <Link href="/seller/inventory?filter=out" style={{ color: "inherit", textDecoration: "underline" }}>
+                {data.outOfStockProducts} {data.outOfStockProducts === 1 ? "variant is" : "variants are"} out of
+                stock
+              </Link>
+              . Shoppers can still find the product, and they cannot buy it.
+            </p>
           ) : null}
           {data.unansweredReviews > 0 ? (
             <Alert tone="warning">
@@ -256,14 +260,18 @@ export function SellerDashboard() {
               <p style={{ color: "var(--text-muted)", margin: 0 }}>Nothing waiting. New orders appear here.</p>
             ) : (
               <table className="mp-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Order</th>
-                    <th scope="col">Items</th>
-                    <th scope="col">You earn</th>
-                    <th scope="col">Status</th>
-                  </tr>
-                </thead>
+<thead>
+                    <tr>
+                      <th scope="col">Order</th>
+                      <th scope="col" className="text-end">
+                        Items
+                      </th>
+                      <th scope="col" className="text-end">
+                        You earn
+                      </th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
                 <tbody>
                   {orders.data?.items.map(order => (
                     <tr key={order.id}>
@@ -272,10 +280,12 @@ export function SellerDashboard() {
                           {order.sellerOrderNumber}
                         </Link>
                       </td>
-                      <td>{order.itemCount}</td>
-                      <td>{formatCurrency(order.sellerEarnings)}</td>
+                      <td className="text-end" style={{ fontVariantNumeric: "tabular-nums" }}>{order.itemCount}</td>
+                      <td className="text-end" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        {formatCurrency(order.sellerEarnings)}
+                      </td>
                       <td>
-                        <StatusBadge tone={orderTone(order.status)}>{order.status}</StatusBadge>
+                        <StatusBadge tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusBadge>
                       </td>
                     </tr>
                   ))}
@@ -303,9 +313,11 @@ export function SellerDashboard() {
             </ul>
 
             {data.lowStockProducts > 0 ? (
-              <p style={{ margin: "var(--space-3) 0 0", color: "var(--warning)", fontSize: "var(--fs-sm)" }}>
-                <AlertTriangle size={14} aria-hidden className="me-1" />
-                {data.lowStockProducts} {data.lowStockProducts === 1 ? "product is" : "products are"} low on stock.
+              <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--fs-sm)" }}>
+                <AlertTriangle size={14} aria-hidden className="me-1" style={{ color: "var(--warning)" }} />
+                <Link href="/seller/inventory?filter=low" style={{ color: "var(--warning)" }}>
+                  {data.lowStockProducts} {data.lowStockProducts === 1 ? "variant is" : "variants are"} low on stock
+                </Link>
               </p>
             ) : null}
           </Panel>
@@ -379,19 +391,4 @@ function ChartEmpty({ message }: { message: string }) {
 function shortDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function orderTone(status: string): "success" | "warning" | "danger" | "info" {
-  switch (status) {
-    case "Delivered":
-    case "Completed":
-      return "success";
-    case "Cancelled":
-    case "Returned":
-      return "danger";
-    case "Pending":
-      return "warning";
-    default:
-      return "info";
-  }
 }

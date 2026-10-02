@@ -2,10 +2,13 @@
 
 import { apiClient } from "@/api/axiosClient";
 import type {
+  AdjustStockRequest,
   CategorySales,
   CommissionPage,
   DateRange,
+  InventoryItem,
   InventoryPage,
+  InventoryTransaction,
   OrderStatusCount,
   PayoutPage,
   RevenuePoint,
@@ -136,10 +139,62 @@ export const sellerApi = {
   updateOrderStatus: (id: string, body: { status: SellerOrderStatus; note?: string | null; carrierName?: string | null; trackingNumber?: string | null }) =>
     apiClient.put(`/api/seller/orders/${id}/status`, body).then(data => data.data),
 
-  inventory: (params: { page: number; lowStockOnly?: boolean }) => {
-    const path = params.lowStockOnly ? "/api/inventory/low-stock" : "/api/inventory";
-    return apiClient.get<InventoryPage>(`${path}?page=${params.page}&pageSize=20`).then(data => data.data);
+/**
+   * A page of this seller's stock.
+   *
+   * One endpoint does the filtering: `lowStockOnly`, `outOfStockOnly`, `search` (product name or
+   * variant SKU) and `productId` are all parameters on the paged list. There is a separate
+   * `/api/inventory/low-stock` route, but it answers with a bare array capped at 100 rows rather
+   * than a page, so reading it as a page is how a filtered stock list ends up throwing.
+   */
+  inventory: (params: {
+    page: number;
+    pageSize?: number;
+    search?: string;
+    lowStockOnly?: boolean;
+    outOfStockOnly?: boolean;
+    productId?: string;
+  }) => {
+    const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
+
+    if (params.search) {
+      search.set("search", params.search);
+    }
+
+    if (params.lowStockOnly) {
+      search.set("lowStockOnly", "true");
+    }
+
+    if (params.outOfStockOnly) {
+      search.set("outOfStockOnly", "true");
+    }
+
+    if (params.productId) {
+      search.set("productId", params.productId);
+    }
+
+    return apiClient.get<InventoryPage>(`/api/inventory?${search.toString()}`).then(data => data.data);
   },
+
+  /**
+   * Moves stock by a signed amount and records why.
+   *
+   * The reason is required by the server on every adjustment, so it is required here too: a
+   * ledger entry that cannot be explained is an entry nobody can trust at stock-take time.
+   * The response is the row as it now stands, which is what the list shows afterwards.
+   */
+  adjustStock: (variantId: string, request: AdjustStockRequest) =>
+    apiClient.put<InventoryItem>(`/api/inventory/${variantId}`, request).then(data => data.data),
+
+  /** The level at or below which the variant counts as low, in units of sellable stock. */
+  setStockThreshold: (variantId: string, lowStockThreshold: number) =>
+    apiClient.put<void>(`/api/inventory/${variantId}/threshold`, { lowStockThreshold }).then(() => undefined),
+
+  /** The movement ledger for one variant, newest first. Empty when it has never moved. */
+  inventoryTransactions: (variantId: string, take = 50) =>
+    apiClient
+      .get<InventoryTransaction[]>(`/api/inventory/${variantId}/transactions?take=${take}`)
+      .then(data => data.data),
 
   commissions: (params: { page: number; status?: string }) => {
     const search = new URLSearchParams({ page: String(params.page), pageSize: "20" });

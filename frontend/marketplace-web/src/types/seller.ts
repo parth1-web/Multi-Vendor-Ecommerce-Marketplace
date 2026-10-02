@@ -105,6 +105,12 @@ export interface OrderStatusCount {
   total: number;
 }
 
+/**
+ * The nine states a sub-order can be in.
+ *
+ * Mirrors the API's own enum, `Completed` included: a completed order arrives from the server and a
+ * union that omits it is a status that renders as `undefined` in a badge.
+ */
 export type SellerOrderStatus =
   | "Pending"
   | "Confirmed"
@@ -113,7 +119,8 @@ export type SellerOrderStatus =
   | "Shipped"
   | "Delivered"
   | "Cancelled"
-  | "Returned";
+  | "Returned"
+  | "Completed";
 
 export interface SellerOrder {
   id: string;
@@ -192,7 +199,7 @@ export interface SellerProduct {
   primaryImageUrl: string | null;
   categoryId: string;
   categoryName: string;
-  status: ProductStatus;
+status: ProductStatus;
   rejectionReason: string | null;
   rejectionNote: string | null;
   isFeatured: boolean;
@@ -203,7 +210,8 @@ export interface SellerProduct {
   ratingCount: number;
   createdAt: string;
   publishedAt: string | null;
-  updatedAt: string | null;
+  /** The API always sends this; it is the sort order of the list as well. */
+  updatedAt: string;
 }
 
 export type SellerProductPage = PagedResult<SellerProduct>;
@@ -228,6 +236,46 @@ export interface InventoryItem {
 }
 
 export type InventoryPage = PagedResult<InventoryItem>;
+
+/** Why stock moved. The API's own names, so the ledger reads the same on both sides. */
+export type InventoryTransactionType =
+  | "InitialStock"
+  | "Restock"
+  | "Reservation"
+  | "ReservationRelease"
+  | "Sale"
+  | "SaleReversal"
+  | "ManualAdjustment"
+  | "Return"
+  | "Damage";
+
+/**
+ * One movement of stock, as the ledger records it.
+ *
+ * Both sides of the change are stored, not just the difference, because "it went from 12 to 3" is
+ * answerable without knowing what happened, and "−9" on its own is not.
+ */
+export interface InventoryTransaction {
+  id: string;
+  type: InventoryTransactionType;
+  quantityDelta: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+/**
+ * A stock adjustment is a change, not a new total: the API adds `delta` to what is on hand and
+ * records the move in the ledger. Sending "12" therefore means "twelve more", and a form that asks
+ * for a total would quietly add it instead of setting it.
+ */
+export interface AdjustStockRequest {
+  delta: number;
+  reason: string;
+}
 
 export interface Commission {
   id: string;

@@ -98,20 +98,32 @@ export const queryKeys = {
     seller: (params: unknown) => ["reviews", "seller", params] as const,
   },
 
-  seller: {
+seller: {
     all: ["seller"] as const,
     me: () => [...queryKeys.seller.all, "me"] as const,
     ownStore: () => [...queryKeys.seller.all, "own-store"] as const,
-    products: (params: unknown) => [...queryKeys.seller.all, "products", params] as const,
-    product: (id: string) => [...queryKeys.seller.all, "products", "detail", id] as const,
-    inventory: (page: number) => [...queryKeys.seller.all, "inventory", page] as const,
+    /**
+     * Lists are gathered under one prefix so a mutation can say "every product list" without
+     * naming the parameters each one was built with, and without also invalidating the detail
+     * reads a modal is standing on.
+     */
+    productLists: () => [...queryKeys.seller.all, "product-lists"] as const,
+    products: (params: unknown) => [...queryKeys.seller.productLists(), params] as const,
+    productDetails: () => [...queryKeys.seller.all, "product"] as const,
+    product: (id: string) => [...queryKeys.seller.productDetails(), id] as const,
+    orderLists: () => [...queryKeys.seller.all, "order-lists"] as const,
+    orders: (params: unknown) => [...queryKeys.seller.orderLists(), params] as const,
+    orderDetails: () => [...queryKeys.seller.all, "order"] as const,
+    order: (id: string) => [...queryKeys.seller.orderDetails(), id] as const,
+    inventoryLists: () => [...queryKeys.seller.all, "inventory-lists"] as const,
+    inventory: (params: unknown) => [...queryKeys.seller.inventoryLists(), params] as const,
+    inventoryTransactions: (variantId: string) => [...queryKeys.seller.all, "inventory-transactions", variantId] as const,
     reviews: (params: unknown) => [...queryKeys.seller.all, "reviews", params] as const,
-    orders: (params: unknown) => [...queryKeys.seller.all, "orders", params] as const,
-    order: (id: string) => [...queryKeys.seller.all, "orders", "detail", id] as const,
     summary: () => [...queryKeys.seller.all, "summary"] as const,
     revenue: (range: string) => [...queryKeys.seller.all, "revenue", range] as const,
     topProducts: (range: string) => [...queryKeys.seller.all, "top-products", range] as const,
     salesByCategory: (range: string) => [...queryKeys.seller.all, "sales-by-category", range] as const,
+    orderBreakdown: () => [...queryKeys.seller.all, "order-breakdown"] as const,
     commissions: (params: unknown) => [...queryKeys.seller.all, "commissions", params] as const,
     payouts: (params: unknown) => [...queryKeys.seller.all, "payouts", params] as const,
   },

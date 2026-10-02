@@ -8,6 +8,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { Panel, StatRow, StatTile } from "@/components/dashboard/DashboardParts";
@@ -71,10 +72,19 @@ export function SellerEarnings() {
                   <th scope="col">Accrued</th>
                 </tr>
               </thead>
-              <tbody>
-                {commissions.data.items.map(commission => (
-                  <tr key={commission.id}>
-                    <td>{commission.sellerOrderNumber}</td>
+<tbody>
+                  {commissions.data.items.map(commission => (
+                    <tr key={commission.id}>
+                      <td>
+                        {/*
+                          The seller commission endpoint does not fill in the order number — it is
+                          blank on every row — so the link is built from the id the same response
+                          does carry. A blank cell labelled "Order" is worse than no column.
+                        */}
+                        <Link href={`/seller/orders/${commission.sellerOrderId}`} style={{ fontVariantNumeric: "tabular-nums" }}>
+                          {commission.sellerOrderNumber || shortId(commission.sellerOrderId)}
+                        </Link>
+                      </td>
                     <td style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(commission.grossAmount, commission.currency)}</td>
                     <td style={{ fontVariantNumeric: "tabular-nums", color: "var(--text-muted)" }}>
                       {formatCurrency(commission.commissionAmount, commission.currency)}
@@ -132,6 +142,11 @@ export function SellerEarnings() {
 
 function formatCount(count: number): string {
   return `${count} ${count === 1 ? "order" : "orders"}`;
+}
+
+/** The first eight characters of an id: enough to recognise, not enough to be mistaken for a number. */
+function shortId(id: string): string {
+  return id.slice(0, 8);
 }
 
 function commissionTone(status: string): "success" | "warning" | "danger" | "info" {

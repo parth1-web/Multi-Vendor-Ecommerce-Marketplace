@@ -13,11 +13,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 
@@ -27,27 +27,48 @@ import { categoryApi } from "@/features/products/api/productApi";
 import { sellerApi } from "@/features/seller/api/sellerApi";
 import { errorMessage, fieldErrors } from "@/lib/errors";
 import { queryKeys } from "@/lib/queryKeys";
+import { useToast } from "@/providers/ToastProvider";
 import type { Category, ProductImage, ProductSpecification, ProductVariant } from "@/types/product";
 import type { CreateProductRequest, SellerProductDetail } from "@/types/productAuthoring";
 
-const basicsSchema = z.object({
-  name: z.string().trim().min(3, "Give the product a name shoppers will recognise.").max(200),
-  shortDescription: z
-    .string()
-    .trim()
-    .min(10, "One line that will appear in listings and search results.")
-    .max(500),
-  description: z
-    .string()
-    .trim()
-    .min(30, "Describe the product: what it is, who it is for, what it does.")
-    .max(20000),
-  brand: z.string().trim().max(100).optional(),
-  model: z.string().trim().max(100).optional(),
-  basePrice: z.coerce.number().positive("Enter a price above zero."),
-  compareAtPrice: z.coerce.number().positive("Enter a price above zero.").optional(),
-  categoryId: z.string().uuid("Choose the category this belongs in."),
-});
+/**
+ * The API's own limits, so the form can refuse before the request rather than after it.
+ *
+ * `basePrice` is bounded at both ends by the server, and `compareAtPrice` must be above it —
+ * a "was" price at or below the price being charged is not a discount, and the API rejects it.
+ */
+const basicsSchema = z
+  .object({
+    name: z.string().trim().min(3, "Give the product a name shoppers will recognise.").max(200),
+    shortDescription: z
+      .string()
+      .trim()
+      .min(10, "One line that will appear in listings and search results.")
+      .max(500),
+    description: z
+      .string()
+      .trim()
+      .min(30, "Describe the product: what it is, who it is for, what it does.")
+      .max(20000),
+    brand: z.string().trim().max(100).optional(),
+    model: z.string().trim().max(100).optional(),
+    basePrice: z.coerce
+      .number({ invalid_type_error: "Enter a price." })
+      .min(0.01, "Enter a price above zero.")
+      .max(10_000_000, "That is above the highest price this marketplace accepts."),
+    compareAtPrice: z.coerce.number().positive("Enter a price above zero.").optional(),
+    categoryId: z.string().uuid("Choose the category this belongs in."),
+  })
+  .refine(
+    (values) =>
+      values.compareAtPrice === undefined ||
+      Number.isNaN(values.compareAtPrice) ||
+      values.compareAtPrice > values.basePrice,
+    {
+      message: "The was-price has to be higher than the price you are charging.",
+      path: ["compareAtPrice"],
+    },
+  );
 
 type BasicsValues = z.infer<typeof basicsSchema>;
 
@@ -104,23 +125,28 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
 function ListingForm({ productId, existing }: { productId?: string; existing: SellerProductDetail | null }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const { push } = useToast();
   const isEdit = Boolean(productId);
 
   const categories = useQuery({ queryKey: queryKeys.categories.tree(), queryFn: () => categoryApi.tree() });
   const categoryOptions = useMemo(() => flattenCategories(categories.data ?? []), [categories.data]);
 
-  const [variants, setVariants] = useState<VariantDraft[]>(() => draftsFromVariants(existing?.variants));
-  const [images, setImages] = useState<ImageDraft[]>(() => draftsFromImages(existing?.images));
-  const [specifications, setSpecifications] = useState<SpecDraft[]>(() => draftsFromSpecifications(existing?.specifications));
+  const [variants, setVariantsState] = useState<VariantDraft[]>(() => draftsFromVariants(existing?.variants));
+  const [images, setImagesState] = useState<ImageDraft[]>(() => draftsFromImages(existing?.images));
+  const [specifications, setSpecificationsState] = useState<SpecDraft[]>(() => draftsFromSpecifications(existing?.specifications));
   const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  // Images, variants and specifications live outside the form, so the form cannot report them as
+  // changed on its own. Every edit to them counts as a change worth warning about.
+  const [listsChanged, setListsChanged] = useState(false);
 
   const {
     register,
     handleSubmit,
     getValues,
     setError,
-    formState: { errors },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<BasicsValues>({
     resolver: zodResolver(basicsSchema),
     defaultValues: existing
@@ -137,9 +163,40 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
       : { name: "", shortDescription: "", description: "", brand: "", model: "", basePrice: 0, categoryId: "" },
   });
 
+  const changed = isDirty || listsChanged;
+
+  function setVariants(update: (list: VariantDraft[]) => VariantDraft[]) {
+    setVariantsState(update);
+    setListsChanged(true);
+  }
+
+  function setImages(update: (list: ImageDraft[]) => ImageDraft[]) {
+    setImagesState(update);
+    setListsChanged(true);
+  }
+
+  function setSpecifications(update: (list: SpecDraft[]) => SpecDraft[]) {
+    setSpecificationsState(update);
+    setListsChanged(true);
+  }
+
+  /*
+   * A listing is a lot of typing to lose to a stray reload, and the browser's own warning is the
+   * only guard that covers closing the tab — a router-level guard would cover neither.
+   */
+  useEffect(() => {
+    if (!changed) {
+      return;
+    }
+
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [changed]);
+
   async function onSubmit(values: BasicsValues) {
     setFormError(null);
-    setSubmitting(true);
 
     const request: CreateProductRequest = {
       name: values.name,
@@ -167,18 +224,19 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
       tags: [],
     };
 
-    // A product with no image or no variant is refused by the API, and the reason is worth
-    // saying here rather than as a validation error about a field the seller cannot see.
-    if (request.images.length === 0) {
-      setFormError("Add at least one image URL. A listing with no picture cannot be bought.");
-      setSubmitting(false);
-      return;
-    }
+    // On an edit these two checks would be checking fields the API cannot accept: the update
+    // endpoint has no images, variants or specifications in it at all. On a new listing they are
+    // the API's own preconditions, checked here so the seller is told before the round trip.
+    if (!isEdit) {
+      if (request.images.length === 0) {
+        setFormError("Add at least one image URL. A listing with no picture cannot be bought.");
+        return;
+      }
 
-    if (request.variants.some(variant => variant.sku.trim().length === 0)) {
-      setFormError("Every variant needs a SKU, so orders can be matched to stock.");
-      setSubmitting(false);
-      return;
+      if (request.variants.some(variant => variant.sku.trim().length === 0)) {
+        setFormError("Every variant needs a SKU, so orders can be matched to stock.");
+        return;
+      }
     }
 
     try {
@@ -199,7 +257,22 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
         await sellerApi.createProduct(request);
       }
 
-      router.push("/seller/products");
+      // The list, the dashboard's counts and the public catalogue all read what was just saved, so
+      // they are refreshed before the redirect rather than after it lands on a stale page.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.seller.productLists() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.seller.summary() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.products.all }),
+        ...(productId ? [queryClient.invalidateQueries({ queryKey: queryKeys.seller.product(productId) })] : []),
+      ]);
+
+      push({
+        tone: "success",
+        title: isEdit ? "Changes saved" : "Listing created",
+        body: isEdit ? "Your catalogue and the public product page show the new details." : "It is with a moderator now. Shoppers see it once it is approved.",
+      });
+
+      router.push(`/seller/products${listContextFor(searchParams)}`);
     } catch (error) {
       for (const [field, message] of Object.entries(fieldErrors(error))) {
         const key = field.toLowerCase();
@@ -209,7 +282,6 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
       }
 
       setFormError(errorMessage(error));
-      setSubmitting(false);
     }
   }
 
@@ -304,52 +376,96 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
           <h2 className="mp-section-title" id="editor-images" style={{ fontSize: "var(--fs-h3)", margin: 0 }}>
             Images
           </h2>
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setImages(list => [...list, { key: nextKey(), url: "", altText: "", isPrimary: false }])}>
-            <Plus size={14} aria-hidden className="me-1" />
-            Add an image
-          </button>
+          {isEdit ? null : (
+            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setImages(list => [...list, { key: nextKey(), url: "", altText: "", isPrimary: false }])}>
+              <Plus size={14} aria-hidden className="me-1" />
+              Add an image
+            </button>
+          )}
         </div>
 
-        <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
-          Paste an image address. The first one is the picture shoppers see in listings.
-        </p>
+        {/*
+          On an edit these panels are shown, not offered. The update endpoint carries no images,
+          no variants and no specifications, so inputs here would look editable and silently do
+          nothing — the worst of both. They are on the product page instead, one operation at a
+          time, which is where they can actually be saved.
+        */}
+        {isEdit ? (
+          <>
+            <p className="mp-alert mp-alert-info" style={{ marginBottom: "0" }}>
+              Images are changed on the listing itself, one picture at a time.{" "}
+              <Link href={`/seller/products/${productId}`} className="mp-link">
+                Open the listing
+              </Link>
+              .
+            </p>
+            <ul className="list-unstyled mb-0 d-flex flex-wrap" style={{ gap: "var(--space-2)" }}>
+              {images.map(image => (
+                <li key={image.key}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image.url}
+                    alt={image.altText || existing?.name || "Product image"}
+                    width={72}
+                    height={72}
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      width: "4.5rem",
+                      height: "4.5rem",
+                      objectFit: "cover",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--border)",
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <>
+            <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+              Paste an image address. The first one is the picture shoppers see in listings.
+            </p>
 
-        <div className="mp-stack-sm">
-          {images.map((image, index) => (
-            <div key={image.key} className="row g-2 align-items-start">
-              <div className="col-12 col-md-5">
-                <TextField
-                  label={index === 0 ? "Main image" : `Image ${index + 1}`}
-                  type="url"
-                  placeholder="https://…"
-                  value={image.url}
-                  onChange={event => setImages(list => list.map(item => (item.key === image.key ? { ...item, url: event.target.value } : item)))}
-                />
-              </div>
-              <div className="col-12 col-md-5">
-                <TextField
-                  label="Alt text"
-                  hint="What a screen reader should say. The product name is a good start."
-                  value={image.altText}
-                  onChange={event => setImages(list => list.map(item => (item.key === image.key ? { ...item, altText: event.target.value } : item)))}
-                />
-              </div>
-              <div className="col-12 col-md-2">
-                {images.length > 1 ? (
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => setImages(list => list.filter(item => item.key !== image.key))}
-                    aria-label={`Remove image ${index + 1}`}
-                    style={{ color: "var(--text-subtle)" }}
-                  >
-                    <Trash2 size={16} aria-hidden />
-                  </button>
-                ) : null}
-              </div>
+            <div className="mp-stack-sm">
+              {images.map((image, index) => (
+                <div key={image.key} className="row g-2 align-items-start">
+                  <div className="col-12 col-md-5">
+                    <TextField
+                      label={index === 0 ? "Main image" : `Image ${index + 1}`}
+                      type="url"
+                      placeholder="https://…"
+                      value={image.url}
+                      onChange={event => setImages(list => list.map(item => (item.key === image.key ? { ...item, url: event.target.value } : item)))}
+                    />
+                  </div>
+                  <div className="col-12 col-md-5">
+                    <TextField
+                      label="Alt text"
+                      hint="What a screen reader should say. The product name is a good start."
+                      value={image.altText}
+                      onChange={event => setImages(list => list.map(item => (item.key === image.key ? { ...item, altText: event.target.value } : item)))}
+                    />
+                  </div>
+                  <div className="col-12 col-md-2">
+                    {images.length > 1 ? (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => setImages(list => list.filter(item => item.key !== image.key))}
+                        aria-label={`Remove image ${index + 1}`}
+                        style={{ color: "var(--text-subtle)" }}
+                      >
+                        <Trash2 size={16} aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </section>
 
       <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="editor-variants">
@@ -357,10 +473,12 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
           <h2 className="mp-section-title" id="editor-variants" style={{ fontSize: "var(--fs-h3)", margin: 0 }}>
             What can a shopper buy?
           </h2>
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setVariants(list => [...list, newVariant()])}>
-            <Plus size={14} aria-hidden className="me-1" />
-            Add a variant
-          </button>
+          {isEdit ? null : (
+            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setVariants(list => [...list, newVariant()])}>
+              <Plus size={14} aria-hidden className="me-1" />
+              Add a variant
+            </button>
+          )}
         </div>
 
         <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
@@ -369,99 +487,133 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
         </p>
 
         {isEdit ? (
-          <p className="mp-alert mp-alert-info" style={{ marginBottom: 0 }}>
-            These are shown so you can see what the listing has. Images, variants, stock and specifications are
-            separate operations on the product page, where each one can be checked on its own.{" "}
-            <Link href={`/seller/products/${productId}`} className="mp-link">
-              Open the listing
-            </Link>
-            .
-          </p>
-        ) : null}
+          <>
+            <p className="mp-alert mp-alert-info" style={{ marginBottom: "0" }}>
+              Variants and their stock are separate operations, and they are edited on the listing so each one can be
+              checked on its own.{" "}
+              <Link href={`/seller/products/${productId}`} className="mp-link">
+                Open the listing
+              </Link>
+              .
+            </p>
 
-        <div className="mp-table-wrap">
-          <table className="mp-table">
-            <caption className="visually-hidden">Variants and their stock</caption>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">SKU</th>
-                <th scope="col">Price override</th>
-                <th scope="col">Stock</th>
-                <th scope="col">Warn below</th>
-                <th scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {variants.map((variant, index) => (
-                <tr key={variant.key}>
-                  <td>
-                    <input
-                      className="mp-input"
-                      value={variant.name}
-                      placeholder="Default"
-                      aria-label={`Variant ${index + 1} name`}
-                      onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, name: event.target.value } : item)))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="mp-input"
-                      value={variant.sku}
-                      placeholder="SKU-001"
-                      aria-label={`Variant ${index + 1} SKU`}
-                      onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, sku: event.target.value } : item)))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="mp-input"
-                      type="number"
-                      step="0.01"
-                      value={variant.price}
-                      placeholder={String(getValues("basePrice") || "")}
-                      aria-label={`Variant ${index + 1} price override`}
-                      onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, price: event.target.value } : item)))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="mp-input"
-                      type="number"
-                      min="0"
-                      value={variant.initialStock}
-                      aria-label={`Variant ${index + 1} stock`}
-                      onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, initialStock: event.target.value } : item)))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="mp-input"
-                      type="number"
-                      min="0"
-                      value={variant.lowStockThreshold}
-                      aria-label={`Variant ${index + 1} low stock threshold`}
-                      onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, lowStockThreshold: event.target.value } : item)))}
-                    />
-                  </td>
-                  <td>
-                    {variants.length > 1 ? (
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={() => setVariants(list => list.filter(item => item.key !== variant.key))}
-                        aria-label={`Remove variant ${index + 1}`}
-                        style={{ color: "var(--text-subtle)" }}
-                      >
-                        <Trash2 size={16} aria-hidden />
-                      </button>
-                    ) : null}
-                  </td>
+            <div className="mp-table-wrap mt-3">
+              <table className="mp-table">
+                <caption className="visually-hidden">Variants this listing already has</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">SKU</th>
+                    <th scope="col" className="text-end">
+                      In stock
+                    </th>
+                    <th scope="col" className="text-end">
+                      Low at
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variants.map(variant => (
+                    <tr key={variant.key}>
+                      <td>{variant.name}</td>
+                      <td style={{ fontVariantNumeric: "tabular-nums" }}>{variant.sku}</td>
+                      <td className="text-end" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        {variant.initialStock}
+                      </td>
+                      <td className="text-end" style={{ fontVariantNumeric: "tabular-nums", color: "var(--text-muted)" }}>
+                        {variant.lowStockThreshold || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="mp-table-wrap">
+            <table className="mp-table">
+              <caption className="visually-hidden">Variants and their stock</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">SKU</th>
+                  <th scope="col">Price override</th>
+                  <th scope="col">Stock</th>
+                  <th scope="col">Warn below</th>
+                  <th scope="col" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {variants.map((variant, index) => (
+                  <tr key={variant.key}>
+                    <td>
+                      <input
+                        className="mp-input"
+                        value={variant.name}
+                        placeholder="Default"
+                        aria-label={`Variant ${index + 1} name`}
+                        onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, name: event.target.value } : item)))}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="mp-input"
+                        value={variant.sku}
+                        placeholder="SKU-001"
+                        aria-label={`Variant ${index + 1} SKU`}
+                        onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, sku: event.target.value } : item)))}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="mp-input"
+                        type="number"
+                        step="0.01"
+                        value={variant.price}
+                        placeholder={String(getValues("basePrice") || "")}
+                        aria-label={`Variant ${index + 1} price override`}
+                        onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, price: event.target.value } : item)))}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="mp-input"
+                        type="number"
+                        min="0"
+                        value={variant.initialStock}
+                        aria-label={`Variant ${index + 1} stock`}
+                        onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, initialStock: event.target.value } : item)))}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="mp-input"
+                        type="number"
+                        min="0"
+                        value={variant.lowStockThreshold}
+                        aria-label={`Variant ${index + 1} low stock threshold`}
+                        onChange={event => setVariants(list => list.map(item => (item.key === variant.key ? { ...item, lowStockThreshold: event.target.value } : item)))}
+                      />
+                    </td>
+                    <td>
+                      {variants.length > 1 ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setVariants(list => list.filter(item => item.key !== variant.key))}
+                          aria-label={`Remove variant ${index + 1}`}
+                          style={{ color: "var(--text-subtle)" }}
+                        >
+                          <Trash2 size={16} aria-hidden />
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="mp-card" style={{ padding: "var(--space-4)" }} aria-labelledby="editor-specs">
@@ -469,65 +621,97 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
           <h2 className="mp-section-title" id="editor-specs" style={{ fontSize: "var(--fs-h3)", margin: 0 }}>
             Specifications
           </h2>
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-secondary"
-            onClick={() => setSpecifications(list => [...list, { key: nextKey(), specKey: "", value: "" }])}
-          >
-            <Plus size={14} aria-hidden className="me-1" />
-            Add a row
-          </button>
+          {isEdit ? null : (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setSpecifications(list => [...list, { key: nextKey(), specKey: "", value: "" }])}
+            >
+              <Plus size={14} aria-hidden className="me-1" />
+              Add a row
+            </button>
+          )}
         </div>
 
         <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
           The facts a buyer checks before ordering: dimensions, materials, what is in the box.
         </p>
 
-        <div className="mp-stack-sm">
-          {specifications.map((spec, index) => (
-            <div key={spec.key} className="row g-2 align-items-end">
-              <div className="col-12 col-md-5">
-                <TextField
-                  label={`Label ${index + 1}`}
-                  placeholder="Battery life"
-                  value={spec.specKey}
-                  onChange={event => setSpecifications(list => list.map(item => (item.key === spec.key ? { ...item, specKey: event.target.value } : item)))}
-                />
+        {isEdit ? (
+          <>
+            <p className="mp-alert mp-alert-info" style={{ marginBottom: 0 }}>
+              The update endpoint does not carry specifications, so they cannot be changed from this form.{" "}
+              <Link href={`/seller/products/${productId}`} className="mp-link">
+                Open the listing
+              </Link>
+              .
+            </p>
+            {specifications.some(spec => spec.specKey.trim()) ? (
+              <dl className="mp-stack-sm mb-0 mt-3" style={{ fontSize: "var(--fs-sm)" }}>
+                {specifications
+                  .filter(spec => spec.specKey.trim().length > 0)
+                  .map(spec => (
+                    <div key={spec.key} className="mp-spread">
+                      <dt style={{ color: "var(--text-muted)" }}>{spec.specKey}</dt>
+                      <dd className="mb-0" style={{ textAlign: "right" }}>
+                        {spec.value}
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
+            ) : null}
+          </>
+        ) : (
+          <div className="mp-stack-sm">
+            {specifications.map((spec, index) => (
+              <div key={spec.key} className="row g-2 align-items-end">
+                <div className="col-12 col-md-5">
+                  <TextField
+                    label={`Label ${index + 1}`}
+                    placeholder="Battery life"
+                    value={spec.specKey}
+                    onChange={event => setSpecifications(list => list.map(item => (item.key === spec.key ? { ...item, specKey: event.target.value } : item)))}
+                  />
+                </div>
+                <div className="col-12 col-md-5">
+                  <TextField
+                    label={`Value ${index + 1}`}
+                    placeholder="40 hours"
+                    value={spec.value}
+                    onChange={event => setSpecifications(list => list.map(item => (item.key === spec.key ? { ...item, value: event.target.value } : item)))}
+                  />
+                </div>
+                <div className="col-12 col-md-2">
+                  {specifications.length > 1 ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setSpecifications(list => list.filter(item => item.key !== spec.key))}
+                      aria-label={`Remove specification ${index + 1}`}
+                      style={{ color: "var(--text-subtle)" }}
+                    >
+                      <Trash2 size={16} aria-hidden />
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <div className="col-12 col-md-5">
-                <TextField
-                  label={`Value ${index + 1}`}
-                  placeholder="40 hours"
-                  value={spec.value}
-                  onChange={event => setSpecifications(list => list.map(item => (item.key === spec.key ? { ...item, value: event.target.value } : item)))}
-                />
-              </div>
-              <div className="col-12 col-md-2">
-                {specifications.length > 1 ? (
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => setSpecifications(list => list.filter(item => item.key !== spec.key))}
-                    aria-label={`Remove specification ${index + 1}`}
-                    style={{ color: "var(--text-subtle)" }}
-                  >
-                    <Trash2 size={16} aria-hidden />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
-      <div className="d-flex flex-wrap" style={{ gap: "0.5rem" }}>
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? "Saving…" : isEdit ? "Save changes" : "Create this listing"}
+      <div className="d-flex flex-wrap align-items-center" style={{ gap: "0.5rem" }}>
+        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Create this listing"}
         </button>
-        <Link href="/seller/products" className="btn btn-outline-secondary">
+        <Link href={`/seller/products${listContextFor(searchParams)}`} className="btn btn-outline-secondary">
           Cancel
         </Link>
-        {!isEdit ? (
+        {changed ? (
+          <p role="status" style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+            You have unsaved changes.
+          </p>
+        ) : !isEdit ? (
           <p style={{ margin: 0, color: "var(--text-subtle)", fontSize: "var(--fs-xs)", alignSelf: "center" }}>
             New listings are reviewed by a moderator before shoppers can see them.
           </p>
@@ -535,6 +719,28 @@ function ListingForm({ productId, existing }: { productId?: string; existing: Se
       </div>
     </form>
   );
+}
+
+/**
+ * The list the seller was on, as a query string.
+ *
+ * Saving a listing sends them back to their catalogue; arriving at page one of an unfiltered list
+ * after editing the third product they looked at is a small hostility, and one the URL can fix.
+ */
+function listContextFor(searchParams: URLSearchParams): string {
+  const params = new URLSearchParams();
+
+  for (const key of ["status", "search"]) {
+    const value = searchParams.get(key);
+
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const queryString = params.toString();
+
+  return queryString ? `?${queryString}` : "";
 }
 
 function newVariant(): VariantDraft {
