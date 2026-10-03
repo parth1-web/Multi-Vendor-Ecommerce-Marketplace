@@ -171,6 +171,14 @@ seller: {
      * key would mean approving a refund refetching every chart on the dashboard.
      */
     refundAnalytics: (range: string) => [...queryKeys.admin.all, "refund-analytics", range] as const,
+    /**
+     * Category revenue for the overview's ranking.
+     *
+     * Its own prefix rather than the seller's `salesByCategory`, because the two are different
+     * questions about different data — one is the marketplace, the other is one store's slice of
+     * it — and sharing a key would let a seller's dashboard invalidate the admin overview.
+     */
+    categoryPerformance: (range: string) => [...queryKeys.admin.all, "category-performance", range] as const,
     /** The refund queue an administrator works through, and the single refund behind it. */
     refunds: (params: unknown) => [...queryKeys.admin.all, "refunds", "list", params] as const,
     refund: (id: string) => [...queryKeys.admin.all, "refunds", "detail", id] as const,

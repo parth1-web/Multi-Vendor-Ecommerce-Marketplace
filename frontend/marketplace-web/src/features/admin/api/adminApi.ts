@@ -6,6 +6,7 @@ import type {
   AdminSummary,
   AdminUser,
   AdminUserPage,
+  AuditActionName,
   AuditPage,
   CategorySales,
   CommissionReportRow,
@@ -122,11 +123,56 @@ export const adminApi = {
 
   setUserActive: (id: string, isActive: boolean) => apiClient.put(`/api/admin/users/${id}/status`, { isActive }).then(() => undefined),
 
-  auditLogs: (params: { page: number; pageSize?: number; action?: string; search?: string }) => {
+  /**
+   * The audit log, filtered server-side and paginated server-side.
+   *
+   * Every filter the route accepts is here: `action` (an `AuditAction` name), `entityType`,
+   * `entityId`, `actorId`, `from`, `to` and `search`. `search` is not a free-text search over
+   * every field — the API matches the actor's email and the entity's name only, so a term that
+   * appears in neither returns nothing even when it is in the row's payload.
+   *
+   * `from`/`to` are sent as ISO instants rather than dates, because `to` is inclusive server-side:
+   * a bare `2026-10-03` would mean midnight at the *start* of that day and silently exclude
+   * everything after it. Callers pass the end of the day they mean.
+   *
+   * There is no export. The API has no audit export route, and building a CSV in the browser from
+   * one page of results would be a file that looks like the log and is not.
+   */
+  auditLogs: (params: {
+    page: number;
+    pageSize?: number;
+    action?: AuditActionName;
+    entityType?: string;
+    entityId?: string;
+    actorId?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+  }) => {
     const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 25) });
 
     if (params.action) {
       search.set("action", params.action);
+    }
+
+    if (params.entityType) {
+      search.set("entityType", params.entityType);
+    }
+
+    if (params.entityId) {
+      search.set("entityId", params.entityId);
+    }
+
+    if (params.actorId) {
+      search.set("actorId", params.actorId);
+    }
+
+    if (params.from) {
+      search.set("from", params.from);
+    }
+
+    if (params.to) {
+      search.set("to", params.to);
     }
 
     if (params.search) {
@@ -136,16 +182,57 @@ export const adminApi = {
     return apiClient.get<AuditPage>(`/api/admin/audit-logs?${search.toString()}`).then(data => data.data);
   },
 
-  salesReport: (range: DateRange) => apiClient.get<SalesReportRow[]>(`/api/admin/reports/sales?${withRange(range)}`).then(data => data.data),
+/**
+ * Sales per period, one row per bucket, gap-filled by the API.
+ *
+ * `range` is the only parameter the route accepts — it is a preset name, and the server resolves
+ * it to a window and a bucket size (daily for the short ranges, weekly for 90 days, monthly for a
+ * year). There is no `from`/`to` here even though `/api/admin/analytics/revenue` has them, so a
+ * custom window is not offered rather than offered and ignored.
+ *
+ * Cancelled orders are excluded by the API. `discounts`, `tax`, `shipping` and `refunds` come back
+ * as zero because the report does not compute them, and `netRevenue` repeats `grossRevenue`;
+ * none of those are rendered anywhere.
+ */
+salesReport: (range: DateRange) => apiClient.get<SalesReportRow[]>(`/api/admin/reports/sales?${withRange(range)}`).then(data => data.data),
 
-  sellerReport: () => apiClient.get<SellerReportRow[]>("/api/admin/reports/sellers").then(data => data.data),
+/**
+ * Every seller, ranked by gross revenue. No parameters at all: no range, no filter, no paging.
+ *
+ * The numbers are lifetime totals rather than period totals, which is why the report has no period
+ * control. `averageRating` is a hard-coded zero and is not shown.
+ */
+sellerReport: () => apiClient.get<SellerReportRow[]>("/api/admin/reports/sellers").then(data => data.data),
 
-  inventoryReport: () => apiClient.get<InventoryReportRow[]>("/api/admin/reports/inventory").then(data => data.data),
+/**
+ * Stock per variant, lowest available first.
+ *
+ * No parameters, and the API caps the result at 500 rows — the whole platform is not necessarily
+ * in it, so no total is computed here or on the page. A variant whose product no longer exists
+ * comes back with an empty name and SKU and a zero stock value rather than being dropped, because
+ * a silently missing row of stock is worse than an obviously odd one.
+ */
+inventoryReport: () => apiClient.get<InventoryReportRow[]>("/api/admin/reports/inventory").then(data => data.data),
 
-  commissionReport: (range: DateRange) => apiClient.get<CommissionReportRow[]>(`/api/admin/reports/commissions?${withRange(range)}`).then(data => data.data),
+/**
+ * Commission earned per seller within the range, ranked by commission.
+ *
+ * The commission, gross and order columns are range-scoped. `payouts` and `paidOut` are *not*:
+ * the API sums completed payouts for the seller over all time, so those two columns answer a
+ * lifetime question in the middle of a period report. Both are labelled where they are shown.
+ */
+commissionReport: (range: DateRange) => apiClient.get<CommissionReportRow[]>(`/api/admin/reports/commissions?${withRange(range)}`).then(data => data.data),
 
-  /** A direct link to the CSV, so the browser downloads it rather than the page navigating to it. */
-  salesCsvUrl: (range: DateRange) => `${apiClient.defaults.baseURL}/api/admin/reports/export/sales.csv?${withRange(range)}`,
+/**
+ * A direct link to the CSV, so the browser downloads it rather than the page navigating to it.
+ *
+ * What it actually contains, since the name is misleading on its own: **one row per order**, not
+ * one row per sales-report period, and every order in the chosen range including cancelled ones —
+ * so it does not match the sales table on screen. It is built in one synchronous request with no
+ * row cap, and the API does not write a `ReportExported` audit entry when it serves it, so this
+ * download leaves no trace in the audit log. The button that uses this says so.
+ */
+salesCsvUrl: (range: DateRange) => `${apiClient.defaults.baseURL}/api/admin/reports/export/sales.csv?${withRange(range)}`,
 
   /**
    * Every order on the marketplace, across all sellers.

@@ -257,7 +257,17 @@ public sealed class AuditQueryService(IRepository<AuditLog> auditLogs) : IAuditQ
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = $"%{query.Search.Trim()}%";
-            source = source.Where(a => EF.Functions.Like(a.ActorEmail, term) || EF.Functions.Like(a.EntityName!, term));
+
+            // Lowercased on both sides rather than a bare LIKE. The database this runs on has a
+            // case-sensitive collation, so `LIKE '%aerolux%'` does not match an entity named
+            // "AeroLux Wireless Headphones" — and a search box that misses a name because of the
+            // capitals in it is worse than no search box at all. Translating to LOWER() on both
+            // operands keeps the wildcard match and makes it case-insensitive on any provider.
+            var lowered = term.ToLowerInvariant();
+
+            source = source.Where(a =>
+                EF.Functions.Like(a.ActorEmail.ToLower(), lowered)
+                || EF.Functions.Like(a.EntityName!.ToLower(), lowered));
         }
 
         return await source

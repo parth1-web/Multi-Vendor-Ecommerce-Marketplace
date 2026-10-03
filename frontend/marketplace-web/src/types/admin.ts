@@ -78,19 +78,127 @@ export interface AuditEntry {
 
 export type AuditPage = PagedResult<AuditEntry>;
 
+/**
+ * The action names the API's `AuditAction` enum defines.
+ *
+ * A transcription of the server's enum, not a description of what this marketplace does: the
+ * filter sends one of these to `GET /api/admin/audit-logs?action=`, and the API parses it back
+ * with `Enum.TryParse`, so a name that is not in the list is silently ignored and would look like
+ * a filter that does nothing. Adding a name here does not create the event — only the server
+ * records events — but omitting one hides events that exist.
+ *
+ * `CouponDeleted` is retired server-side and kept because rows written under it still exist;
+ * `CouponDeactivated` replaced it. `SellerProfileUpdated` and `UserRoleChanged` are the accurate
+ * names for a profile edit and a role change, added when those paths stopped reporting
+ * themselves as something else.
+ */
+export const AUDIT_ACTIONS = [
+  "Login",
+  "LoginFailed",
+  "Logout",
+  "Register",
+  "PasswordChanged",
+  "RoleChanged",
+  "UserStatusChanged",
+  "SellerApplied",
+  "SellerApproved",
+  "SellerRejected",
+  "SellerSuspended",
+  "SellerResumed",
+  "SellerProfileUpdated",
+  "StoreUpdated",
+  "CategoryCreated",
+  "CategoryUpdated",
+  "CategoryDeleted",
+  "ProductCreated",
+  "ProductUpdated",
+  "ProductDeleted",
+  "ProductApproved",
+  "ProductRejected",
+  "ProductFeatured",
+  "InventoryAdjusted",
+  "OrderCreated",
+  "OrderStatusChanged",
+  "OrderCancelled",
+  "PaymentCreated",
+  "PaymentVerified",
+  "PaymentFailed",
+  "WebhookReceived",
+  "RefundRequested",
+  "RefundApproved",
+  "RefundRejected",
+  "CommissionCreated",
+  "CommissionReversed",
+  "CommissionPaid",
+  "ReviewCreated",
+  "ReviewUpdated",
+  "ReviewDeleted",
+  "ReviewModerated",
+  "CouponCreated",
+  "CouponUpdated",
+  "CouponDeleted",
+  "CouponDeactivated",
+  "SettingsUpdated",
+  "ReportExported",
+  "PasswordResetRequested",
+  "PasswordResetCompleted",
+  "UserRoleChanged",
+] as const;
+
+export type AuditActionName = (typeof AUDIT_ACTIONS)[number];
+
+/** The entity types the audit rows in this codebase carry, for the target column's wording. */
+export const AUDIT_ENTITY_TYPES = [
+  "User",
+  "Seller",
+  "SellerOrder",
+  "Store",
+  "Category",
+  "Product",
+  "Inventory",
+  "Order",
+  "Payment",
+  "Refund",
+  "Commission",
+  "Payout",
+  "Review",
+  "Coupon",
+] as const;
+
+export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
+
+/**
+ * One period of the sales report.
+ *
+ * `discounts`, `tax`, `shipping`, `refunds` and `netRevenue` are **not measurements**. The API
+ * returns a literal zero for the first four and repeats `grossRevenue` into `netRevenue`, so a
+ * screen that prints them is printing constants. They are typed because the wire shape includes
+ * them; nothing on the reports page renders them.
+ */
 export interface SalesReportRow {
   period: string;
   orders: number;
   grossRevenue: number;
+  /** Always 0. The API does not compute it. */
   discounts: number;
   commission: number;
   netToSellers: number;
+  /** Always 0. The API does not compute it. */
   tax: number;
+  /** Always 0. The API does not compute it. */
   shipping: number;
+  /** Always 0. The API does not compute it. */
   refunds: number;
+  /** Identical to `grossRevenue`; kept for the wire shape only. */
   netRevenue: number;
 }
 
+/**
+ * One seller in the seller report.
+ *
+ * `averageRating` is always 0: the API does not join review data. It is typed for the wire shape
+ * and deliberately not rendered — "0.0 average rating" on every store reads as a real score.
+ */
 export interface SellerReportRow {
   sellerId: string;
   storeName: string;
@@ -100,6 +208,7 @@ export interface SellerReportRow {
   grossRevenue: number;
   commission: number;
   netEarnings: number;
+  /** Always 0. The API does not compute it. */
   averageRating: number;
 }
 

@@ -56,14 +56,20 @@ export function ModerationQueue() {
       adminApi.reviewProduct(id, approve, reason, note),
     onSuccess: async () => {
       setActionError(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      // A listing decision moves the moderation queue and the platform's product counts — not the
+      // reports, and not the audit log, which stays as it was until somebody opens it.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.products({})[0] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.products.all }),
+      ]);
     },
     onError: error => setActionError(errorMessage(error)),
   });
 
   const feature = useMutation({
     mutationFn: ({ id, featured }: { id: string; featured: boolean }) => adminApi.setFeatured(id, featured),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.all }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.products({})[0] }),
     onError: error => setActionError(errorMessage(error)),
   });
 

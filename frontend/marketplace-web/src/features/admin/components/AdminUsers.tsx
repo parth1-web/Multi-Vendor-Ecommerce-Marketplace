@@ -38,7 +38,12 @@ export function AdminUsers() {
     onSuccess: async () => {
       setConfirming(null);
       setActionError(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      // A role or status change moves the account list and the overview's counts. It writes an
+      // audit event, but the audit page is not mounted here, so it is left to be fetched when asked.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({})[0] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
+      ]);
     },
     onError: error => setActionError(errorMessage(error)),
   });
@@ -48,7 +53,12 @@ export function AdminUsers() {
     onSuccess: async () => {
       setConfirming(null);
       setActionError(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      // A role or status change moves the account list and the overview's counts. It writes an
+      // audit event, but the audit page is not mounted here, so it is left to be fetched when asked.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({})[0] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
+      ]);
     },
     onError: error => setActionError(errorMessage(error)),
   });

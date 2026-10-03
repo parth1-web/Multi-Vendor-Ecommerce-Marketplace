@@ -59,7 +59,9 @@ export function AdminCoupons() {
     setActionError(null);
     setCreating(false);
     setEditing(null);
-    await queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+    // A discount code changes the coupon list. It moves no sales figure until a shopper uses
+    // one, so the reports and the overview are deliberately left alone.
+    await queryClient.invalidateQueries({ queryKey: queryKeys.admin.coupons({})[0] });
   };
 
   const save = useMutation({

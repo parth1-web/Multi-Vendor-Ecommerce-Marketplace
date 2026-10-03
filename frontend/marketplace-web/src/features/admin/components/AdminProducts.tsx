@@ -88,7 +88,8 @@ export function AdminProducts() {
 
   const refreshCatalogue = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.products({})[0] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all }),
       queryClient.invalidateQueries({ queryKey: queryKeys.seller.productLists() }),
     ]);

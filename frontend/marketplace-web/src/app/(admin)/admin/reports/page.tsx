@@ -1,14 +1,23 @@
-/** The figures a marketplace is run on: sales, sellers and commission. */
+/** The four report families the API has, one at a time. */
 
-import { AdminReports } from "@/features/admin/components/AdminPanels";
+import type { Metadata } from "next";
 
-export default function ReportsPage() {
+import { AdminReports } from "@/features/admin/components/AdminReports";
+
+export const metadata: Metadata = {
+  title: "Reports",
+  robots: { index: false, follow: false },
+};
+
+export default function Page() {
   return (
     <div>
       <div className="mp-page-header">
         <div>
           <h1 className="mp-page-title">Reports</h1>
-          <p className="mp-page-subtitle">Sales, sellers and the commission the marketplace keeps.</p>
+          <p className="mp-page-subtitle">
+            Sales by period, sellers by revenue, stock across every store, and the commission the marketplace keeps.
+          </p>
         </div>
       </div>
 

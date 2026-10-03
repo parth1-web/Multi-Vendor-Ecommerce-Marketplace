@@ -50,17 +50,20 @@ import { useThemeStore } from "@/providers/ThemeProvider";
  * link because there is no settings endpoint, and no review *editing* link because reviews are not
  * editable by an administrator at all — Reviews is a hide-and-restore queue, not a text editor.
  *
- * Grouped by what an operator is doing rather than alphabetically, because the two questions that
- * come up all day are "what needs deciding" and "what needs checking".
+ * Grouped by the question the section answers, which is the order an operator works in: DECIDE is
+ * the queues waiting on a person, OPERATE is the machinery that runs whether anyone is looking at
+ * it, UNDERSTAND is the reading that explains the other two.
+ *
+ * Accounts stands in for the spec's "Customers" as well as administrators and sellers: it is the
+ * same screen with a role filter, and a second link to one screen under two names would be a
+ * navigation entry that goes nowhere new.
  */
 const LINK_GROUPS: { label: string; links: { href: string; label: string; icon: LucideIcon }[] }[] = [
   {
     label: "Decide",
     links: [
-      { href: "/admin", label: "Overview", icon: BarChart3 },
       { href: "/admin/moderation", label: "Moderation", icon: ShieldCheck },
       { href: "/admin/reviews", label: "Reviews", icon: MessageSquareQuote },
-      { href: "/admin/sellers", label: "Sellers", icon: Store },
       { href: "/admin/refunds", label: "Refunds", icon: Undo2 },
     ],
   },
@@ -73,14 +76,16 @@ const LINK_GROUPS: { label: string; links: { href: string; label: string; icon: 
       { href: "/admin/inventory", label: "Stock", icon: Warehouse },
       { href: "/admin/payments", label: "Payments", icon: CreditCard },
       { href: "/admin/coupons", label: "Discounts", icon: Tag },
+      { href: "/admin/sellers", label: "Sellers", icon: Store },
       { href: "/admin/users", label: "Accounts", icon: Users },
     ],
   },
   {
     label: "Understand",
     links: [
+      { href: "/admin", label: "Overview", icon: BarChart3 },
       { href: "/admin/reports", label: "Reports", icon: FileText },
-      { href: "/admin/audit", label: "Audit log", icon: UserSquare },
+      { href: "/admin/audit-logs", label: "Audit log", icon: UserSquare },
     ],
   },
 ];

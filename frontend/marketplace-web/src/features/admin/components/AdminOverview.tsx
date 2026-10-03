@@ -17,7 +17,7 @@ import { ShieldCheck } from "lucide-react";
 import { Panel, RangePicker, StatRow, StatTile } from "@/components/dashboard/DashboardParts";
 import { ErrorState } from "@/components/shared/Feedback";
 import { adminApi } from "@/features/admin/api/adminApi";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
 import type { DateRange } from "@/types/seller";
 
@@ -27,6 +27,10 @@ export function AdminOverview() {
   const summary = useQuery({ queryKey: queryKeys.admin.summary(), queryFn: () => adminApi.summary() });
   const growth = useQuery({ queryKey: queryKeys.admin.growth(range), queryFn: () => adminApi.growth(range) });
   const refunds = useQuery({ queryKey: queryKeys.admin.refundAnalytics(range), queryFn: () => adminApi.refundAnalytics(range) });
+  const categories = useQuery({
+    queryKey: queryKeys.admin.categoryPerformance(range),
+    queryFn: () => adminApi.categoryPerformance(range),
+  });
   const queue = useQuery({
     queryKey: queryKeys.admin.products({ page: 1, status: "PendingApproval" }),
     queryFn: () => adminApi.moderationQueue({ page: 1, status: "PendingApproval" }),
@@ -46,6 +50,7 @@ export function AdminOverview() {
 
   const data = summary.data;
   const growthPoints = growth.data ?? [];
+  const categoryRows = categories.data ?? [];
 
   return (
     <div className="mp-stack">
@@ -57,16 +62,24 @@ export function AdminOverview() {
       </div>
 
       <StatRow columns={4}>
+        {/*
+          The two money tiles link to the report that breaks them down. A total with nowhere to
+          go is a dead end; the number somebody acts on lives one click away.
+        */}
         <div className="col-6 col-lg-3">
-          <StatTile lead label="Revenue today" value={formatCurrency(data.revenueToday)} hint={`${data.ordersToday} orders today`} />
+          <Link href="/admin/reports?report=sales" style={{ display: "block", height: "100%" }}>
+            <StatTile lead label="Revenue today" value={formatCurrency(data.revenueToday)} hint={`${data.ordersToday} orders today`} />
+          </Link>
         </div>
         <div className="col-6 col-lg-3">
-          <StatTile
-            label="Commission"
-            value={formatCurrency(data.commissionRevenue)}
-            tone="positive"
-            hint="What the marketplace keeps"
-          />
+          <Link href="/admin/reports?report=commissions" style={{ display: "block", height: "100%" }}>
+            <StatTile
+              label="Commission"
+              value={formatCurrency(data.commissionRevenue)}
+              tone="positive"
+              hint="What the marketplace keeps"
+            />
+          </Link>
         </div>
         <div className="col-6 col-lg-3">
           <StatTile label="To pay sellers" value={formatCurrency(data.sellerPayouts)} hint="Accrued and not yet paid" />
@@ -201,6 +214,64 @@ export function AdminOverview() {
                 }
               />
             </ul>
+          </Panel>
+
+          <Panel
+            className="mt-3"
+            title="Where the money goes"
+            action={
+              <Link href="/admin/reports" className="btn btn-sm btn-outline-secondary">
+                Reports
+              </Link>
+            }
+          >
+            {categories.isPending ? (
+              <div className="mp-skeleton" style={{ height: "8rem", borderRadius: "var(--radius)" }} aria-hidden />
+            ) : categoryRows.length === 0 ? (
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+                Nothing sold in this period, so there is no category to rank.
+              </p>
+            ) : (
+              <ul className="list-unstyled mb-0 mp-stack-sm" style={{ fontSize: "var(--fs-sm)" }}>
+                {categoryRows.slice(0, 6).map(category => (
+                  <li key={category.categoryId}>
+                    <div className="mp-spread" style={{ gap: "var(--space-3)" }}>
+                      <span style={{ minWidth: 0 }}>{category.name}</span>
+                      <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flex: "none" }}>
+                        <span style={{ color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>
+                          {formatNumber(category.quantitySold)} sold
+                        </span>
+                        <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{formatCurrency(category.revenue)}</span>
+                      </span>
+                    </div>
+                    {/*
+                      The share is the API's own percentage of category revenue, drawn as a bar so
+                      the ranking is readable at a glance. It is a proportion of what is in this
+                      period, not a growth rate and not a margin.
+                    */}
+                    <div
+                      aria-hidden
+                      style={{ height: "4px", marginTop: "4px", backgroundColor: "var(--bg-subtle)", borderRadius: "2px" }}
+                    >
+                      <div
+                        style={{
+                          width: `${Math.min(100, category.share)}%`,
+                          height: "100%",
+                          backgroundColor: "var(--accent)",
+                          borderRadius: "2px",
+                        }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p style={{ margin: "var(--space-2) 0 0", color: "var(--text-subtle)", fontSize: "var(--fs-xs)" }}>
+              {categories.data && categories.data.length > 6
+                ? `Top ${6} of ${categories.data.length} categories with sales in this period. The API returns at most 20.`
+                : "Categories with sales in this period, by revenue."}
+            </p>
           </Panel>
 
           <Panel className="mt-3" title="Trust">

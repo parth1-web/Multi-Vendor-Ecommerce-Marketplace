@@ -76,7 +76,11 @@ export function AdminOrders() {
       setActionError(null);
       setNote("");
       setOpenId(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.all });
+      // An order's status moves the order list and the overview's pending count, and nothing else.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.orders({})[0] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
+      ]);
     },
     onError: error => setActionError(errorMessage(error)),
   });
