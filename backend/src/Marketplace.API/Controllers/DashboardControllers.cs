@@ -79,6 +79,8 @@ public sealed class AdminDashboardController(
     IReportService reports,
     IAuditQueryService audit,
     IRepository<User> users,
+    ICurrentUser currentUser,
+    IAuditService auditService,
     IUnitOfWork unitOfWork,
     IClock clock) : ControllerBase
 {
@@ -173,25 +175,69 @@ public sealed class AdminDashboardController(
         return Ok(new Marketplace.Application.Common.Models.PagedResult<AdminUserResponse>(pageItems, paging.Page, paging.PageSize, total));
     }
 
+    /// <summary>
+    /// Changes an account's role.
+    /// </summary>
+    /// <remarks>
+    /// Two rules, both about privilege rather than about convenience.
+    ///
+    /// A caller may not grant a role above their own: only a super administrator may create or
+    /// promote to <see cref="UserRole.SuperAdmin"/>. Without this a plain administrator could
+    /// mint an account more powerful than itself and then use it — the privilege-escalation path
+    /// the role hierarchy exists to prevent.
+    ///
+    /// And nobody may change their own role here. An administrator demoting themselves locks
+    /// themselves out mid-session; an administrator promoting themselves is escalation by another
+    /// route. Someone else's account is the only thing this endpoint is for.
+    /// </remarks>
     [HttpPut("users/{id:guid}/role")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ChangeRole(Guid id, [FromBody] ChangeUserRoleRequest request, CancellationToken cancellationToken)
     {
+        var callerIsSuperAdmin = currentUser.IsInRole(UserRole.SuperAdmin);
+
+        if (request.Role == UserRole.SuperAdmin && !callerIsSuperAdmin)
+        {
+            return Forbid();
+        }
+
+        if (id == currentUser.UserId)
+        {
+            return Forbid();
+        }
+
         var user = await users.GetByIdAsync(id, cancellationToken);
         if (user is null)
         {
             return NotFound();
         }
 
+        var previous = user.Role;
         user.ChangeRole(request.Role, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await auditService.RecordAsync(AuditAction.UserRoleChanged, nameof(User), user.Id, user.Email,
+            new { From = previous.ToString(), To = request.Role.ToString() }, cancellationToken);
         return NoContent();
     }
 
+    /// <summary>
+    /// Enables or disables an account.
+    /// </summary>
+    /// <remarks>
+    /// Self-disabling is refused for the same reason self-demotion is: it is almost always a
+    /// mistake, and it can leave a marketplace with no administrator able to reach this endpoint.
+    /// </remarks>
     [HttpPut("users/{id:guid}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeUserStatusRequest request, CancellationToken cancellationToken)
     {
+        if (id == currentUser.UserId)
+        {
+            return Forbid();
+        }
+
         var user = await users.GetByIdAsync(id, cancellationToken);
         if (user is null)
         {
@@ -200,6 +246,8 @@ public sealed class AdminDashboardController(
 
         user.SetActive(request.IsActive, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await auditService.RecordAsync(AuditAction.UserStatusChanged, nameof(User), user.Id, user.Email,
+            new { user.IsActive }, cancellationToken);
         return NoContent();
     }
 

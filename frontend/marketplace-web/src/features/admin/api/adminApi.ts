@@ -32,6 +32,7 @@ import type { ProductRejectionReason } from "@/types/productAuthoring";
 import type { Order, OrderPage, OrderStatus } from "@/types/order";
 import type { Coupon, CouponPage, CouponStatus, CreateCouponRequest, UpdateCouponRequest } from "@/types/coupon";
 import type { InventoryItem, InventoryTransaction } from "@/types/seller";
+import type { ModerationReview, ModerationReviewPage, ModerationReviewQuery } from "@/types/review";
 import type { UserRole } from "@/types/auth";
 
 const withRange = (range: DateRange) => `range=${range}`;
@@ -327,6 +328,52 @@ export const adminApi = {
    * pretending a cascade happened.
    */
   deleteCategory: (id: string) => apiClient.delete(`/api/categories/${id}`).then(() => undefined),
+
+  /**
+   * Every review on the marketplace, hidden ones included.
+   *
+   * Hidden reviews are in the default list rather than behind a filter because finding one again is
+   * the whole job: a moderator who hid something has to be able to see that they did, and why.
+   * `visibility` is sent as `"true"`/`"false"` strings because the API reads it as a nullable
+   * boolean, and omitting it means "every review".
+   *
+   * This is the only place a review can be listed across sellers. The seller's own list is scoped
+   * to their products and the public one hides moderated reviews, so neither can answer "has
+   * anybody complained about this product".
+   */
+  reviews: (params: ModerationReviewQuery) => {
+    const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
+
+    if (params.visibility) {
+      search.set("visibility", params.visibility);
+    }
+
+    if (params.rating) {
+      search.set("rating", String(params.rating));
+    }
+
+    if (params.search) {
+      search.set("search", params.search);
+    }
+
+    if (params.productId) {
+      search.set("productId", params.productId);
+    }
+
+    return apiClient.get<ModerationReviewPage>(`/api/admin/reviews?${search.toString()}`).then(data => data.data);
+  },
+
+  review: (id: string) => apiClient.get<ModerationReview>(`/api/admin/reviews/${id}`).then(data => data.data),
+
+  /**
+   * Hides a review, or puts it back.
+   *
+   * The note travels with the decision and is stored on the review, so the reason is still there
+   * to whoever opens it next. The review text is never touched: moderation changes whether a
+   * review is shown, not what it says.
+   */
+  setReviewVisibility: (id: string, isVisible: boolean, note?: string | null) =>
+    apiClient.put(`/api/reviews/${id}/visibility`, { isVisible, note: note || null }).then(data => data.data),
 };
 
 export type { AdminUser };

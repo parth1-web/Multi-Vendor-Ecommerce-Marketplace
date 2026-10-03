@@ -177,6 +177,15 @@ seller: {
     payments: (params: unknown) => [...queryKeys.admin.all, "payments", "list", params] as const,
     payment: (id: string) => [...queryKeys.admin.all, "payments", "detail", id] as const,
     categories: () => [...queryKeys.admin.all, "categories"] as const,
+    /**
+     * The review moderation queue, and the single review behind it.
+     *
+     * Named `reviews` rather than folded into `moderation`, which is the *listing* approval queue:
+     * hiding a review has nothing to do with approving a product, and sharing a key would make
+     * every product decision refetch the review queue and the other way round.
+     */
+    reviews: (params: unknown) => [...queryKeys.admin.all, "reviews", "list", params] as const,
+    review: (id: string) => [...queryKeys.admin.all, "reviews", "detail", id] as const,
     /** Platform stock, read through the shared inventory route with the seller predicate dropped. */
     platformInventory: (params: unknown) => [...queryKeys.admin.all, "platform-inventory", "list", params] as const,
     platformInventoryTransactions: (variantId: string) =>

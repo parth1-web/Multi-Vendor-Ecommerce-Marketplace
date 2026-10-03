@@ -21,6 +21,19 @@ public interface IReviewService
 
     Task<PagedResult<ReviewResponse>> ListForSellerAsync(ReviewListQuery query, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every review on the marketplace for moderation, hidden ones included.
+    /// </summary>
+    /// <remarks>
+    /// The gap this exists to close: the only other reads of a review either belong to a single
+    /// product or to a single seller, and both exclude hidden reviews on the shopper's behalf. A
+    /// moderator therefore had no way to see what they had hidden, and no way to undo it.
+    /// </remarks>
+    Task<PagedResult<ModerationReviewResponse>> ListForModerationAsync(ReviewModerationQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>One review for moderation, hidden or not.</summary>
+    Task<Result<ModerationReviewResponse>> GetForModerationAsync(Guid reviewId, CancellationToken cancellationToken = default);
+
     Task<Result<ReviewResponse>> CreateAsync(Guid productId, CreateReviewRequest request, CancellationToken cancellationToken = default);
 
     Task<Result<ReviewResponse>> UpdateAsync(Guid reviewId, UpdateReviewRequest request, CancellationToken cancellationToken = default);
@@ -35,3 +48,15 @@ public interface IReviewService
 }
 
 public sealed record ReviewListQuery(int? Page, int? PageSize, int? MinRating, bool? VisibleOnly, string Sort = "newest");
+
+/// <summary>
+/// The moderation list's filters. Each one maps to a real column or a real relation, and there is
+/// no sort: the list is newest first because a moderator's question is "what has just arrived".
+/// </summary>
+public sealed record ReviewModerationQuery(
+    int? Page,
+    int? PageSize,
+    bool? IsVisible,
+    int? Rating,
+    string? Search,
+    Guid? ProductId);

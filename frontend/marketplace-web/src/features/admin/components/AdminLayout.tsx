@@ -24,6 +24,7 @@ import {
   FileText,
   FolderTree,
   LogOut,
+  MessageSquareQuote,
   Moon,
   Package,
   ShieldCheck,
@@ -46,8 +47,8 @@ import { useThemeStore } from "@/providers/ThemeProvider";
  * The console's sections, and nothing else.
  *
  * Every entry here is a screen built on an endpoint the API actually exposes. There is no Settings
- * link because there is no settings endpoint, and no review queue because the API has no way to
- * list reviews across the marketplace — a link to either would be a page of broken promises.
+ * link because there is no settings endpoint, and no review *editing* link because reviews are not
+ * editable by an administrator at all — Reviews is a hide-and-restore queue, not a text editor.
  *
  * Grouped by what an operator is doing rather than alphabetically, because the two questions that
  * come up all day are "what needs deciding" and "what needs checking".
@@ -58,6 +59,7 @@ const LINK_GROUPS: { label: string; links: { href: string; label: string; icon: 
     links: [
       { href: "/admin", label: "Overview", icon: BarChart3 },
       { href: "/admin/moderation", label: "Moderation", icon: ShieldCheck },
+      { href: "/admin/reviews", label: "Reviews", icon: MessageSquareQuote },
       { href: "/admin/sellers", label: "Sellers", icon: Store },
       { href: "/admin/refunds", label: "Refunds", icon: Undo2 },
     ],

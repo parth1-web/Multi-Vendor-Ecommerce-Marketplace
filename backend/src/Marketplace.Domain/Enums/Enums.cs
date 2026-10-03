@@ -262,7 +262,20 @@ public enum AuditAction
     SettingsUpdated = 43,
     ReportExported = 44,
     PasswordResetRequested = 45,
-    PasswordResetCompleted = 46
+    PasswordResetCompleted = 46,
+
+    /// <summary>
+    /// A seller record's business identity, contact details, tax or bank information was edited.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="SellerApproved"/> on purpose: a profile edit is not an approval,
+    /// and recording one as the other made the audit log claim moderators had approved sellers who
+    /// had simply corrected their address.
+    /// </remarks>
+    SellerProfileUpdated = 48,
+
+    /// <summary>An administrator changed an account's role.</summary>
+    UserRoleChanged = 49
 }
 
 /// <summary>Audience grouping of a notification.</summary>

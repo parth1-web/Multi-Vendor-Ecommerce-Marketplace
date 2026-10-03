@@ -94,6 +94,82 @@ public sealed class ReviewService(
         return await HydrateAsync(result, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<PagedResult<ModerationReviewResponse>> ListForModerationAsync(ReviewModerationQuery query, CancellationToken cancellationToken = default)
+    {
+        var page = new PageRequest(query.Page, query.PageSize);
+
+        // No IsVisible filter here on purpose: a hidden review is precisely the thing a moderator
+        // has to be able to find again, so the default is the whole table, visible or not.
+        var source = reviews.Query().AsNoTracking();
+
+        if (query.IsVisible is { } isVisible)
+        {
+            source = source.Where(r => r.IsVisible == isVisible);
+        }
+
+        if (query.Rating is { } rating)
+        {
+            source = source.Where(r => r.Rating == rating);
+        }
+
+        if (query.ProductId is { } productId)
+        {
+            source = source.Where(r => r.ProductId == productId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = $"%{query.Search.Trim()}%";
+            var matchingProducts = products.Query().Where(p => EF.Functions.Like(p.Name, term)).Select(p => p.Id);
+            var matchingAuthors = users.Query()
+                .Where(u => EF.Functions.Like(u.FirstName, term) || EF.Functions.Like(u.LastName, term))
+                .Select(u => u.Id);
+
+            source = source.Where(r =>
+                matchingProducts.Contains(r.ProductId)
+                || matchingAuthors.Contains(r.CustomerId)
+                || EF.Functions.Like(r.Title, term)
+                || EF.Functions.Like(r.Body, term));
+        }
+
+        var result = await source
+            .OrderByDescending(r => r.CreatedAt)
+            .ToPagedResultAsync(page, r => new ModerationReviewResponse(
+                r.Id, r.ProductId, string.Empty, string.Empty, null, r.SellerId, string.Empty,
+                r.Rating, r.Title, r.Body, r.IsVerifiedPurchase, r.IsVisible, r.HelpfulCount,
+                string.Empty, r.CreatedAt, r.UpdatedAt, r.ModerationNote, null), cancellationToken)
+            .ConfigureAwait(false);
+
+        return await HydrateModerationAsync(result, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<Result<ModerationReviewResponse>> GetForModerationAsync(Guid reviewId, CancellationToken cancellationToken = default)
+    {
+        var review = await reviews.Query().AsNoTracking()
+            .Include(r => r.Reply)
+            .FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (review is null)
+        {
+            return Result<ModerationReviewResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
+        }
+
+        var projected = new PagedResult<ModerationReviewResponse>(
+            [new ModerationReviewResponse(
+                review.Id, review.ProductId, string.Empty, string.Empty, null, review.SellerId, string.Empty,
+                review.Rating, review.Title, review.Body, review.IsVerifiedPurchase, review.IsVisible,
+                review.HelpfulCount, string.Empty, review.CreatedAt, review.UpdatedAt,
+                review.ModerationNote,
+                review.Reply is null
+                    ? null
+                    : new ReviewReplyResponse(review.Reply.Id, review.Reply.Body, string.Empty, review.Reply.CreatedAt))],
+            1, 1, 1);
+
+        var hydrated = await HydrateModerationAsync(projected, cancellationToken).ConfigureAwait(false);
+        return Result<ModerationReviewResponse>.Success(hydrated.Items[0]);
+    }
+
     public async Task<Result<ReviewResponse>> CreateAsync(Guid productId, CreateReviewRequest request, CancellationToken cancellationToken = default)
     {
         var orderItem = await orderItems.Query().AsNoTracking()
@@ -160,6 +236,18 @@ public sealed class ReviewService(
         return await GetByIdAsync(review.Id, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Edits a review's text.
+    /// </summary>
+    /// <remarks>
+    /// The author and nobody else. An administrator is deliberately *not* permitted here: a
+    /// moderator's business is visibility — hiding a review that breaks the rules — and rewriting
+    /// a customer's words in their own name is not a moderation action, it is forgery. Moderation
+    /// goes through <see cref="ModerateAsync"/>, which records who hid it and why.
+    ///
+    /// The author alone is also what makes the audit row meaningful: it records what the review
+    /// said before the edit as well as after, so a disputed change can be reconstructed.
+    /// </remarks>
     public async Task<Result<ReviewResponse>> UpdateAsync(Guid reviewId, UpdateReviewRequest request, CancellationToken cancellationToken = default)
     {
         var review = await reviews.Query().Include(r => r.Reply).FirstOrDefaultAsync(r => r.Id == reviewId, cancellationToken).ConfigureAwait(false);
@@ -168,18 +256,22 @@ public sealed class ReviewService(
             return Result<ReviewResponse>.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
-        if (review.CustomerId != currentUser.UserId && !currentUser.IsAdmin)
+        if (review.CustomerId != currentUser.UserId)
         {
-            return Result<ReviewResponse>.Failure("You can only edit your own review.");
+            // Refused for an administrator as firmly as for a stranger, and with the same wording,
+            // because the rule is about authorship rather than about privilege. Moderation is
+            // visibility; the words belong to the customer who wrote them.
+            return Result<ReviewResponse>.Failure("You can only edit your own review.", ResultErrorCodes.Forbidden);
         }
 
         var now = clock.UtcNow;
+        var previous = new { review.Rating, review.Title, review.Body };
         review.Update(request.Rating, request.Title, request.Body, now);
 
         await RecalculateProductRatingAsync(review.ProductId, now, cancellationToken).ConfigureAwait(false);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await auditService.RecordAsync(AuditAction.ReviewUpdated, nameof(Review), review.Id, null,
-            new { request.Rating }, cancellationToken).ConfigureAwait(false);
+        await auditService.RecordAsync(AuditAction.ReviewUpdated, nameof(Review), review.Id, review.Title,
+            new { Previous = previous, request.Rating, request.Title, request.Body }, cancellationToken).ConfigureAwait(false);
 
         return await GetByIdAsync(review.Id, cancellationToken).ConfigureAwait(false);
     }
@@ -192,9 +284,12 @@ public sealed class ReviewService(
             return Result.Failure("Review not found.", ResultErrorCodes.NotFound);
         }
 
-        if (review.CustomerId != currentUser.UserId && !currentUser.IsAdmin)
+        if (review.CustomerId != currentUser.UserId)
         {
-            return Result.Failure("You can only delete your own review.");
+            // Deletion is irreversible, so it is the author's alone. An administrator who objects to
+            // a review hides it through moderation, which is reversible and keeps the record - the
+            // difference between taking a customer's word away and taking their history away.
+            return Result.Failure("You can only delete your own review.", ResultErrorCodes.Forbidden);
         }
 
         reviews.Remove(review);
@@ -450,6 +545,85 @@ public sealed class ReviewService(
         string.IsNullOrEmpty(firstName)
             ? "Customer"
             : $"{firstName[0].ToString().ToUpperInvariant()}.";
+
+    /// <summary>
+    /// Fills in the product, store and author a moderation row needs to be judged.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the shopper-facing hydration because the moderation shape carries two extra
+    /// facts — the store the review belongs to and the moment it was last changed — and because
+    /// the public hydration deliberately never reads hidden rows. Three queries for a page, not one
+    /// per row: the whole point of projecting ids and filling them afterwards.
+    /// </remarks>
+    private async Task<PagedResult<ModerationReviewResponse>> HydrateModerationAsync(PagedResult<ModerationReviewResponse> result, CancellationToken cancellationToken)
+    {
+        if (result.Items.Count == 0)
+        {
+            return result;
+        }
+
+        var reviewIds = result.Items.Select(i => i.Id).ToList();
+        var productIds = result.Items.Select(i => i.ProductId).Distinct().ToList();
+
+        var rows = await reviews.Query().AsNoTracking()
+            .Where(r => reviewIds.Contains(r.Id))
+            .Select(r => new { r.Id, r.CustomerId })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var authorIds = rows.Select(r => r.CustomerId).Distinct().ToList();
+
+        var productInfo = await products.Query().AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Name, p.SlugValue, p.SellerId, Url = p.Images.Select(i => i.Url).FirstOrDefault() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var authorNames = await users.Query().AsNoTracking()
+            .Where(u => authorIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => MaskName(u.FirstName), cancellationToken)
+            .ConfigureAwait(false);
+
+        var storeNames = await stores.Query().AsNoTracking()
+            .ToDictionaryAsync(s => s.SellerId, s => s.Name, cancellationToken)
+            .ConfigureAwait(false);
+
+        var productMap = productInfo.ToDictionary(p => p.Id);
+        var authorByReview = rows.ToDictionary(r => r.Id, r => authorNames.GetValueOrDefault(r.CustomerId, "Customer"));
+
+        var replies = await ReviewRepliesForModerationAsync(reviewIds, cancellationToken).ConfigureAwait(false);
+
+        var items = result.Items.Select(item =>
+        {
+            var product = productMap.GetValueOrDefault(item.ProductId);
+
+            return item with
+            {
+                ProductName = product?.Name ?? "Unknown product",
+                ProductSlug = product?.SlugValue ?? string.Empty,
+                ProductImageUrl = product?.Url,
+                StoreName = storeNames.GetValueOrDefault(item.SellerId, "Seller"),
+                AuthorName = authorByReview.GetValueOrDefault(item.Id, "Customer"),
+                Reply = replies.GetValueOrDefault(item.Id),
+            };
+        }).ToList();
+
+        return new PagedResult<ModerationReviewResponse>(items, result.Page, result.PageSize, result.TotalCount);
+    }
+
+    private async Task<Dictionary<Guid, ReviewReplyResponse>> ReviewRepliesForModerationAsync(IReadOnlyCollection<Guid> reviewIds, CancellationToken cancellationToken)
+    {
+        var replies = await reviews.Query().AsNoTracking()
+            .Include(r => r.Reply)
+            .Where(r => reviewIds.Contains(r.Id) && r.Reply != null)
+            .Select(r => new { r.Id, Reply = r.Reply! })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return replies.ToDictionary(
+            r => r.Id,
+            r => new ReviewReplyResponse(r.Reply.Id, r.Reply.Body, string.Empty, r.Reply.CreatedAt));
+    }
 
     /// <summary>
     /// A review's reply, for a read that has the navigation loaded.

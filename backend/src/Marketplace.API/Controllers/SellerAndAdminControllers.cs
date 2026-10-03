@@ -269,8 +269,18 @@ public sealed class ReviewsController(IReviewService reviews) : ControllerBase
     public async Task<IActionResult> ListForSeller([FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] bool? visibleOnly, CancellationToken cancellationToken) =>
         Ok(await reviews.ListForSellerAsync(new ReviewListQuery(page, pageSize, null, visibleOnly), cancellationToken));
 
+    /// <summary>
+    /// Edits the author's own review text.
+    /// </summary>
+    /// <remarks>
+    /// No policy beyond the controller's <c>[Authorize]</c>, and that is deliberate: the rule here
+    /// is authorship, not privilege, so it is enforced in the service against the review's own
+    /// customer id. An administrator is refused by the same check — moderation changes visibility
+    /// through <see cref="Moderate"/>, and never rewrites a customer's words.
+    /// </remarks>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(ReviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateReviewRequest request, CancellationToken cancellationToken) =>
         (await reviews.UpdateAsync(id, request, cancellationToken)).ToActionResult();
 
@@ -290,6 +300,47 @@ public sealed class ReviewsController(IReviewService reviews) : ControllerBase
     [ProducesResponseType(typeof(ReviewResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Moderate(Guid id, [FromBody] ModerateReviewRequest request, CancellationToken cancellationToken) =>
         (await reviews.ModerateAsync(id, request, cancellationToken)).ToActionResult();
+}
+
+/// <summary>
+/// Platform-wide review moderation.
+/// </summary>
+/// <remarks>
+/// Its own controller under <c>/api/admin</c> rather than more actions on the seller-facing
+/// <see cref="ReviewsController"/>, because it answers a different question and has a different
+/// blast radius: a seller may read the reviews of their own products, a shopper may read the
+/// visible reviews of a product they are looking at, and neither of those can see a review that
+/// has been hidden. A moderator has to see every review on the marketplace, hidden ones included,
+/// or a hidden review is unrecoverable.
+/// </remarks>
+[ApiController]
+[Route("api/admin/reviews")]
+[Authorize(Policy = Security.AuthorizationPolicies.AdminOnly)]
+public sealed class AdminReviewsController(IReviewService reviews) : ControllerBase
+{
+    /// <summary>
+    /// Every review, newest first, filtered only by what this query can actually do.
+    /// </summary>
+    /// <remarks>
+    /// <c>visibility</c> is deliberately tri-state: absent returns visible and hidden together,
+    /// which is the list a moderator opens. Omitting it and defaulting to "visible only" is what
+    /// made hidden reviews unreachable in the first place.
+    /// </remarks>
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResult<ModerationReviewResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> List(
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] bool? visibility,
+        [FromQuery] int? rating, [FromQuery] string? search, [FromQuery] Guid? productId,
+        CancellationToken cancellationToken) =>
+        Ok(await reviews.ListForModerationAsync(
+            new ReviewModerationQuery(page, pageSize, visibility, rating, search, productId), cancellationToken));
+
+    /// <summary>One review for moderation, hidden or not, with the store and product around it.</summary>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(ModerationReviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken) =>
+        (await reviews.GetForModerationAsync(id, cancellationToken)).ToActionResult();
 }
 
 /// <summary>Coupon management and validation.</summary>

@@ -52,8 +52,31 @@ public sealed class SellerService(
         return await GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Whether the caller may act on the seller identified by <paramref name="sellerId"/>.
+    /// </summary>
+    /// <remarks>
+    /// The whole of object-level authorization for this service, and the reason it exists as one
+    /// predicate rather than as a check at each call site: a seller may only ever reach their own
+    /// record, and only an administrator reaches anybody else's. The seller identity comes from the
+    /// token's <c>sid</c> claim, so a caller cannot widen their own scope by editing a route.
+    /// </remarks>
+    private bool CanAccess(Guid sellerId) =>
+        currentUser.IsAdmin || (currentUser.SellerId is { } ownSellerId && ownSellerId == sellerId);
+
     public async Task<Result<SellerResponse>> GetByIdAsync(Guid sellerId, CancellationToken cancellationToken = default)
     {
+        // Checked before the lookup so an unauthorized caller is refused identically whether or not
+        // the seller exists. The message is the one an absent seller gets, so a probe cannot learn
+        // that somebody else's account is real.
+        if (!CanAccess(sellerId))
+        {
+            logger.LogWarning(
+                "Denied seller read for {SellerId} by user {UserId} (role {Role}, seller claim {ClaimedSellerId}).",
+                sellerId, currentUser.UserId, currentUser.Role, currentUser.SellerId);
+            return Result<SellerResponse>.Failure("Seller not found.", ResultErrorCodes.NotFound);
+        }
+
         var seller = await sellers.GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
         if (seller is null)
         {
@@ -106,8 +129,24 @@ public sealed class SellerService(
         return await projected.ToPagedResultAsync(page, x => x, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Changes a seller record: business identity, contact details, tax and bank information.
+    /// </summary>
+    /// <remarks>
+    /// The same ownership predicate as the read, because a write path with no ownership check is
+    /// how a seller rewrites another seller's tax identity and bank details. Refused before the
+    /// row is loaded, so the refusal cannot be used to probe for existence either.
+    /// </remarks>
     public async Task<Result<SellerResponse>> UpdateAsync(Guid sellerId, UpdateSellerRequest request, CancellationToken cancellationToken = default)
     {
+        if (!CanAccess(sellerId))
+        {
+            logger.LogWarning(
+                "Denied seller update for {SellerId} by user {UserId} (role {Role}, seller claim {ClaimedSellerId}).",
+                sellerId, currentUser.UserId, currentUser.Role, currentUser.SellerId);
+            return Result<SellerResponse>.Failure("Seller not found.", ResultErrorCodes.NotFound);
+        }
+
         var seller = await sellers.GetByIdAsync(sellerId, cancellationToken).ConfigureAwait(false);
         if (seller is null)
         {
@@ -125,7 +164,7 @@ public sealed class SellerService(
             clock.UtcNow);
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await auditService.RecordAsync(AuditAction.SellerApproved, nameof(Seller), seller.Id, seller.BusinessName,
+        await auditService.RecordAsync(AuditAction.SellerProfileUpdated, nameof(Seller), seller.Id, seller.BusinessName,
             new { request.BusinessName, request.LegalName }, cancellationToken).ConfigureAwait(false);
         await InvalidateStoreCacheAsync(sellerId, cancellationToken).ConfigureAwait(false);
 

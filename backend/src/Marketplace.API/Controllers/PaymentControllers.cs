@@ -36,8 +36,25 @@ public sealed class PaymentsController(IPaymentService payments) : ControllerBas
     public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken) =>
         (await payments.GetAsync(id, cancellationToken)).ToActionResult();
 
+    /// <remarks>
+    /// Two checks, and both of them matter.
+    ///
+    /// The policy says *which roles* may ask: the buyer of the payment, or an administrator. A
+    /// seller is refused here rather than reaching the service and happening to own nothing.
+    ///
+    /// The service then says *which payment*: it resolves the row only when the caller is an
+    /// administrator or the payment's own customer, and answers "Payment not found" otherwise. That
+    /// is deliberate — a seller or a customer probing another customer's payment id gets the same
+    /// 404 as a made-up one, so the endpoint cannot be used to discover what exists.
+    ///
+    /// The customer never asserts that a payment succeeded. They say they have been to the payment
+    /// page; the server asks the gateway and applies the answer.
+    /// </remarks>
     [HttpPost("{id:guid}/verify")]
+    [Authorize(Policy = Security.AuthorizationPolicies.CustomerOrAdmin)]
     [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Verify(Guid id, CancellationToken cancellationToken) =>
         (await payments.VerifyAsync(id, cancellationToken)).ToActionResult();
 
