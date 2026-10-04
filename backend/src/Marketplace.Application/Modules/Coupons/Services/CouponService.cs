@@ -6,6 +6,7 @@ using Marketplace.Application.Modules.Coupons.DTOs;
 using Marketplace.Domain.Coupons;
 using Marketplace.Domain.Enums;
 using Marketplace.Domain.Sellers;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.Application.Modules.Coupons.Services;
@@ -49,8 +50,8 @@ public sealed class CouponService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim().ToUpperInvariant()}%";
-            source = source.Where(c => EF.Functions.Like(c.Code, term));
+            var term = SearchPattern.Contains(query.Search);
+            source = source.Where(c => EF.Functions.Like(c.Code.ToLower(), term));
         }
 
         return await source

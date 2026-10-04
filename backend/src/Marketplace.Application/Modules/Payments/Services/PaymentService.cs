@@ -12,6 +12,7 @@ using Marketplace.Domain.Events;
 using Marketplace.Domain.Inventory;
 using Marketplace.Domain.Orders;
 using Marketplace.Domain.Payments;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -342,8 +343,8 @@ public sealed class PaymentService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
-            source = source.Where(p => EF.Functions.Like(p.TransactionReference, term));
+            var term = SearchPattern.Contains(query.Search.Trim());
+            source = source.Where(p => EF.Functions.Like(p.TransactionReference.ToLower(), term));
         }
 
         var result = await source

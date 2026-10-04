@@ -13,6 +13,7 @@ using Marketplace.Domain.Identity;
 using Marketplace.Domain.Payments;
 using Marketplace.Domain.Refunds;
 using Marketplace.Domain.Sellers;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OrderEntity = Marketplace.Domain.Orders.Order;
@@ -166,8 +167,8 @@ public sealed class OrderService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
-            source = source.Where(so => EF.Functions.Like(so.SellerOrderNumber, term));
+            var term = SearchPattern.Contains(query.Search.Trim());
+            source = source.Where(so => EF.Functions.Like(so.SellerOrderNumber.ToLower(), term));
         }
 
         source = query.Sort switch
@@ -406,10 +407,10 @@ public sealed class OrderService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
+            var term = SearchPattern.Contains(query.Search.Trim());
             source = source.Where(o =>
-                EF.Functions.Like(o.OrderNumber, term) ||
-                o.Items.Any(i => EF.Functions.Like(i.ProductName, term)));
+                EF.Functions.Like(o.OrderNumber.ToLower(), term) ||
+                o.Items.Any(i => EF.Functions.Like(i.ProductName.ToLower(), term)));
         }
 
         return query.Sort switch

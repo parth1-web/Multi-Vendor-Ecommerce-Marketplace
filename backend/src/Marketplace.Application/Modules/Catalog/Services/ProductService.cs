@@ -14,6 +14,7 @@ using Marketplace.Domain.Events;
 using InventoryRecord = Marketplace.Domain.Inventory.Inventory;
 using Marketplace.Domain.Reviews;
 using Marketplace.Domain.Sellers;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.Application.Modules.Catalog.Services;
@@ -658,8 +659,8 @@ public sealed class ProductService(
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = $"%{search.Trim()}%";
-            source = source.Where(p => EF.Functions.Like(p.Name, term) || p.Variants.Any(v => EF.Functions.Like(v.Sku, term)));
+            var term = SearchPattern.Contains(search);
+            source = source.Where(p => EF.Functions.Like(p.Name.ToLower(), term) || p.Variants.Any(v => EF.Functions.Like(v.Sku.ToLower(), term)));
         }
 
         // Only a status the caller named narrows the list. Anything else means the whole
@@ -887,12 +888,12 @@ public sealed class ProductService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
+            var term = SearchPattern.Contains(query.Search.Trim());
             source = source.Where(p =>
-                EF.Functions.Like(p.Name, term) ||
-                EF.Functions.Like(p.ShortDescription, term) ||
-                EF.Functions.Like(p.Description, term) ||
-                p.Variants.Any(v => EF.Functions.Like(v.Sku, term)));
+                EF.Functions.Like(p.Name.ToLower(), term) ||
+                EF.Functions.Like(p.ShortDescription.ToLower(), term) ||
+                EF.Functions.Like(p.Description.ToLower(), term) ||
+                p.Variants.Any(v => EF.Functions.Like(v.Sku.ToLower(), term)));
         }
 
         if (query.CategoryId is { } categoryId)

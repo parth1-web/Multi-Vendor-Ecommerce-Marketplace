@@ -12,6 +12,7 @@ using Marketplace.Domain.Events;
 using Marketplace.Domain.Orders;
 using Marketplace.Domain.Payments;
 using Marketplace.Domain.Refunds;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OrderEntity = Marketplace.Domain.Orders.Order;
@@ -183,8 +184,8 @@ public sealed class RefundService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
-            source = source.Where(r => EF.Functions.Like(r.Reason, term));
+            var term = SearchPattern.Contains(query.Search.Trim());
+            source = source.Where(r => EF.Functions.Like(r.Reason.ToLower(), term));
         }
 
         var rows = await source

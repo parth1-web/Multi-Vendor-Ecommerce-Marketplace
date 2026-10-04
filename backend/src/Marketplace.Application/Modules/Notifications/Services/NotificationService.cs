@@ -7,6 +7,7 @@ using Marketplace.Application.Modules.Notifications.DTOs;
 using Marketplace.Domain.Auditing;
 using Marketplace.Domain.Enums;
 using Marketplace.Domain.Notifications;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -256,18 +257,15 @@ public sealed class AuditQueryService(IRepository<AuditLog> auditLogs) : IAuditQ
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
-
-            // Lowercased on both sides rather than a bare LIKE. The database this runs on has a
-            // case-sensitive collation, so `LIKE '%aerolux%'` does not match an entity named
-            // "AeroLux Wireless Headphones" — and a search box that misses a name because of the
-            // capitals in it is worse than no search box at all. Translating to LOWER() on both
-            // operands keeps the wildcard match and makes it case-insensitive on any provider.
-            var lowered = term.ToLowerInvariant();
+            // ILIKE rather than LIKE: PostgreSQL's LIKE is case-sensitive, so `aerolux` finds
+            // nothing when the entity is named "AeroLux". Wrapping the column in LOWER() would
+            // also compare case-insensitively but makes the predicate non-sargable, so the index
+            // on the column stops being usable. ILIKE is the operator for this job.
+            var term = SearchPattern.Contains(query.Search.Trim());
 
             source = source.Where(a =>
-                EF.Functions.Like(a.ActorEmail.ToLower(), lowered)
-                || EF.Functions.Like(a.EntityName!.ToLower(), lowered));
+                EF.Functions.Like(a.ActorEmail.ToLower(), term)
+                || EF.Functions.Like(a.EntityName!.ToLower(), term));
         }
 
         return await source

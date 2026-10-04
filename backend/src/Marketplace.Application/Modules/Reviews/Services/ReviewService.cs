@@ -11,6 +11,7 @@ using Marketplace.Domain.Identity;
 using Marketplace.Domain.Orders;
 using Marketplace.Domain.Reviews;
 using Marketplace.Domain.Sellers;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderEntity = Marketplace.Domain.Orders.Order;
 
@@ -119,17 +120,17 @@ public sealed class ReviewService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
-            var matchingProducts = products.Query().Where(p => EF.Functions.Like(p.Name, term)).Select(p => p.Id);
+            var term = SearchPattern.Contains(query.Search.Trim());
+            var matchingProducts = products.Query().Where(p => EF.Functions.Like(p.Name.ToLower(), term)).Select(p => p.Id);
             var matchingAuthors = users.Query()
-                .Where(u => EF.Functions.Like(u.FirstName, term) || EF.Functions.Like(u.LastName, term))
+                .Where(u => EF.Functions.Like(u.FirstName.ToLower(), term) || EF.Functions.Like(u.LastName.ToLower(), term))
                 .Select(u => u.Id);
 
             source = source.Where(r =>
                 matchingProducts.Contains(r.ProductId)
                 || matchingAuthors.Contains(r.CustomerId)
-                || EF.Functions.Like(r.Title, term)
-                || EF.Functions.Like(r.Body, term));
+                || EF.Functions.Like(r.Title.ToLower(), term)
+                || EF.Functions.Like(r.Body.ToLower(), term));
         }
 
         var result = await source

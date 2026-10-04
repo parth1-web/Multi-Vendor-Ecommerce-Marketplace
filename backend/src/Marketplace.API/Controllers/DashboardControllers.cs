@@ -1,3 +1,4 @@
+using System.Text;
 using Marketplace.API.Middleware;
 using Marketplace.Application.Common.Interfaces;
 using Marketplace.Application.Modules.Analytics.Abstractions;
@@ -11,6 +12,7 @@ using Marketplace.Domain.Enums;
 using Marketplace.Domain.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.API.Controllers;
@@ -82,7 +84,8 @@ public sealed class AdminDashboardController(
     ICurrentUser currentUser,
     IAuditService auditService,
     IUnitOfWork unitOfWork,
-    IClock clock) : ControllerBase
+    IClock clock,
+    ILogger<AdminDashboardController> logger) : ControllerBase
 {
     private static readonly DateTimePreset[] AllowedPresets =
     [
@@ -114,25 +117,171 @@ public sealed class AdminDashboardController(
     public async Task<IActionResult> Refunds([FromQuery] string? range, CancellationToken cancellationToken) =>
         Ok(await analytics.GetRefundAnalyticsAsync(Range(range, null, null), cancellationToken));
 
-    [HttpGet("reports/sales")]
+[HttpGet("reports/sales")]
     public async Task<IActionResult> SalesReport([FromQuery] string? range, CancellationToken cancellationToken) =>
         Ok(await reports.SalesAsync(Range(range, null, null), cancellationToken));
 
+    /// <summary>
+    /// Sellers, ranked by revenue, paged and filtered.
+    /// </summary>
+    /// <remarks>
+    /// <c>range</c> is optional here and its absence is meaningful: with no period the order
+    /// aggregates are lifetime totals, which is what this report has always shown. Supplying one
+    /// scopes them to that window. Both are real answers and the caller has to say which it wants.
+    /// </remarks>
     [HttpGet("reports/sellers")]
-    public async Task<IActionResult> SellerReport(CancellationToken cancellationToken) => Ok(await reports.SellersAsync(cancellationToken));
+    public async Task<IActionResult> SellerReport(
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] string? range,
+        CancellationToken cancellationToken)
+    {
+        SellerStatus? parsedStatus = Enum.TryParse<SellerStatus>(status, true, out var statusValue) ? statusValue : null;
+        var window = string.IsNullOrWhiteSpace(range) ? null : Range(range, null, null);
 
+        return Ok(await reports.SellersAsync(
+            new SellerReportQuery(page, pageSize, search, parsedStatus, window),
+            cancellationToken));
+    }
+
+    /// <summary>
+    /// Stock per variant, lowest available first, paged.
+    /// </summary>
+    /// <remarks>
+    /// The low-stock and out-of-stock filters use the same definitions as the seller inventory
+    /// screen — sellable quantity against the variant's own threshold, and available quantity of
+    /// zero or less — so a row that this report calls low stock is the row the seller sees as low
+    /// stock.
+    /// </remarks>
     [HttpGet("reports/inventory")]
-    public async Task<IActionResult> InventoryReport(CancellationToken cancellationToken) => Ok(await reports.InventoryAsync(cancellationToken));
+    public async Task<IActionResult> InventoryReport(
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery] string? search,
+        [FromQuery] bool? lowStockOnly,
+        [FromQuery] bool? outOfStockOnly,
+        [FromQuery] Guid? sellerId,
+        CancellationToken cancellationToken) =>
+        Ok(await reports.InventoryAsync(
+            new InventoryReportQuery(page, pageSize, search, lowStockOnly ?? false, outOfStockOnly ?? false, sellerId),
+            cancellationToken));
 
     [HttpGet("reports/commissions")]
     public async Task<IActionResult> CommissionReport([FromQuery] string? range, CancellationToken cancellationToken) =>
         Ok(await reports.CommissionsAsync(Range(range, null, null), cancellationToken));
 
+    /// <summary>
+    /// The sales CSV, streamed row by row.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Written straight to the response instead of being built as one string, so a year of orders
+    /// does not have to exist in memory to be exported. The row cap is part of the contract: past
+    /// it the export stops and says so in <c>X-Export-Truncated</c> and in the audit record,
+    /// rather than running until the request is killed.
+    /// </para>
+    /// <para>
+    /// Every export is recorded as <see cref="AuditAction.ReportExported"/> with the report name,
+    /// the window, the row count and whether it was cut short — the facts somebody needs when
+    /// asking later who took the data and how much of it. Nothing about the orders themselves goes
+    /// into the record.
+    /// </para>
+    /// <para>
+    /// The window is the same <c>range</c> preset the sales report takes, resolved by the same
+    /// code, so "last 30 days" on screen and in the download are the same thirty days.
+    /// </para>
+    /// </remarks>
     [HttpGet("reports/export/sales.csv")]
-    public async Task<IActionResult> ExportSales([FromQuery] string? range, CancellationToken cancellationToken)
+    public async Task ExportSales([FromQuery] string? range, CancellationToken cancellationToken)
     {
-        var csv = await reports.ExportSalesCsvAsync(Range(range, null, null), cancellationToken);
-        return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", $"sales-{DateTime.UtcNow:yyyyMMdd}.csv");
+        var window = Range(range, null, null);
+
+        // Every header is set before the first byte is written. Once the body has started the
+        // response is committed and no further header can be added, which is why the row count is
+        // not one of them: it is not knowable until the rows have been written, and a header that
+        // is silently missing is worse than no header at all. The count and whether the cap was
+        // reached both go into the audit record, and a file that hit the cap is exactly
+        // IReportService.SalesExportRowLimit lines long.
+        Response.ContentType = "text/csv; charset=utf-8";
+        Response.Headers.ContentDisposition = $"attachment; filename=\"sales-{DateTime.UtcNow:yyyyMMdd}.csv\"";
+        Response.Headers["X-Export-Row-Limit"] = IReportService.SalesExportRowLimit.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        await using var writer = new StreamWriter(Response.Body, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        await writer.WriteLineAsync("Order Number,Date,Status,Subtotal,Discount,Shipping,Tax,Total,Refunded,Items,Sellers");
+
+        var written = 0;
+
+        await foreach (var row in reports.StreamSalesAsync(window, cancellationToken))
+        {
+            var line = new StringBuilder()
+                .Append(Escape(row.OrderNumber)).Append(',')
+                .Append(row.PlacedAt.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(Escape(row.Status)).Append(',')
+                .Append(row.Subtotal.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.Discount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.Shipping.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.Tax.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.Total.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.Refunded.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.ItemCount.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.SellerCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Append('\n');
+
+            await writer.WriteAsync(line).ConfigureAwait(false);
+            written++;
+        }
+
+        await writer.FlushAsync(cancellationToken);
+
+        // A file with exactly the cap's worth of rows may have been cut short; the count is what
+        // tells the reader whether it was.
+        var truncated = written >= IReportService.SalesExportRowLimit;
+
+        await auditService.RecordAsync(
+            AuditAction.ReportExported,
+            "SalesReport",
+            null,
+            $"sales-{range ?? "Last30Days"}",
+            new
+            {
+                report = "sales",
+                requestedRange = range ?? "Last30Days",
+                from = window.From,
+                to = window.To,
+                rowCount = written,
+                rowLimit = IReportService.SalesExportRowLimit,
+                truncated
+            },
+            cancellationToken);
+
+        logger.LogInformation(
+            "Sales CSV exported for {From:o} to {To:o}: {RowCount} rows{Truncated}",
+            window.From,
+            window.To,
+            written,
+            truncated ? " (at the row limit, so the export may be incomplete)" : string.Empty);
+    }
+
+    /// <summary>
+    /// Quotes a CSV field that might contain a comma, a quote or a newline.
+    /// </summary>
+    /// <remarks>
+    /// Order numbers and statuses cannot contain those today, but a status name that gained a
+    /// comma in a future enum, or a reference that gained a quote, would otherwise produce a file
+    /// that silently disagrees with itself about which column is which.
+    /// </remarks>
+    private static string Escape(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return value.IndexOfAny([',', '"', '\n', '\r']) < 0
+            ? value
+            : $"\"{value.Replace("\"", "\"\"")}\"";
     }
 
     [HttpGet("audit-logs")]
@@ -156,8 +305,8 @@ public sealed class AdminDashboardController(
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = $"%{search.Trim()}%";
-            source = source.Where(u => EF.Functions.Like(u.Email, term) || EF.Functions.Like(u.FirstName, term) || EF.Functions.Like(u.LastName, term));
+            var term = SearchPattern.Contains(search);
+            source = source.Where(u => EF.Functions.Like(u.Email.ToLower(), term) || EF.Functions.Like(u.FirstName.ToLower(), term) || EF.Functions.Like(u.LastName.ToLower(), term));
         }
 
         if (Enum.TryParse<UserRole>(role, true, out var parsedRole))

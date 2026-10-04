@@ -14,6 +14,7 @@ using Marketplace.Domain.Enums;
 using Marketplace.Domain.Identity;
 using Marketplace.Domain.Orders;
 using Marketplace.Domain.Sellers;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -99,8 +100,8 @@ public sealed class SellerService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
-            source = source.Where(s => EF.Functions.Like(s.BusinessName, term));
+            var term = SearchPattern.Contains(query.Search);
+            source = source.Where(s => EF.Functions.Like(s.BusinessName.ToLower(), term));
         }
 
         var projected = source.Select(s => new SellerListItemResponse(

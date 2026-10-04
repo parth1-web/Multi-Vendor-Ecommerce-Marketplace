@@ -11,6 +11,7 @@ using Marketplace.Domain.Events;
 using Marketplace.Domain.Inventory;
 using InventoryRecord = Marketplace.Domain.Inventory.Inventory;
 using Marketplace.Domain.Sellers;
+using Marketplace.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -64,9 +65,9 @@ public sealed class InventoryService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{query.Search.Trim()}%";
-            var productIds = products.Query().Where(p => EF.Functions.Like(p.Name, term)).Select(p => p.Id);
-            var skus = variants.Query().Where(v => EF.Functions.Like(v.Sku, term)).Select(v => v.Id);
+            var term = SearchPattern.Contains(query.Search.Trim());
+            var productIds = products.Query().Where(p => EF.Functions.Like(p.Name.ToLower(), term)).Select(p => p.Id);
+            var skus = variants.Query().Where(v => EF.Functions.Like(v.Sku.ToLower(), term)).Select(v => v.Id);
             source = source.Where(i => productIds.Contains(i.ProductId) || skus.Contains(i.ProductVariantId));
         }
 
@@ -148,6 +149,15 @@ public sealed class InventoryService(
         return Result<InventoryItemResponse>.Success(hydrated);
     }
 
+    /// <summary>
+    /// Changes the level at which a variant counts as low on stock.
+    /// </summary>
+    /// <remarks>
+    /// This is recorded rather than silent. A threshold decides when the seller is warned and when
+    /// a variant appears on the low-stock report, so quietly changing it is the kind of edit that
+    /// makes a later "why did nobody warn me?" unanswerable. The record names the variant and both
+    /// values, and nothing about the stock itself.
+    /// </remarks>
     public async Task<Result> SetThresholdAsync(Guid variantId, SetThresholdRequest request, CancellationToken cancellationToken = default)
     {
         var inventory = await ScopedQuery().FirstOrDefaultAsync(i => i.ProductVariantId == variantId, cancellationToken).ConfigureAwait(false);
@@ -156,8 +166,21 @@ public sealed class InventoryService(
             return Result.Failure("Inventory record not found.", ResultErrorCodes.NotFound);
         }
 
+        var before = inventory.LowStockThreshold;
         inventory.SetLowStockThreshold(request.LowStockThreshold, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        if (before != inventory.LowStockThreshold)
+        {
+            await auditService.RecordAsync(
+                AuditAction.InventoryThresholdChanged,
+                nameof(Inventory),
+                inventory.Id,
+                $"variant {inventory.ProductVariantId:D}",
+                new { Before = before, After = inventory.LowStockThreshold, ProductVariantId = inventory.ProductVariantId },
+                cancellationToken).ConfigureAwait(false);
+        }
+
         return Result.Success();
     }
 

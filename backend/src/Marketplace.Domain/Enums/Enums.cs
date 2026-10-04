@@ -275,7 +275,17 @@ public enum AuditAction
     SellerProfileUpdated = 48,
 
     /// <summary>An administrator changed an account's role.</summary>
-    UserRoleChanged = 49
+    UserRoleChanged = 49,
+
+    /// <summary>
+    /// A variant's low-stock threshold was changed.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="InventoryAdjusted"/> because the two answer different questions:
+    /// an adjustment says stock moved, a threshold change says the line that counts as "low" moved.
+    /// Recorded with the variant and both values, and nothing about the quantity on hand.
+    /// </remarks>
+    InventoryThresholdChanged = 50
 }
 
 /// <summary>Audience grouping of a notification.</summary>

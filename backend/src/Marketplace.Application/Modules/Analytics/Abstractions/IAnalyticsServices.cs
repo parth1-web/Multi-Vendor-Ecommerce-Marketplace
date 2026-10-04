@@ -1,8 +1,45 @@
 using Marketplace.Domain.Enums;
+using Marketplace.Application.Common.Models;
 using Marketplace.Application.Modules.Analytics.DTOs;
 using Marketplace.Application.Modules.Orders.DTOs;
 
 namespace Marketplace.Application.Modules.Analytics.Abstractions;
+
+/// <summary>
+/// Filters for the seller report.
+/// </summary>
+/// <param name="Page">1-based page number.</param>
+/// <param name="PageSize">Rows per page, capped by <see cref="PageRequest"/>.</param>
+/// <param name="Search">Matches the seller's business name or their store's name.</param>
+/// <param name="Status">Restrict to one seller status.</param>
+/// <param name="Range">
+/// When present, the order aggregates cover this window. When null they are lifetime totals —
+/// the behaviour this report had before it grew filters, kept so that "no period" and "a period"
+/// cannot be confused for one another.
+/// </param>
+public sealed record SellerReportQuery(
+    int? Page,
+    int? PageSize,
+    string? Search,
+    SellerStatus? Status,
+    DateTimeRange? Range);
+
+/// <summary>
+/// Filters for the inventory report.
+/// </summary>
+/// <param name="Page">1-based page number.</param>
+/// <param name="PageSize">Rows per page, capped by <see cref="PageRequest"/>.</param>
+/// <param name="Search">Matches the product name, the variant SKU, or the store name.</param>
+/// <param name="LowStockOnly">Only variants whose sellable quantity is at or below their threshold.</param>
+/// <param name="OutOfStockOnly">Only variants with no available quantity.</param>
+/// <param name="SellerId">Restrict to one seller.</param>
+public sealed record InventoryReportQuery(
+    int? Page,
+    int? PageSize,
+    string? Search,
+    bool LowStockOnly,
+    bool OutOfStockOnly,
+    Guid? SellerId);
 
 public interface ISellerAnalyticsService
 {
@@ -35,17 +72,48 @@ public interface ICustomerAnalyticsService
     Task<CustomerSummaryResponse> GetSummaryAsync(CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// The admin reports. Every read here is filtered, paged and aggregated by the database; none of
+/// them loads the underlying table to count or sort it in memory.
+/// </summary>
 public interface IReportService
 {
     Task<IReadOnlyList<SalesReportRowResponse>> SalesAsync(DateTimeRange range, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<SellerReportRowResponse>> SellersAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Sellers, paged and filtered. <paramref name="query"/> may carry a period, in which case the
+    /// order aggregates cover that window instead of all time.
+    /// </summary>
+    Task<PagedResult<SellerReportRowResponse>> SellersAsync(SellerReportQuery query, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<InventoryReportRowResponse>> InventoryAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Stock per variant, paged, lowest available first.
+    /// </summary>
+    /// <remarks>
+    /// "Low stock" and "out of stock" mean exactly what they mean in the seller inventory screen:
+    /// sellable quantity (available less reserved) at or below the variant's own threshold, and
+    /// available quantity of zero or less respectively. No fixed number is involved.
+    /// </remarks>
+    Task<PagedResult<InventoryReportRowResponse>> InventoryAsync(InventoryReportQuery query, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<CommissionReportRowResponse>> CommissionsAsync(DateTimeRange range, CancellationToken cancellationToken = default);
 
-    Task<string> ExportSalesCsvAsync(DateTimeRange range, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// The sales CSV, streamed.
+    /// </summary>
+    /// <remarks>
+    /// An async sequence rather than a finished string so that a wide range cannot pull every
+    /// matching order into memory before the first byte is written. The caller writes the header,
+    /// then each row, and stops at <see cref="SalesExportRowLimit"/> rows — the cap is part of the
+    /// contract so that "unbounded" is never true of this endpoint again.
+    /// </remarks>
+    IAsyncEnumerable<SalesExportRow> StreamSalesAsync(DateTimeRange range, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The most rows one export will write. Beyond this the response is truncated and says so, in
+    /// a header and in the audit record, rather than running until the request dies.
+    /// </summary>
+    const int SalesExportRowLimit = 50_000;
 }
 
 /// <summary>Resolved date window. Always computed server-side; the client cannot widen it.</summary>
