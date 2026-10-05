@@ -12,7 +12,8 @@ import type {
   CommissionReportRow,
   CreateCategoryRequest,
   GrowthPoint,
-  InventoryReportRow,
+  InventoryReportPage,
+  InventoryReportQuery,
   Payment,
   PaymentPage,
   PaymentState,
@@ -21,9 +22,11 @@ import type {
   RefundPage,
   RefundReviewAction,
   RefundState,
+  SalesExportResult,
   RevenuePoint,
   SalesReportRow,
-  SellerReportRow,
+  SellerReportPage,
+  SellerReportQuery,
   UpdateCategoryRequest,
 } from "@/types/admin";
 import type { DateRange } from "@/types/seller";
@@ -185,54 +188,111 @@ export const adminApi = {
 /**
  * Sales per period, one row per bucket, gap-filled by the API.
  *
- * `range` is the only parameter the route accepts — it is a preset name, and the server resolves
- * it to a window and a bucket size (daily for the short ranges, weekly for 90 days, monthly for a
+ * `range` is the only parameter the route accepts — it is a preset name, and the server resolves it
+ * to a window and a bucket size (daily for the short ranges, weekly for 90 days, monthly for a
  * year). There is no `from`/`to` here even though `/api/admin/analytics/revenue` has them, so a
  * custom window is not offered rather than offered and ignored.
  *
- * Cancelled orders are excluded by the API. `discounts`, `tax`, `shipping` and `refunds` come back
- * as zero because the report does not compute them, and `netRevenue` repeats `grossRevenue`;
- * none of those are rendered anywhere.
+ * Every money column is a real aggregate now: discounts, tax, shipping and refunds are summed from
+ * what the orders in the bucket recorded at checkout, and `netRevenue` is gross less discounts
+ * less refunds. Cancelled orders are excluded by the server.
  */
 salesReport: (range: DateRange) => apiClient.get<SalesReportRow[]>(`/api/admin/reports/sales?${withRange(range)}`).then(data => data.data),
 
 /**
- * Every seller, ranked by gross revenue. No parameters at all: no range, no filter, no paging.
+ * Sellers, ranked by gross revenue, paged and filtered by the server.
  *
- * The numbers are lifetime totals rather than period totals, which is why the report has no period
- * control. `averageRating` is a hard-coded zero and is not shown.
+ * `range` is optional and its absence means lifetime totals — the behaviour this report had before
+ * it grew filters. Supplying one scopes the order aggregates to that window; the products and
+ * rating columns are platform-wide either way, because neither is a period figure.
+ *
+ * `search` matches the seller's business name or their store's name, case-insensitively.
  */
-sellerReport: () => apiClient.get<SellerReportRow[]>("/api/admin/reports/sellers").then(data => data.data),
+sellerReport: (params: SellerReportQuery) => {
+  const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
+
+  if (params.search) {
+    search.set("search", params.search);
+  }
+
+  if (params.status) {
+    search.set("status", params.status);
+  }
+
+  if (params.range) {
+    search.set("range", params.range);
+  }
+
+  return apiClient.get<SellerReportPage>(`/api/admin/reports/sellers?${search.toString()}`).then(data => data.data);
+},
 
 /**
- * Stock per variant, lowest available first.
+ * Stock per variant, lowest available first, paged by the server.
  *
- * No parameters, and the API caps the result at 500 rows — the whole platform is not necessarily
- * in it, so no total is computed here or on the page. A variant whose product no longer exists
- * comes back with an empty name and SKU and a zero stock value rather than being dropped, because
- * a silently missing row of stock is worse than an obviously odd one.
+ * `lowStockOnly` means sellable quantity at or below the variant's own threshold — the same
+ * definition the seller inventory screen uses — and `outOfStockOnly` means no available quantity.
+ * `search` matches the product name, the SKU or the store, case-insensitively.
  */
-inventoryReport: () => apiClient.get<InventoryReportRow[]>("/api/admin/reports/inventory").then(data => data.data),
+inventoryReport: (params: InventoryReportQuery) => {
+  const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
+
+  if (params.search) {
+    search.set("search", params.search);
+  }
+
+  if (params.lowStockOnly) {
+    search.set("lowStockOnly", "true");
+  }
+
+  if (params.outOfStockOnly) {
+    search.set("outOfStockOnly", "true");
+  }
+
+  return apiClient.get<InventoryReportPage>(`/api/admin/reports/inventory?${search.toString()}`).then(data => data.data);
+},
 
 /**
- * Commission earned per seller within the range, ranked by commission.
+ * Commission earned per seller within the range, ranked by amount.
  *
- * The commission, gross and order columns are range-scoped. `payouts` and `paidOut` are *not*:
- * the API sums completed payouts for the seller over all time, so those two columns answer a
- * lifetime question in the middle of a period report. Both are labelled where they are shown.
+ * Every column is scoped to the range, including the payout pair: those count completed payouts
+ * *created* inside the window, which is the only period question a payout record can answer.
  */
 commissionReport: (range: DateRange) => apiClient.get<CommissionReportRow[]>(`/api/admin/reports/commissions?${withRange(range)}`).then(data => data.data),
 
 /**
- * A direct link to the CSV, so the browser downloads it rather than the page navigating to it.
+ * The sales CSV, fetched rather than linked.
  *
- * What it actually contains, since the name is misleading on its own: **one row per order**, not
- * one row per sales-report period, and every order in the chosen range including cancelled ones —
- * so it does not match the sales table on screen. It is built in one synchronous request with no
- * row cap, and the API does not write a `ReportExported` audit entry when it serves it, so this
- * download leaves no trace in the audit log. The button that uses this says so.
+ * Three reasons it is not a plain `<a download>`:
+ *
+ * - The button has to say whether the export worked, and a navigation cannot report that.
+ * - The response's `X-Export-Row-Limit` header says how many rows the server will write before it
+ *   stops. A file with exactly that many rows may have been cut short, and the reader is entitled to
+ *   know rather than to assume completeness.
+ * - The whole export is streamed, so the browser holds the file as it arrives instead of the
+ *   server holding every order in memory to build one string.
+ *
+ * The content itself is **one row per order**, including cancelled ones — so it does not match the
+ * sales table on screen, which measures revenue and leaves cancelled orders out. Only the range is
+ * shared between them, and both resolve it through the same server-side code.
  */
-salesCsvUrl: (range: DateRange) => `${apiClient.defaults.baseURL}/api/admin/reports/export/sales.csv?${withRange(range)}`,
+exportSalesCsv: async (range: DateRange): Promise<SalesExportResult> => {
+  const response = await apiClient.get<string>(`/api/admin/reports/export/sales.csv?${withRange(range)}`, {
+    responseType: "text",
+    transformResponse: [(data: string) => data],
+  });
+
+  const limitHeader = response.headers["x-export-row-limit"];
+  const rowLimit = Number(limitHeader ?? 0);
+  const lines = response.data.split("\n").filter(line => line.trim() !== "");
+
+  return {
+    fileName: `sales-${range}-${new Date().toISOString().slice(0, 10)}.csv`,
+    // The header line is not a data row.
+    rowCount: Math.max(0, lines.length - 1),
+    rowLimit,
+    text: response.data,
+  };
+},
 
   /**
    * Every order on the marketplace, across all sellers.

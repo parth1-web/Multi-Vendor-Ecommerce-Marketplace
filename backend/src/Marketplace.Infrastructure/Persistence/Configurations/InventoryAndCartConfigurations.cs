@@ -19,7 +19,13 @@ public sealed class InventoryConfiguration : IEntityTypeConfiguration<Inventory>
         builder.ConfigureRowVersion();
 
         builder.HasIndex(i => i.ProductVariantId).IsUnique().HasDatabaseName("ux_inventory_variant");
-        builder.HasIndex(i => new { i.SellerId, i.AvailableQuantity }).HasDatabaseName("ix_inventory_seller");
+    builder.HasIndex(i => new { i.SellerId, i.AvailableQuantity }).HasDatabaseName("ix_inventory_seller");
+
+    // The inventory report orders every variant by available quantity and pages through the whole
+    // platform, not one seller at a time, so the seller-led index above cannot order it. Id is in
+    // the key because two variants commonly hold the same quantity and the report needs a stable
+    // tie-break to keep a page from repeating or dropping a row.
+    builder.HasIndex(i => new { i.AvailableQuantity, i.Id }).HasDatabaseName("ix_inventory_available");
 
         builder.Ignore(i => i.SellableQuantity);
         builder.Ignore(i => i.IsOutOfStock);

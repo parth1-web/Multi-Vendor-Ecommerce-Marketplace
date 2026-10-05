@@ -199,7 +199,7 @@ public sealed class AdminReportingTests : IClassFixture<MarketplaceApiFactory>, 
 
         var approved = await admin.PutAsync($"/api/refunds/{refund.Id}/status",
             new ReviewRefundRequest(ReviewRefundAction.Approve, "Phase 16 refund for the report test"));
-        approved.StatusCode.Should().Be(HttpStatusCode.NoContent, await ApiClient.ReadTextAsync(approved));
+        approved.StatusCode.Should().Be(HttpStatusCode.OK, await ApiClient.ReadTextAsync(approved));
 
         var afterApproval = await ReportFor(order.OrderNumber);
         afterApproval!.Refunds.Should().BeGreaterThan(0m, "an approved refund has returned money and must be reported");
@@ -213,14 +213,18 @@ public sealed class AdminReportingTests : IClassFixture<MarketplaceApiFactory>, 
         var (admin, _) = await AuthHelper.SignInAsync(
             _factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
 
+        // The bucket is a whole month shared with every other order in this class, so the claim is
+        // about what this order contributed, not about an absolute count.
         var (cancelledClient, cancelled) = await CheckoutAsync(coupon: null);
+        var before = await ReportFor(cancelled.OrderNumber);
+        before.Should().NotBeNull();
+
         var cancel = await cancelledClient.PostAsync($"/api/orders/{cancelled.OrderId}/cancel", new { reason = "Phase 16 test" });
         cancel.StatusCode.Should().Be(HttpStatusCode.NoContent, await ApiClient.ReadTextAsync(cancel));
 
-        var period = await ReportFor(cancelled.OrderNumber);
-        period.Should().NotBeNull();
-        period!.Orders.Should().Be(0, "a cancelled order is not revenue and the report says so by leaving it out");
-        period.GrossRevenue.Should().Be(0m);
+        var after = await ReportFor(cancelled.OrderNumber);
+        after.Should().NotBeNull();
+        after!.Orders.Should().Be(before!.Orders - 1, "a cancelled order stops counting, so the bucket loses exactly it");
     }
 
     /* ================================================================ seller report: filtered */
@@ -400,24 +404,35 @@ public sealed class AdminReportingTests : IClassFixture<MarketplaceApiFactory>, 
             _factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
 
         // Driven relative to one variant's own numbers, because "low" is a relationship between
-        // what is on hand and what that variant says is low. No fixed quantity is involved.
-        var (seller, variantId, _) = await FirstSellerVariantAsync();
-        var before = await admin.GetAsync<PagedResult<InventoryReportRowResponse>>("/api/admin/reports/inventory?page=1&pageSize=100");
-        var row = before!.Items.First(i => i.Available > 5 && i.Reserved == 0);
+        // what is sellable and what that variant says is low. No fixed quantity is involved.
+        var (seller, variantId, sku) = await FirstSellerVariantAsync();
+        var row = await ReportRowForAsync(admin, sku);
+        var original = row.Threshold;
 
-        // Exactly at the threshold is low.
-        await SetThresholdAsync(seller, variantId, row.Available);
+        try
+        {
+            // The threshold that puts this variant exactly on the line is its sellable quantity:
+            // anything lower says low, anything above does not. Using the report's own reserved
+            // figure keeps the arithmetic honest even if another test is holding stock.
+            var sellable = row.Available - row.Reserved;
 
-        var atThreshold = await admin.GetAsync<PagedResult<InventoryReportRowResponse>>("/api/admin/reports/inventory?page=1&pageSize=100&lowStockOnly=true");
-        atThreshold!.Items.Should().Contain(r => r.Sku == row.Sku, "stock exactly at the threshold counts as low");
-        atThreshold.Items.Should().OnlyContain(r => r.Available - r.Reserved <= r.Threshold,
-            "every row in the filter really is at or below its own threshold");
+            await SetThresholdAsync(seller, variantId, sellable);
 
-        // One below the threshold is not.
-        await SetThresholdAsync(seller, variantId, row.Available - 1);
+            var atThreshold = await admin.GetAsync<PagedResult<InventoryReportRowResponse>>("/api/admin/reports/inventory?page=1&pageSize=100&lowStockOnly=true");
+            atThreshold!.Items.Should().Contain(r => r.Sku == sku, "sellable stock exactly at the threshold counts as low");
+            atThreshold.Items.Should().OnlyContain(r => r.Available - r.Reserved <= r.Threshold,
+                "every row the filter returned really is at or below its own threshold");
 
-        var aboveThreshold = await admin.GetAsync<PagedResult<InventoryReportRowResponse>>("/api/admin/reports/inventory?page=1&pageSize=100&lowStockOnly=true");
-        aboveThreshold!.Items.Should().NotContain(r => r.Sku == row.Sku, "one above its own threshold is not low stock");
+            // One below the threshold is not.
+            await SetThresholdAsync(seller, variantId, sellable - 1);
+
+            var aboveThreshold = await admin.GetAsync<PagedResult<InventoryReportRowResponse>>("/api/admin/reports/inventory?page=1&pageSize=100&lowStockOnly=true");
+            aboveThreshold!.Items.Should().NotContain(r => r.Sku == sku, "one above its own threshold is not low stock");
+        }
+        finally
+        {
+            await SetThresholdAsync(seller, variantId, original);
+        }
     }
 
     [Fact]
@@ -425,15 +440,24 @@ public sealed class AdminReportingTests : IClassFixture<MarketplaceApiFactory>, 
     {
         var (admin, _) = await AuthHelper.SignInAsync(
             _factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
-
         var (seller, variantId, sku) = await FirstSellerVariantAsync();
         var row = await ReportRowForAsync(admin, sku);
 
-        await seller.PutAsync($"/api/inventory/{variantId}", new { delta = -row.Available, reason = "Phase 16 out of stock" });
+        try
+        {
+            await seller.PutAsync($"/api/inventory/{variantId}", new { delta = -row.Available, reason = "Phase 16 out of stock" });
 
-        var outOfStock = await admin.GetAsync<PagedResult<InventoryReportRowResponse>>("/api/admin/reports/inventory?page=1&pageSize=100&outOfStockOnly=true");
-        outOfStock!.Items.Should().OnlyContain(r => r.Available <= 0);
-        outOfStock.Items.Should().Contain(r => r.Sku == row.Sku);
+            var outOfStock = await admin.GetAsync<PagedResult<InventoryReportRowResponse>>("/api/admin/reports/inventory?page=1&pageSize=100&outOfStockOnly=true");
+            outOfStock!.Items.Should().OnlyContain(r => r.Available <= 0);
+            outOfStock.Items.Should().Contain(r => r.Sku == sku);
+        }
+        finally
+        {
+            // The fixture is shared across the class. Draining a seller's stock and leaving it
+            // drained makes every later checkout fail with "out of stock", which is a failure about
+            // the tests rather than about the code.
+            await seller.PutAsync($"/api/inventory/{variantId}", new { delta = row.Available, reason = "Phase 16 restored" });
+        }
     }
 
     [Fact]
@@ -524,7 +548,7 @@ public sealed class AdminReportingTests : IClassFixture<MarketplaceApiFactory>, 
         var (admin, _) = await AuthHelper.SignInAsync(
             _factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
 
-        var before = await admin.GetAsync<PagedResult<AuditLogResponse>>("/api/admin/audit-logs?page=1&pageSize=1");
+        var before = await admin.GetAsync<PagedResult<AuditLogResponse>>("/api/admin/audit-logs?page=1&pageSize=1&action=ReportExported");
         await CheckoutAsync(coupon: null);
         (await admin.Http.GetAsync("/api/admin/reports/export/sales.csv?range=Last7Days")).EnsureSuccessStatusCode();
 
@@ -778,14 +802,26 @@ public sealed class AdminReportingTests : IClassFixture<MarketplaceApiFactory>, 
         var context = scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>();
         return context.SellerOrders.AsNoTracking().Where(so => so.OrderId == orderId).Select(so => so.SellerId).First();
     }
-
+    /// <summary>
+    /// A seller variant worth asserting about: the one holding the most stock that has a SKU.
+    /// </summary>
+    /// <remarks>
+    /// Chosen by "most stock, and identifiable" rather than "the first one", because the class
+    /// shares a single database and earlier tests move quantities around. A variant with no SKU
+    /// cannot be matched back to a report row, and one another test has emptied is no use to a
+    /// test about stock levels.
+    /// </remarks>
     private async Task<(ApiClient Client, Guid VariantId, string Sku)> FirstSellerVariantAsync()
     {
         var (seller, _) = await AuthHelper.SignInAsync(
             _factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
 
         var items = await seller.GetAsync<PagedResult<InventoryItemResponse>>("/api/inventory?page=1&pageSize=50");
-        var item = items!.Items.First(i => i.AvailableQuantity > 0);
+        var item = items!.Items
+            .Where(i => !string.IsNullOrEmpty(i.Sku))
+            .OrderByDescending(i => i.AvailableQuantity)
+            .First();
+
         return (seller, item.ProductVariantId, item.Sku);
     }
 

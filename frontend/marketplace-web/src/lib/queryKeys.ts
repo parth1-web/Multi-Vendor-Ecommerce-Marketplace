@@ -198,10 +198,23 @@ seller: {
     platformInventory: (params: unknown) => [...queryKeys.admin.all, "platform-inventory", "list", params] as const,
     platformInventoryTransactions: (variantId: string) =>
       [...queryKeys.admin.all, "platform-inventory", "transactions", variantId] as const,
+    /**
+     * Reports each keep their own prefix, and the paged ones key on their whole parameter object.
+     *
+     * The seller and inventory reports became paged and filterable in Phase 16, so their keys carry
+     * the filters: a different page, or a different low-stock selection, is genuinely different
+     * server state, and one shared key would have every page overwrite the last.
+     */
     salesReport: (range: string) => [...queryKeys.admin.all, "report-sales", range] as const,
-    sellerReport: () => [...queryKeys.admin.all, "report-sellers"] as const,
-    inventoryReport: () => [...queryKeys.admin.all, "report-inventory"] as const,
+    sellerReport: (params: unknown) => [...queryKeys.admin.all, "report-sellers", params] as const,
+    inventoryReport: (params: unknown) => [...queryKeys.admin.all, "report-inventory", params] as const,
     commissionReport: (range: string) => [...queryKeys.admin.all, "report-commissions", range] as const,
+    /**
+     * The prefix covering every report, for the writes that genuinely move all of them — settling
+     * an order, for instance, changes sales, seller and commission figures together. A category
+     * rename or a review hiding touches none of it.
+     */
+    reports: () => [...queryKeys.admin.all, "report"] as const,
   },
 
 

@@ -324,6 +324,10 @@ function AdjustStockDialog({
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.platformInventoryTransactions(item.productVariantId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.products }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.reports() }),
+        // Stock moved, so the analytical stock report is stale — including its low-stock filter,
+        // which is defined in terms of what is sellable.
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.inventoryReport({})[0] }),
       ]);
       onDone(updated, Number(delta));
     },

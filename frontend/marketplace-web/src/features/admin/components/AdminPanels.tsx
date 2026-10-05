@@ -44,7 +44,7 @@ export function AdminSellers() {
       // and the sales report along with it.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellers({})[0] }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellerReport() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellerReport({}) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.seller.all }),
       ]);

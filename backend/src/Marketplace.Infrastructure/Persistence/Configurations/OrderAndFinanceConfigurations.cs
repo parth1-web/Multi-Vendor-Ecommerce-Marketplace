@@ -57,7 +57,12 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.HasIndex(o => o.OrderNumber).IsUnique().HasDatabaseName("ux_orders_number");
         builder.HasIndex(o => new { o.CustomerId, o.PlacedAt }).HasDatabaseName("ix_orders_customer");
-        builder.HasIndex(o => new { o.Status, o.PlacedAt }).HasDatabaseName("ix_orders_status");
+    builder.HasIndex(o => new { o.Status, o.PlacedAt }).HasDatabaseName("ix_orders_status");
+
+    // The sales report and the CSV both scan orders by when they were placed, with no status
+    // equality to narrow them: the report excludes one status rather than filtering for it, which an
+    // index led by Status cannot serve. PlacedAt on its own is what that range scan reads.
+    builder.HasIndex(o => o.PlacedAt).HasDatabaseName("ix_orders_placedat");
 
         // A retried checkout must never create a second order. The key is unique per customer,
         // and the database enforces it so two concurrent retries cannot both slip through.

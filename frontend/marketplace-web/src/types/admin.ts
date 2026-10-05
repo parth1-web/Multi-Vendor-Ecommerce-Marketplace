@@ -138,6 +138,7 @@ export const AUDIT_ACTIONS = [
   "CouponUpdated",
   "CouponDeleted",
   "CouponDeactivated",
+  "InventoryThresholdChanged",
   "SettingsUpdated",
   "ReportExported",
   "PasswordResetRequested",
@@ -170,34 +171,42 @@ export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 /**
  * One period of the sales report.
  *
- * `discounts`, `tax`, `shipping`, `refunds` and `netRevenue` are **not measurements**. The API
- * returns a literal zero for the first four and repeats `grossRevenue` into `netRevenue`, so a
- * screen that prints them is printing constants. They are typed because the wire shape includes
- * them; nothing on the reports page renders them.
+ * Every money column is a real aggregate of what checkout recorded on the orders in the period:
+ * gross is their subtotal, discounts their coupon discount, tax and shipping what was charged,
+ * refunds what has actually been returned. Cancelled orders are left out by the API; every other
+ * status counts, because a placed order is revenue the marketplace has earned the right to collect.
  */
 export interface SalesReportRow {
   period: string;
   orders: number;
   grossRevenue: number;
-  /** Always 0. The API does not compute it. */
+  /** Sum of the coupon discount allocated at checkout. */
   discounts: number;
   commission: number;
   netToSellers: number;
-  /** Always 0. The API does not compute it. */
+  /** Tax computed at checkout from the rate in force at the time. */
   tax: number;
-  /** Always 0. The API does not compute it. */
+  /** Delivery charged at checkout, already net of the free-shipping threshold. */
   shipping: number;
-  /** Always 0. The API does not compute it. */
+  /** Money actually returned. A request nobody has approved is not in here. */
   refunds: number;
-  /** Identical to `grossRevenue`; kept for the wire shape only. */
+  /**
+   * Gross less discounts less refunds: the value of goods actually retained.
+   *
+   * Tax and shipping are excluded on purpose. Whether collected tax is platform revenue, and
+   * whether shipping is income or a pass-through to a carrier, are policy questions this codebase
+   * has not answered; reporting them in their own columns is honest where folding them in would be
+   * a guess.
+   */
   netRevenue: number;
 }
 
 /**
  * One seller in the seller report.
  *
- * `averageRating` is always 0: the API does not join review data. It is typed for the wire shape
- * and deliberately not rendered — "0.0 average rating" on every store reads as a real score.
+ * `averageRating` is the mean of that seller's *visible* reviews — the ones a shopper can actually
+ * see — and `null` for a seller who has none, which is not the same thing as zero. Zero is a score
+ * somebody gave.
  */
 export interface SellerReportRow {
   sellerId: string;
@@ -208,8 +217,9 @@ export interface SellerReportRow {
   grossRevenue: number;
   commission: number;
   netEarnings: number;
-  /** Always 0. The API does not compute it. */
-  averageRating: number;
+  averageRating: number | null;
+  /** How many visible reviews the average came from. */
+  reviewCount: number;
 }
 
 export interface InventoryReportRow {
@@ -231,8 +241,43 @@ export interface CommissionReportRow {
   grossRevenue: number;
   commissionAmount: number;
   sellerEarnings: number;
+  /** Completed payouts *created* within the selected range, not lifetime totals. */
   payouts: number;
+  /** As above: money paid out within the range. */
   paidOut: number;
+}
+
+/** The seller report, paged by the server. */
+export type SellerReportPage = PagedResult<SellerReportRow>;
+
+/** The inventory report, paged by the server. */
+export type InventoryReportPage = PagedResult<InventoryReportRow>;
+
+/** Filters the seller report accepts. An absent `range` means lifetime totals, not "no orders". */
+export interface SellerReportQuery {
+  page: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  range?: DateRange;
+}
+
+/** Filters the inventory report accepts. */
+export interface InventoryReportQuery {
+  page: number;
+  pageSize?: number;
+  search?: string;
+  lowStockOnly?: boolean;
+  outOfStockOnly?: boolean;
+}
+
+/** What a CSV export actually produced, so the browser can say so rather than guessing. */
+export interface SalesExportResult {
+  fileName: string;
+  rowCount: number;
+  /** The server's cap. A file with exactly this many rows may have been cut short. */
+  rowLimit: number;
+  text: string;
 }
 
 /** A listing in the moderation queue, with the notes a reviewer needs to decide. */

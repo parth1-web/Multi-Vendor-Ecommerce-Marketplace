@@ -75,6 +75,10 @@ export function AdminRefunds() {
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.orders({})[0] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.platformInventory({})[0] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.reports() }),
+        // A refund returns money and reverses commission, so it moves the sales, seller and
+        // commission reports alike. It does not move the audit log's own queries, and it does not
+        // need the stock report unless the refund put units back, which this endpoint does.
       ]);
 
       push({

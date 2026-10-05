@@ -80,6 +80,9 @@ export function AdminOrders() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.orders({})[0] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.summary() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.reports() }),
+        // An order moving through its states changes what the sales, seller and commission reports
+        // count. The stock report is untouched by a status change.
       ]);
     },
     onError: error => setActionError(errorMessage(error)),
