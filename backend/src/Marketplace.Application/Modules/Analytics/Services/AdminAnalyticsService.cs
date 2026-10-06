@@ -73,7 +73,6 @@ public sealed class AdminAnalyticsService(
             decimal.Round(refunded, 2),
             totalRevenue <= 0m ? 0m : decimal.Round(refunded / totalRevenue * 100m, 2),
             totalOrders == 0 ? 0m : decimal.Round(totalRevenue / totalOrders, 2),
-            0m,
             await users.Query().AsNoTracking().CountAsync(u => u.Role == UserRole.Customer && u.CreatedAt >= monthStart, cancellationToken).ConfigureAwait(false),
             await sellers.Query().AsNoTracking().CountAsync(s => s.AppliedAt >= monthStart, cancellationToken).ConfigureAwait(false),
             await orders.Query().AsNoTracking().CountAsync(o => o.PlacedAt >= today, cancellationToken).ConfigureAwait(false),

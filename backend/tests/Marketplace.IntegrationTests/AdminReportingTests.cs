@@ -626,6 +626,28 @@ public sealed class AdminReportingTests : IClassFixture<MarketplaceApiFactory>, 
         after!.TotalCount.Should().Be(between!.TotalCount, "nothing changed, so nothing was written");
     }
 
+    [Fact]
+    public async Task Neither_summary_offers_a_conversion_rate_because_there_is_nothing_to_convert()
+    {
+        var (admin, _) = await AuthHelper.SignInAsync(
+            _factory, MarketplaceTestData.AdminEmail, MarketplaceTestData.AdminPassword);
+
+        // Both summaries used to carry a conversion rate the service returned as a hard-coded zero,
+        // and the seller's dashboard printed it. A field that is always 0.0% measures nothing, so
+        // it is gone rather than rendered as a real figure. This fails if it ever comes back.
+        var adminSummary = await ApiClient.ReadTextAsync(await admin.Http.GetAsync("/api/admin/analytics/summary"));
+        adminSummary.ToLowerInvariant().Should().NotContain("conversionrate");
+
+        var (seller, _) = await AuthHelper.SignInAsync(
+            _factory, MarketplaceTestData.SellerEmail, MarketplaceTestData.SellerPassword);
+        var sellerSummary = await ApiClient.ReadTextAsync(await seller.Http.GetAsync("/api/seller/analytics/summary"));
+        sellerSummary.ToLowerInvariant().Should().NotContain("conversionrate");
+
+        // The figures that *are* there must still be real.
+        adminSummary.Should().Contain("averageOrderValue");
+        sellerSummary.Should().Contain("averageOrderValue");
+    }
+
     /* ================================================================ who may read any of it */
 
     [Fact]

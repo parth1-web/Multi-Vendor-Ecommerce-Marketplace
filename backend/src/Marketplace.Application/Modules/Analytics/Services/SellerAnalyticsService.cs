@@ -114,7 +114,6 @@ public sealed class SellerAnalyticsService(
             rating?.Count ?? 0,
             unanswered,
             totalOrders == 0 ? 0m : decimal.Round(totalSales / totalOrders, 2),
-            0m,
             lastOrder);
     }
 
@@ -289,7 +288,7 @@ public sealed class SellerAnalyticsService(
     }
 
     private static SellerSummaryResponse EmptySummary() =>
-        new(0m, 0m, 0m, 0m, 0m, 0m, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0m, 0, 0, 0m, 0m, null);
+        new(0m, 0m, 0m, 0m, 0m, 0m, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0m, 0, 0, 0m, null);
     internal static IReadOnlyList<RevenuePointResponse> Bucket(
         DateTimeRange range,
         IEnumerable<(DateTimeOffset At, decimal Revenue, decimal Commission, decimal Net, int Items)> rows)

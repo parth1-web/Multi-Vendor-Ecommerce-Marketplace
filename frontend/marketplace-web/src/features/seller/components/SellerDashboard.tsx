@@ -188,9 +188,6 @@ export function SellerDashboard() {
                 Average order <strong style={{ color: "var(--text)" }}>{formatCurrency(data.averageOrderValue)}</strong>
               </span>
               <span>
-                Conversion <strong style={{ color: "var(--text)" }}>{data.conversionRate.toFixed(1)}%</strong>
-              </span>
-              <span>
                 Rating <strong style={{ color: "var(--text)" }}>{data.averageRating.toFixed(1)}</strong> ({data.reviewCount})
               </span>
             </div>

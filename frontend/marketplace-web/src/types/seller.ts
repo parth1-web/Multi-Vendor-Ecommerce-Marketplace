@@ -67,7 +67,6 @@ export interface SellerSummary {
   reviewCount: number;
   unansweredReviews: number;
   averageOrderValue: number;
-  conversionRate: number;
   lastOrderAt: string | null;
 }
 

@@ -23,7 +23,6 @@ export interface AdminSummary {
   refundedAmount: number;
   refundRate: number;
   averageOrderValue: number;
-  conversionRate: number;
   newCustomersThisMonth: number;
   newSellersThisMonth: number;
   ordersToday: number;

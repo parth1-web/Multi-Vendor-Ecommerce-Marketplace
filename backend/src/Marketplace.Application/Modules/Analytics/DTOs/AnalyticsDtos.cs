@@ -21,10 +21,9 @@ public sealed record SellerSummaryResponse(
     int LowStockProducts,
     int OutOfStockProducts,
     decimal AverageRating,
-    int ReviewCount,
+int ReviewCount,
     int UnansweredReviews,
     decimal AverageOrderValue,
-    decimal ConversionRate,
     DateTimeOffset? LastOrderAt);
 
 public sealed record RevenuePointResponse(DateTimeOffset Period, decimal Revenue, decimal Commission, decimal NetEarnings, int OrderCount, int ItemCount);
@@ -51,9 +50,8 @@ public sealed record AdminSummaryResponse(
     decimal CommissionRevenue,
     decimal SellerPayouts,
     decimal RefundedAmount,
-    decimal RefundRate,
+decimal RefundRate,
     decimal AverageOrderValue,
-    decimal ConversionRate,
     int NewCustomersThisMonth,
     int NewSellersThisMonth,
     int OrdersToday,

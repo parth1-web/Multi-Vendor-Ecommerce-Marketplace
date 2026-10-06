@@ -200,9 +200,10 @@ export function AdminOverview() {
               <Row label="Products" value={data.totalProducts} hint={`${data.publishedProducts} live`} />
               <Row label="Orders" value={data.totalOrders} hint={`${formatCurrency(data.averageOrderValue)} average`} />
               {/*
-                Refund volume, from the API's own refund analytics for the chosen period. The
-                summary's `conversionRate` is deliberately not shown: the service returns a hard-coded
-                zero for it, and a rate that is always 0.0% is worse than no rate at all.
+                Refund volume, from the API's own refund analytics for the chosen period. There is
+                no conversion rate here, and there is not one to add later without traffic data:
+                the summary used to carry a `conversionRate` that the service returned as a
+                hard-coded zero, and a field that is always 0.0% is a measurement of nothing.
               */}
               <Row
                 label="Refunds"
