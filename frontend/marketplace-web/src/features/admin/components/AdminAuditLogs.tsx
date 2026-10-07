@@ -33,7 +33,7 @@ import { Pagination } from "@/components/navigation/Pagination";
 import { adminApi } from "@/features/admin/api/adminApi";
 import { cx, formatDateTime, formatNumber } from "@/lib/format";
 import { queryKeys } from "@/lib/queryKeys";
-import { AUDIT_ACTIONS, type AuditActionName, type AuditEntry } from "@/types/admin";
+import { AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, type AuditActionName, type AuditEntry } from "@/types/admin";
 
 const BASE_PATH = "/admin/audit-logs";
 const PAGE_SIZE = 25;
@@ -46,6 +46,7 @@ export function AdminAuditLogs() {
   const action = (searchParams.get("action") ?? "") as AuditActionName | "";
   const term = searchParams.get("search") ?? "";
   const entityId = searchParams.get("entityId") ?? "";
+  const entityType = searchParams.get("entityType") ?? "";
   const from = searchParams.get("from") ?? "";
   const to = searchParams.get("to") ?? "";
 
@@ -76,7 +77,7 @@ export function AdminAuditLogs() {
     router.replace(query ? `${BASE_PATH}?${query}` : BASE_PATH, { scroll: false });
   };
 
-  const filters = { page, action, search: searchKey, entityId, from, to };
+  const filters = { page, action, search: searchKey, entityId, entityType, from, to };
 
   const logs = useQuery({
     queryKey: queryKeys.admin.auditLogs(filters),
@@ -87,6 +88,7 @@ export function AdminAuditLogs() {
         action: action || undefined,
         search: searchKey || undefined,
         entityId: entityId || undefined,
+        entityType: entityType || undefined,
         from: from ? startOfDay(from) : undefined,
         to: to ? endOfDay(to) : undefined,
       }),
@@ -99,7 +101,7 @@ export function AdminAuditLogs() {
     router.replace(BASE_PATH, { scroll: false });
   };
 
-  const filtered = Boolean(action || searchKey || entityId || from || to);
+  const filtered = Boolean(action || searchKey || entityId || entityType || from || to);
 
   return (
     <div className="mp-stack">
@@ -141,7 +143,31 @@ export function AdminAuditLogs() {
               onChange={event => navigate({ action: event.target.value || undefined })}
             >
               <option value="">Every action</option>
-              {AUDIT_ACTIONS.map(value => (
+{AUDIT_ACTIONS.map(value => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/*
+            What was acted on, as opposed to what was done. Useful on its own — "everything ever
+            done to a refund" is the question behind a support conversation — and it composes with
+            the action filter, so "any action against a Payment" is one click rather than a search.
+          */}
+          <div className="col-12 col-sm-6 col-md-3">
+            <label htmlFor="audit-entity-type" className="mp-metric-label">
+              Target type
+            </label>
+            <select
+              id="audit-entity-type"
+              className="form-select form-select-sm"
+              value={entityType}
+              onChange={event => navigate({ entityType: event.target.value || undefined })}
+            >
+              <option value="">Every target</option>
+              {AUDIT_ENTITY_TYPES.map(value => (
                 <option key={value} value={value}>
                   {value}
                 </option>
@@ -245,7 +271,7 @@ export function AdminAuditLogs() {
         <Pagination
           page={logs.data.page}
           totalPages={logs.data.totalPages}
-          query={{ action, search: searchKey, entityId, from, to }}
+          query={{ action, search: searchKey, entityId, entityType, from, to }}
           basePath={BASE_PATH}
         />
       ) : null}

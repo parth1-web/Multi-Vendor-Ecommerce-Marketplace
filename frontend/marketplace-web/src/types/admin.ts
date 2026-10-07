@@ -147,22 +147,37 @@ export const AUDIT_ACTIONS = [
 
 export type AuditActionName = (typeof AUDIT_ACTIONS)[number];
 
-/** The entity types the audit rows in this codebase carry, for the target column's wording. */
+/**
+ * The entity types the audit log actually carries, as the services write them.
+ *
+ * A transcription of `nameof(...)` arguments at the `RecordAsync` call sites, not a taxonomy. The
+ * filter sends one of these to `GET /api/admin/audit-logs?entityType=`, which compares the string
+ * for equality — so a name that is not in this list is a filter that returns nothing and looks
+ * broken, and a name that is in the list but never written is a filter that always returns nothing.
+ *
+ * `OrderEntity` is the real value, not a typo: the audit call sits in a file that aliases the order
+ * entity as `OrderEntity`, and `nameof` records whatever identifier was written. Rows already in the
+ * log say `OrderEntity`, so it stays — changing it now would only make the older half of the log
+ * unfilterable.
+ *
+ * Adding a name here creates no events; only a service writing one does. Omitting one hides the
+ * events that do exist.
+ */
 export const AUDIT_ENTITY_TYPES = [
-  "User",
+  "Category",
+  "Coupon",
+  "Inventory",
+  "OrderEntity",
+  "Payment",
+  "PaymentWebhook",
+  "Product",
+  "RefreshToken",
+  "Refund",
+  "Review",
   "Seller",
   "SellerOrder",
-  "Store",
-  "Category",
-  "Product",
-  "Inventory",
-  "Order",
-  "Payment",
-  "Refund",
-  "Commission",
-  "Payout",
-  "Review",
-  "Coupon",
+  "SellerStore",
+  "User",
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
