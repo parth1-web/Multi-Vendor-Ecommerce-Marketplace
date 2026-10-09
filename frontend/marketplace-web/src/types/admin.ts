@@ -283,6 +283,7 @@ export interface InventoryReportQuery {
   search?: string;
   lowStockOnly?: boolean;
   outOfStockOnly?: boolean;
+  sellerId?: string;
 }
 
 /** What a CSV export actually produced, so the browser can say so rather than guessing. */

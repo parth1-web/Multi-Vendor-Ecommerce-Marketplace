@@ -119,6 +119,7 @@ export function AdminReports() {
           term={searchParams.get("search") ?? ""}
           lowStock={searchParams.get("lowStock") === "1"}
           outOfStock={searchParams.get("outOfStock") === "1"}
+          sellerId={searchParams.get("sellerId") ?? ""}
           page={pageOf(searchParams)}
         />
       ) : null}
@@ -557,19 +558,30 @@ function InventoryReport({
   term,
   lowStock,
   outOfStock,
+  sellerId,
   page,
 }: {
   onChange: (changes: Record<string, string | undefined>) => void;
   term: string;
   lowStock: boolean;
   outOfStock: boolean;
+  sellerId: string;
   page: number;
 }) {
   const [search, setSearch] = useState(term);
-  const filtered = term !== "" || lowStock || outOfStock;
+  const filtered = term !== "" || lowStock || outOfStock || sellerId !== "";
+
+  // The seller list for the dropdown. Fetched only while this report is on screen, at the page
+  // size ceiling, because a select that silently lists the first twenty stores would quietly hide
+  // every seller after them.
+  const sellers = useQuery({
+    queryKey: queryKeys.admin.sellers({ page: 1, pageSize: 100 }),
+    queryFn: () => adminApi.sellers({ page: 1, pageSize: 100 }),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const report = useQuery({
-    queryKey: queryKeys.admin.inventoryReport({ page, term, lowStock, outOfStock }),
+    queryKey: queryKeys.admin.inventoryReport({ page, term, lowStock, outOfStock, sellerId }),
     queryFn: () =>
       adminApi.inventoryReport({
         page,
@@ -577,6 +589,7 @@ function InventoryReport({
         search: term || undefined,
         lowStockOnly: lowStock,
         outOfStockOnly: outOfStock,
+        sellerId: sellerId || undefined,
       }),
   });
 
@@ -599,7 +612,7 @@ function InventoryReport({
         }}
       >
         <div className="row g-2 align-items-end">
-          <div className="col-12 col-sm-6 col-md-6">
+          <div className="col-12 col-sm-6 col-md-4">
             <label htmlFor="inventory-report-search" className="mp-metric-label">
               Search stock
             </label>
@@ -615,7 +628,32 @@ function InventoryReport({
             />
           </div>
 
-          <div className="col-12 col-sm-6 col-md-6 d-flex flex-wrap align-items-center" style={{ gap: "0.5rem" }}>
+          {/*
+            The report has always been able to answer "what does this one store hold", because the
+            route takes a seller; nothing could ask it until now. Search already matches a store
+            name, but it is a substring match over every row, so a dropdown is the honest way to say
+            "only this seller".
+          */}
+          <div className="col-12 col-sm-6 col-md-4">
+            <label htmlFor="inventory-report-seller" className="mp-metric-label">
+              Store
+            </label>
+            <select
+              id="inventory-report-seller"
+              className="form-select form-select-sm"
+              value={sellerId}
+              onChange={event => onChange({ sellerId: event.target.value || undefined })}
+            >
+              <option value="">Every store</option>
+              {sellers.data?.items.map(seller => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.businessName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="col-12 col-sm-6 col-md-4 d-flex flex-wrap align-items-center" style={{ gap: "0.5rem" }}>
             <div className="form-check form-switch mb-0">
               <input
                 id="inventory-low-stock"
@@ -646,7 +684,7 @@ function InventoryReport({
                 className="btn btn-sm btn-outline-secondary"
                 onClick={() => {
                   setSearch("");
-                  onChange({ search: undefined, lowStock: undefined, outOfStock: undefined });
+                  onChange({ search: undefined, lowStock: undefined, outOfStock: undefined, sellerId: undefined });
                 }}
               >
                 Clear
@@ -671,7 +709,7 @@ function InventoryReport({
                 className="btn btn-sm btn-primary"
                 onClick={() => {
                   setSearch("");
-                  onChange({ search: undefined, lowStock: undefined, outOfStock: undefined });
+                  onChange({ search: undefined, lowStock: undefined, outOfStock: undefined, sellerId: undefined });
                 }}
               >
                 Show every variant
@@ -743,7 +781,7 @@ function InventoryReport({
           <Pagination
             page={report.data.page}
             totalPages={report.data.totalPages}
-            query={{ search: term, lowStock: lowStock ? "1" : "", outOfStock: outOfStock ? "1" : "" }}
+            query={{ search: term, lowStock: lowStock ? "1" : "", outOfStock: outOfStock ? "1" : "", sellerId }}
             basePath={BASE_PATH}
           />
 

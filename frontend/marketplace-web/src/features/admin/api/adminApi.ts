@@ -231,13 +231,18 @@ sellerReport: (params: SellerReportQuery) => {
  *
  * `lowStockOnly` means sellable quantity at or below the variant's own threshold — the same
  * definition the seller inventory screen uses — and `outOfStockOnly` means no available quantity.
- * `search` matches the product name, the SKU or the store, case-insensitively.
+ * `search` matches the product name, the SKU or the store, case-insensitively. `sellerId`
+ * narrows to one store.
  */
 inventoryReport: (params: InventoryReportQuery) => {
   const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
 
   if (params.search) {
     search.set("search", params.search);
+  }
+
+  if (params.sellerId) {
+    search.set("sellerId", params.sellerId);
   }
 
   if (params.lowStockOnly) {
