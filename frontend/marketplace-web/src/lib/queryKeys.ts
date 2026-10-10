@@ -118,6 +118,11 @@ seller: {
     inventoryLists: () => [...queryKeys.seller.all, "inventory-lists"] as const,
     inventory: (params: unknown) => [...queryKeys.seller.inventoryLists(), params] as const,
     inventoryTransactions: (variantId: string) => [...queryKeys.seller.all, "inventory-transactions", variantId] as const,
+    /**
+     * The seller's stock report, keyed on its filters so two different low-stock selections are
+     * not the same cache entry.
+     */
+    inventoryReport: (params: unknown) => [...queryKeys.seller.all, "inventory-report", params] as const,
     reviews: (params: unknown) => [...queryKeys.seller.all, "reviews", params] as const,
     summary: () => [...queryKeys.seller.all, "summary"] as const,
     revenue: (range: string) => [...queryKeys.seller.all, "revenue", range] as const,

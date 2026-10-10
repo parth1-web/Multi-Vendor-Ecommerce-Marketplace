@@ -1,6 +1,8 @@
 /** Seller dashboard endpoints. The only module that touches these paths. */
 
 import { apiClient } from "@/api/axiosClient";
+import type { InventoryReportRow } from "@/types/admin";
+import type { PagedResult } from "@/types/api";
 import type {
   AdjustStockRequest,
   CategorySales,
@@ -147,6 +149,43 @@ export const sellerApi = {
    * `/api/inventory/low-stock` route, but it answers with a bare array capped at 100 rows rather
    * than a page, so reading it as a page is how a filtered stock list ends up throwing.
    */
+  /**
+   * The seller's own stock, as a report.
+   *
+   * `/api/seller/reports/inventory`, not `/api/inventory`: that route is the operational list a
+   * seller works from, and this one is the same rows read for looking rather than acting — with a
+   * total across every variant instead of a working set.
+   *
+   * The response is the admin inventory report's shape, so the two screens cannot drift apart on
+   * what "low stock" means or how a page is cut. There is deliberately no seller parameter to send:
+   * the server takes the identity from the caller's token, and a seller cannot widen this by
+   * editing a URL.
+   */
+  inventoryReport: (params: {
+    page: number;
+    pageSize?: number;
+    search?: string;
+    lowStockOnly?: boolean;
+    outOfStockOnly?: boolean;
+  }) => {
+    const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize ?? 20) });
+
+    if (params.search) {
+      search.set("search", params.search);
+    }
+
+    if (params.lowStockOnly) {
+      search.set("lowStockOnly", "true");
+    }
+
+    if (params.outOfStockOnly) {
+      search.set("outOfStockOnly", "true");
+    }
+
+    return apiClient
+      .get<PagedResult<InventoryReportRow>>(`/api/seller/reports/inventory?${search.toString()}`)
+      .then(data => data.data);
+  },
   inventory: (params: {
     page: number;
     pageSize?: number;

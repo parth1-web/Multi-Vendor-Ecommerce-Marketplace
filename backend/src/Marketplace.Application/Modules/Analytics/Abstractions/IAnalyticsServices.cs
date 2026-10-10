@@ -73,8 +73,28 @@ public interface ICustomerAnalyticsService
 }
 
 /// <summary>
-/// The admin reports. Every read here is filtered, paged and aggregated by the database; none of
-/// them loads the underlying table to count or sort it in memory.
+/// Filters for the seller-facing inventory report.
+/// </summary>
+/// <remarks>
+/// Deliberately has no seller field. A seller reading this report gets their own stock and cannot
+/// ask for anybody else's, so the identity comes from the caller's principal rather than from a
+/// query string — the one thing that must never be client-supplied on this route.
+/// </remarks>
+/// <param name="Page">1-based page number.</param>
+/// <param name="PageSize">Rows per page, capped by <see cref="PageRequest"/>.</param>
+/// <param name="Search">Matches the product name or the variant SKU, case-insensitively.</param>
+/// <param name="LowStockOnly">Only variants whose sellable quantity is at or below their threshold.</param>
+/// <param name="OutOfStockOnly">Only variants with no available quantity.</param>
+public sealed record SellerInventoryReportQuery(
+    int? Page,
+    int? PageSize,
+    string? Search,
+    bool LowStockOnly,
+    bool OutOfStockOnly);
+
+/// <summary>
+/// The admin reporting endpoints. Every read here is filtered, paged and aggregated by the
+/// database; none of them loads the underlying table to count or sort it in memory.
 /// </summary>
 public interface IReportService
 {
@@ -108,6 +128,19 @@ public interface IReportService
     /// contract so that "unbounded" is never true of this endpoint again.
     /// </remarks>
     IAsyncEnumerable<SalesExportRow> StreamSalesAsync(DateTimeRange range, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// One seller's stock, for the seller themselves.
+    /// </summary>
+    /// <remarks>
+    /// The same rows, filters and ordering as <see cref="InventoryAsync"/>, narrowed to one seller —
+    /// and the seller is an argument, not something read from the query string, so a caller cannot
+    /// widen this by editing a URL.
+    /// </remarks>
+    Task<PagedResult<InventoryReportRowResponse>> SellerInventoryAsync(
+        Guid sellerId,
+        SellerInventoryReportQuery query,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The most rows one export will write. Beyond this the response is truncated and says so, in

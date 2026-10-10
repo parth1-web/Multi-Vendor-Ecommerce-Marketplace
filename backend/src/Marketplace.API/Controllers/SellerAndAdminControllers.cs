@@ -1,5 +1,8 @@
 using Marketplace.API.Middleware;
+using Marketplace.Application.Common.Interfaces;
 using Marketplace.Application.Common.Models;
+using Marketplace.Application.Modules.Analytics.Abstractions;
+using Marketplace.Application.Modules.Analytics.DTOs;
 using Marketplace.Application.Modules.Catalog.Abstractions;
 using Marketplace.Application.Modules.Catalog.DTOs;
 using Marketplace.Application.Modules.Coupons.Abstractions;
@@ -16,6 +19,52 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Marketplace.API.Controllers;
+
+/// <summary>
+/// A seller's own stock, as a report: paged, filtered, and ordered lowest-stock-first.
+/// </summary>
+/// <remarks>
+/// Distinct from <c>/api/inventory</c>, which is the operational screen a seller works from — this
+/// is the same rows read for looking rather than for acting, with a total across every variant
+/// rather than a working set.
+///
+/// <para>
+/// Ownership comes from the caller's principal and from nowhere else. There is deliberately no
+/// seller parameter on this route: a seller who sends one cannot widen the result, because there
+/// is nothing to read. An administrator has no route here at all — the platform-wide view, which
+/// can select a seller, is <c>/api/admin/reports/inventory</c> behind the administrator policy.
+/// </para>
+/// </remarks>
+[ApiController]
+[Route("api/seller/reports/inventory")]
+[Authorize(Policy = Security.AuthorizationPolicies.SellerOnly)]
+public sealed class SellerInventoryReportController(IReportService reports, ICurrentUser currentUser) : ControllerBase
+{
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResult<InventoryReportRowResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> List(
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery] string? search,
+        [FromQuery] bool? lowStockOnly,
+        [FromQuery] bool? outOfStockOnly,
+        CancellationToken cancellationToken)
+    {
+        // SellerOnly admits any account with the seller role; the seller record it points at is the
+        // thing that scopes the rows, and an account carrying the role without one is refused rather
+        // than shown everything.
+        if (currentUser.SellerId is not { } sellerId)
+        {
+            return Forbid();
+        }
+
+        return Ok(await reports.SellerInventoryAsync(
+            sellerId,
+            new SellerInventoryReportQuery(page, pageSize, search, lowStockOnly ?? false, outOfStockOnly ?? false),
+            cancellationToken));
+    }
+}
 
 /// <summary>Seller product management. Ownership is enforced in the service layer.</summary>
 [ApiController]

@@ -24,6 +24,28 @@ namespace Marketplace.Application.Modules.Analytics.Services;
 /// a report of March is still correct after next month's tax rate changes or a coupon is edited.
 /// Nothing here recomputes a historical figure from current configuration, and nothing here sums a
 /// whole table to paginate it — every list is filtered, counted and sliced by the database.
+///
+/// <para><b>There is no profit or margin report, and there cannot honestly be one yet.</b></para>
+///
+/// Every figure available here is a revenue figure. The system persists what a customer paid
+/// (<c>Order.Subtotal</c>, <c>DiscountAmount</c>, <c>ShippingAmount</c>, <c>TaxAmount</c>,
+/// <c>TotalAmount</c>, <c>RefundedAmount</c>), what the marketplace kept
+/// (<c>SellerOrder.CommissionAmount</c>) and what the seller earned (<c>SellerOrder.SellerEarnings</c>).
+/// It persists **no cost of goods anywhere**: <c>Product</c> has a selling <c>BasePrice</c> and a
+/// <c>CompareAtPrice</c>, <c>ProductVariant</c> has a selling <c>Price</c>, and <c>OrderItem</c>
+/// snapshots <c>UnitPrice</c> and <c>LineTotal</c> — all revenue-side, none of them what the seller
+/// paid for the unit. No cost column exists on any entity, and none exists in any migration.
+///
+/// Gross profit is revenue minus cost, so with no cost recorded there is no gross profit, no margin
+/// and no contribution figure to report. Subtracting today's product price from a historical order
+/// would be inventing cost data: a seller's cost changes when they renegotiate with a supplier, and
+/// an order placed last March was costed at last March's price, which no longer exists anywhere.
+///
+/// Adding it safely is possible but is a larger change than a report: a nullable cost on
+/// <c>ProductVariant</c>, captured onto <c>OrderItem</c> at checkout, populated by seller input that
+/// does not exist yet, and a report that reports coverage honestly because every order placed before
+/// that change has no recorded cost. That belongs in its own phase with the product authoring work it
+/// depends on.
 /// </remarks>
 public sealed class ReportService(
     IRepository<OrderEntity> orders,
@@ -306,13 +328,41 @@ public sealed class ReportService(
         return new PagedResult<InventoryReportRowResponse>(hydrated, page.Page, page.PageSize, total);
     }
 
+/// <summary>
+    /// One seller's stock, for the seller themselves.
+    /// </summary>
+    /// <remarks>
+    /// Delegates to the same implementation the admin report uses and then pins the seller, so the
+    /// filters, the ordering and the total cannot drift between the two screens. The seller id is
+    /// supplied by the caller of *this method* from the authenticated principal; the controller
+    /// never reads it from a request.
+    /// </remarks>
+    public Task<PagedResult<InventoryReportRowResponse>> SellerInventoryAsync(
+        Guid sellerId,
+        SellerInventoryReportQuery query,
+        CancellationToken cancellationToken = default) =>
+        InventoryAsync(
+            new InventoryReportQuery(query.Page, query.PageSize, query.Search, query.LowStockOnly, query.OutOfStockOnly, sellerId),
+            cancellationToken);
+
     /// <summary>
     /// Commission earned per seller in the window, ranked by amount.
     /// </summary>
     /// <remarks>
-    /// The payout columns are scoped the same way as the rest: completed payouts <i>created</i>
-    /// within the window. A payout record carries the period it was raised for, so that is the only
-    /// period question about it that the data can answer without guessing.
+    /// Payout columns are scoped by the period the payout <i>covers</i>, not by when the row was
+    /// written. A payout records the window of commission accrual it settles — the job selects
+    /// commissions where <c>CreatedAt &gt;= periodStart &amp;&amp; CreatedAt &lt; periodEnd</c> — and it
+    /// is created afterwards, when the job next runs. Filtering on the row's own creation date
+    /// therefore answers "when did we pay", which is not a reporting question.
+    ///
+    /// A payout whose period straddles a reporting boundary is assigned to the window containing
+    /// its <c>PeriodEnd</c>. That counts every payout exactly once — an overlap rule would count a
+    /// February payout in both January and February, and full containment would hide it from both —
+    /// and it matches how the payout is described: it settles up to the moment its period ends.
+    ///
+    /// Only completed payouts count. A pending, processing, failed or cancelled payout is not money
+    /// that has moved, and the commission columns above still show what was earned for the period
+    /// regardless of whether it has been paid out yet.
     /// </remarks>
     public async Task<IReadOnlyList<CommissionReportRowResponse>> CommissionsAsync(DateTimeRange range, CancellationToken cancellationToken = default)
     {
@@ -339,8 +389,8 @@ public sealed class ReportService(
         var payoutRows = await payouts.Query().AsNoTracking()
             .Where(p => sellerIds.Contains(p.SellerId)
                 && p.Status == PayoutStatus.Completed
-                && p.CreatedAt >= range.From
-                && p.CreatedAt <= range.To)
+                && p.PeriodEnd > range.From
+                && p.PeriodEnd <= range.To)
             .GroupBy(p => p.SellerId)
             .Select(g => new { SellerId = g.Key, Payouts = g.Count(), Paid = g.Sum(p => p.NetAmount) })
             .ToListAsync(cancellationToken)

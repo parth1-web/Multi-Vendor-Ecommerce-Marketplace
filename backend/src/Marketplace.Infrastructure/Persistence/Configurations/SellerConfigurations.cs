@@ -82,7 +82,12 @@ public sealed class SellerPayoutConfiguration : IEntityTypeConfiguration<SellerP
         builder.Property(p => p.TransactionReference).HasColumnType("varchar(128)");
 
         builder.HasIndex(p => p.Reference).IsUnique().HasDatabaseName("ux_seller_payouts_reference");
-        builder.HasIndex(p => new { p.SellerId, p.Status }).HasDatabaseName("ix_seller_payouts_seller_status");
+    builder.HasIndex(p => new { p.SellerId, p.Status }).HasDatabaseName("ix_seller_payouts_seller_status");
+
+    // The commission report groups completed payouts by the end of the period they cover, across
+    // every seller at once. The index above is led by SellerId and so cannot narrow that range; this
+    // one is the one the report's WHERE clause actually uses.
+    builder.HasIndex(p => p.PeriodEnd).HasDatabaseName("ix_seller_payouts_period_end");
 
         builder.HasOne<Seller>()
             .WithMany()

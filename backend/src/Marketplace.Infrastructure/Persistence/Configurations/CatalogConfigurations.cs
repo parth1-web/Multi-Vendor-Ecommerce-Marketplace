@@ -57,7 +57,17 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(p => new { p.CategoryId, p.Status, p.CreatedAt }).HasDatabaseName("ix_products_category_status");
         builder.HasIndex(p => p.BasePrice).HasDatabaseName("ix_products_price");
         builder.HasIndex(p => p.IsFeatured).HasDatabaseName("ix_products_featured");
-        builder.HasIndex(p => p.RatingAverage).HasDatabaseName("ix_products_rating");
+    builder.HasIndex(p => p.RatingAverage).HasDatabaseName("ix_products_rating");
+
+    // "Popular" is one of the product list's own sort orders and orders by SoldCount then
+    // ViewCount. Nothing else here covers that pair, so the sort is a sort over every matching
+    // row rather than an ordered walk of an index.
+    builder.HasIndex(p => new { p.SoldCount, p.ViewCount }).HasDatabaseName("ix_products_popularity");
+
+    // Name is the other supported sort with no index behind it. A plain B-tree cannot help the
+    // substring search (a leading wildcard is a sequential scan whatever is indexed), but it does
+    // serve the ORDER BY, which is why this is here and a trigram index is not.
+    builder.HasIndex(p => p.Name).HasDatabaseName("ix_products_name");
 
         builder.Ignore(p => p.Slug);
         builder.Ignore(p => p.DiscountPercentage);

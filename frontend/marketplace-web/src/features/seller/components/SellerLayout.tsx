@@ -20,6 +20,7 @@ import { useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Boxes,
+  ClipboardList,
   ChevronRight,
   LayoutDashboard,
   LogOut,
@@ -44,6 +45,7 @@ const WORKSPACE_LINKS = [
   { href: "/seller/products", label: "Products", icon: Package },
   { href: "/seller/orders", label: "Orders", icon: ShoppingBag },
   { href: "/seller/inventory", label: "Stock", icon: Boxes },
+  { href: "/seller/reports/inventory", label: "Stock report", icon: ClipboardList },
   { href: "/seller/coupons", label: "Coupons", icon: TicketPercent },
   { href: "/seller/reviews", label: "Reviews", icon: MessageSquareQuote },
   { href: "/seller/earnings", label: "Earnings", icon: Wallet },
